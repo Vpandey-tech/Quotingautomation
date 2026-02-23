@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AccuDesign Quoting Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@300;400;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <meta name="description"
+    content="Instantaneous, accurate manufacturing quotes from STEP files — powered by OCCT WebAssembly." />
+
+  <!--
+    occt-import-js MUST be loaded as a classic browser script — NOT via Vite's
+    module bundler. Vite's CJS→ESM transform breaks the Emscripten runtime's
+    internal scope (wasmMemory, function table, etc.), causing:
+      "Import #52 'a' '_': function import requires a callable"
+
+    Both occt-import-js.js AND occt-import-js.wasm must be served from /public/
+    so the Emscripten locateFile callback can resolve the .wasm path correctly.
+
+    To set up:
+      copy node_modules\occt-import-js\dist\occt-import-js.js public\
+      (occt-import-js.wasm is already in /public/)
+
+    This matches the official occt-import-js browser example exactly.
+  -->
+  <script src="/occt-import-js.js"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
+</html>

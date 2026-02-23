@@ -1,0 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    /* Prevent body scroll — layout is fixed */
+  }
+
+  /* Monospace font for metrics/code */
+  .font-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  /* ── SIDEBAR SCROLL ISOLATION ─────────────────────────────────────────────
+     The single most reliable way to stop OrbitControls from catching scroll
+     events that originate in the sidebar:
+       1. The <aside> uses position:relative and has its own scroll container
+       2. The 3D canvas section gets pointer-events:none when sidebar is hovered
+          (we do this in JS with the sidebar's onMouseEnter/onMouseLeave)
+       3. CSS overscroll-behavior:contain stops scroll chaining at page level
+  */
+  .sidebar-scroll-container {
+    /* Own scroll context — completely isolated */
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    /* Firefox thin scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: #1e3448 transparent;
+    /* Prevent this element's scroll from propagating upward */
+    isolation: isolate;
+  }
+
+  .sidebar-scroll-container::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .sidebar-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .sidebar-scroll-container::-webkit-scrollbar-thumb {
+    background: #1e3448;
+    border-radius: 4px;
+  }
+
+  .sidebar-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: #22d3ee44;
+  }
+
+  /* When sidebar is active (pointer inside), block pointer events on canvas */
+  .viewer-section.pointer-blocked {
+    pointer-events: none !important;
+  }
+
+  /* ─── Global dark scrollbar ─────────────────────────────────────────────── */
+  ::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #0a0f1a;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #1e2a3a;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2a3a4e;
+  }
+}
+
+@layer utilities {
+
+  /* Glow text utility */
+  .glow-cyan {
+    text-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+  }
+
+  /* Glass card */
+  .glass-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  /* Sidebar gradient background */
+  .sidebar-bg {
+    background: linear-gradient(180deg, rgba(13, 17, 23, 0.95) 0%, rgba(8, 12, 20, 0.98) 100%);
+  }
+
+  /* Animated gradient border */
+  .glow-border-cyan {
+    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.2), 0 0 20px rgba(34, 211, 238, 0.08);
+  }
+
+  /* Button hover lift */
+  .btn-lift {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .btn-lift:hover {
+    transform: translateY(-1px);
+  }
+
+  .btn-lift:active {
+    transform: translateY(0);
+  }
+}
