@@ -6,7 +6,7 @@ import Scene from './Scene';
 import { parseStepFile } from '../../lib/occt';
 import { computeMetrics } from '../../lib/metrics';
 
-const API = 'http://localhost:8000/api';
+const API = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:8000/api';
 
 /**
  * AccuDesign Viewer — Phase 4

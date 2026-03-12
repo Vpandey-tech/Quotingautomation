@@ -20,8 +20,9 @@ Run:
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.background import BackgroundTasks
+from fastapi.staticfiles import StaticFiles
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -437,3 +438,36 @@ def _analyze_with_cadquery(path: str, original_name: str) -> dict:
         "complexity":  {"score": round(score, 1), "tier": tier,
                         "faces": n_faces, "edges": n_edges, "holes": n_holes},
     }
+
+# ── STATIC ASSETS (For Production/Render) ────────────────────────────────────
+# We serve the compiled React SPA from the "dist" folder.
+import posixpath
+
+dist_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dist")
+
+if os.path.isdir(dist_path):
+    # Serve assets like JS/CSS
+    app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
+
+    # Serve files at root like vite.svg or favicon.ico if they exist
+    for root_file in os.listdir(dist_path):
+        fpath = os.path.join(dist_path, root_file)
+        if os.path.isfile(fpath) and root_file != "index.html":
+            # Quick static route for root-level files
+            pass # (Skipping manual root file mapping for brevity, Vite usually puts everything cleanly in /assets)
+
+    # Catch-all Route: serve index.html for all non-API paths so React Router works natively
+    @app.get("/{full_path:path}")
+    async def serve_react_app(full_path: str):
+        # Don't intercept API calls
+        if full_path.startswith("api/"):
+            raise HTTPException(404, "API endpoint not found")
+        
+        # If looking for a static root file that might exist
+        potential_file = os.path.join(dist_path, full_path)
+        if os.path.isfile(potential_file):
+            return FileResponse(potential_file)
+
+        # Fallback to index.html for React SPA
+        return FileResponse(os.path.join(dist_path, "index.html"))
+
