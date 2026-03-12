@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import {
-    DollarSign, Wrench, ChevronDown,
-    RefreshCw, AlertCircle, CheckCircle, Zap, FileText
+    Wrench, ChevronDown,
+    RefreshCw, AlertCircle, CheckCircle, Zap, FileText,
+    User, Building, IndianRupee
 } from 'lucide-react';
 
 const API = 'http://localhost:8000/api';
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
-const fmt = (n, dec = 2) =>
+const fmt = (n, dec = 0) =>
     typeof n === 'number'
-        ? n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec })
+        ? n.toLocaleString('en-IN', { minimumFractionDigits: dec, maximumFractionDigits: dec })
         : '—';
 
 /* ─── LineItem row ───────────────────────────────────────────────────────── */
@@ -56,32 +57,71 @@ function Select({ label, value, onChange, options, disabled }) {
     );
 }
 
+/* ─── Text Input ─────────────────────────────────────────────────────────── */
+function TextInput({ label, value, onChange, placeholder, icon: Icon }) {
+    return (
+        <div className="space-y-1">
+            <label className="text-[10px] text-gray-500 uppercase tracking-widest">{label}</label>
+            <div className="relative">
+                {Icon && <Icon size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />}
+                <input
+                    type="text"
+                    value={value}
+                    onChange={e => onChange(e.target.value)}
+                    placeholder={placeholder}
+                    className={`w-full bg-gray-800/70 border border-gray-700/60 text-gray-200
+                        text-[11px] rounded-lg ${Icon ? 'pl-8' : 'px-3'} pr-3 py-2 focus:outline-none
+                        focus:border-cyan-500/50 font-mono placeholder:text-gray-700
+                        hover:border-gray-600 transition-colors`}
+                />
+            </div>
+        </div>
+    );
+}
+
 /* ─── Main component ─────────────────────────────────────────────────────── */
-export default function QuotePanel({ geometry, fileMetrics }) {
-    // ── Catalogue state ───────────────────────────────────────────────────────
+export default function QuotePanel({ geometry, fileMetrics, captureScreenshot }) {
+    // ── Catalogue state
     const [materials, setMaterials] = useState({});
     const [processes, setProcesses] = useState({});
     const [tolerances, setTolerances] = useState({});
     const [catLoading, setCatLoading] = useState(true);
 
-    // ── Pricing state ─────────────────────────────────────────────────────────
+    // ── Pricing state
     const [prices, setPrices] = useState(null);
     const [priceSource, setPriceSource] = useState('');
+    const [exchangeRate, setExchangeRate] = useState(null);
     const [priceLoading, setPriceLoading] = useState(false);
 
-    // ── Selection state ───────────────────────────────────────────────────────
+    // ── Selection state
     const [materialId, setMaterialId] = useState('aluminum_6061');
     const [processId, setProcessId] = useState('cnc_milling_3ax');
     const [toleranceId, setToleranceId] = useState('standard');
     const [quantity, setQuantity] = useState(1);
 
-    // ── Output state ──────────────────────────────────────────────────────────
+    // ── Client info
+    const [clientName, setClientName] = useState('');
+    const [clientCompany, setClientCompany] = useState('');
+
+    // ── Output state
     const [quote, setQuote] = useState(null);
     const [loading, setLoading] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
     const [error, setError] = useState('');
 
-    // ── Load catalogue + prices on mount ──────────────────────────────────────
+    // ── Auto-fill selections from PDF analysis if available
+    useEffect(() => {
+        if (fileMetrics?.source === 'pdf') {
+            if (fileMetrics.materialId) setMaterialId(fileMetrics.materialId);
+            if (fileMetrics.processId) setProcessId(fileMetrics.processId);
+            if (fileMetrics.toleranceId) setToleranceId(fileMetrics.toleranceId);
+            // Auto-fill client info extracted from PDF (admin can still edit)
+            if (fileMetrics.clientName) setClientName(fileMetrics.clientName);
+            if (fileMetrics.clientCompany) setClientCompany(fileMetrics.clientCompany);
+        }
+    }, [fileMetrics]);
+
+    // ── Load catalogue + prices on mount
     useEffect(() => {
         let cancelled = false;
         const loadAll = async () => {
@@ -93,29 +133,36 @@ export default function QuotePanel({ geometry, fileMetrics }) {
                     fetch(`${API}/tolerances`),
                 ]);
                 const [matData, procData, tolData] = await Promise.all([
-                    matRes.json(),
-                    procRes.json(),
-                    tolRes.json(),
+                    matRes.json(), procRes.json(), tolRes.json(),
                 ]);
                 if (cancelled) return;
                 setMaterials(matData);
                 setProcesses(procData);
                 setTolerances(tolData);
             } catch {
-                // Backend offline — populate hardcoded fallbacks so UI still works
                 if (cancelled) return;
                 setMaterials({
                     aluminum_6061: { name: 'Aluminum 6061' },
                     stainless_steel_304: { name: 'Stainless Steel 304' },
-                    mild_steel: { name: 'Mild Steel (AISI 1018)' },
+                    mild_steel: { name: 'Mild Steel (EN-8)' },
                     titanium_ti6al4v: { name: 'Titanium Ti-6Al-4V' },
                     copper: { name: 'Copper (C101)' },
+                    brass_360: { name: 'Brass (C360)' },
+                    inconel_718: { name: 'Inconel 718' },
+                    aluminum_7075: { name: 'Aluminum 7075-T6' },
+                    stainless_steel_316l: { name: 'SS 316L' },
+                    tool_steel_d2: { name: 'Tool Steel D2' },
+                    pla_plastic: { name: 'PLA (3D Print)' },
+                    abs_plastic: { name: 'ABS (3D Print)' },
                 });
                 setProcesses({
+                    cnc_turning: { name: 'CNC Turning' },
+                    cnc_milling_2ax: { name: 'CNC Milling (2-Axis)' },
                     cnc_milling_3ax: { name: 'CNC Milling (3-Axis)' },
                     cnc_milling_5ax: { name: 'CNC Milling (5-Axis)' },
-                    cnc_turning: { name: 'CNC Turning' },
                     fdm_3d_print: { name: '3D Printing (FDM)' },
+                    edm_wire: { name: 'EDM Wire Cutting' },
+                    laser_cutting: { name: 'Laser Cutting' },
                 });
                 setTolerances({
                     rough: { label: 'Rough (±1.0 mm)' },
@@ -139,8 +186,9 @@ export default function QuotePanel({ geometry, fileMetrics }) {
             const r = await fetch(`${API}/prices`);
             if (!r.ok) throw new Error('Price fetch failed');
             const d = await r.json();
-            setPrices(d.prices || {});
-            setPriceSource(d.source || 'fallback');
+            setPrices(d.prices_inr || {});
+            setPriceSource(d.price_source || 'fallback');
+            setExchangeRate(d.exchange_rate || null);
         } catch {
             setPriceSource('error');
         } finally {
@@ -148,10 +196,10 @@ export default function QuotePanel({ geometry, fileMetrics }) {
         }
     };
 
-    // ── Generate quote ────────────────────────────────────────────────────────
+    // ── Generate quote
     const generateQuote = async () => {
         if (!geometry) {
-            setError('Please upload a STEP file first.');
+            setError('Please upload a STEP file or PDF drawing first.');
             return;
         }
         setLoading(true);
@@ -159,6 +207,12 @@ export default function QuotePanel({ geometry, fileMetrics }) {
         setQuote(null);
         try {
             const qty = Math.max(1, Math.min(10000, parseInt(String(quantity), 10) || 1));
+
+            let screenshot = null;
+            if (captureScreenshot) {
+                try { screenshot = captureScreenshot(); } catch { }
+            }
+
             const resp = await fetch(`${API}/quote`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -168,6 +222,10 @@ export default function QuotePanel({ geometry, fileMetrics }) {
                     process_id: processId,
                     tolerance_id: toleranceId,
                     quantity: qty,
+                    client_name: clientName,
+                    client_company: clientCompany,
+                    source_filename: fileMetrics?.fileName || '',
+                    screenshot,
                 }),
             });
             if (!resp.ok) {
@@ -182,13 +240,19 @@ export default function QuotePanel({ geometry, fileMetrics }) {
         }
     };
 
-    // ── Download PDF ──────────────────────────────────────────────────────────
+    // ── Download PDF
     const downloadPdf = async () => {
         if (!geometry) return;
         setPdfLoading(true);
         setError('');
         try {
             const qty = Math.max(1, Math.min(10000, parseInt(String(quantity), 10) || 1));
+
+            let screenshot = null;
+            if (captureScreenshot) {
+                try { screenshot = captureScreenshot(); } catch { }
+            }
+
             const resp = await fetch(`${API}/quote/pdf`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -198,6 +262,10 @@ export default function QuotePanel({ geometry, fileMetrics }) {
                     process_id: processId,
                     tolerance_id: toleranceId,
                     quantity: qty,
+                    client_name: clientName,
+                    client_company: clientCompany,
+                    source_filename: fileMetrics?.fileName || '',
+                    screenshot,
                 }),
             });
             if (!resp.ok) {
@@ -220,12 +288,12 @@ export default function QuotePanel({ geometry, fileMetrics }) {
         }
     };
 
-    // ── Derived values ────────────────────────────────────────────────────────
+    // ── Derived values
     const matOptions = Object.entries(materials).map(([k, v]) => ({ value: k, label: v.name }));
     const procOptions = Object.entries(processes).map(([k, v]) => ({ value: k, label: v.name }));
     const tolOptions = Object.entries(tolerances).map(([k, v]) => ({ value: k, label: v.label }));
 
-    const livePriceKg = prices?.[materialId];
+    const livePriceInr = prices?.[materialId];
     const mat = materials[materialId];
 
     const sourceColor = {
@@ -245,15 +313,15 @@ export default function QuotePanel({ geometry, fileMetrics }) {
     return (
         <div className="space-y-4">
 
-            {/* ── Metal price banner ──────────────────────────────────────────── */}
+            {/* ── Metal price banner (INR) ─────────────────────────────────── */}
             <div className="rounded-2xl bg-gradient-to-br from-white/[0.05] to-white/[0.01]
                 border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-md p-4
                 transition-all hover:border-white/[0.15]">
                 <div className="flex items-center justify-between mb-3 border-b border-white/[0.05] pb-2">
                     <div className="flex items-center gap-1.5">
-                        <DollarSign size={12} className="text-cyan-400" />
+                        <IndianRupee size={12} className="text-cyan-400" />
                         <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
-                            Live Metal Prices
+                            Live Metal Prices (INR)
                         </span>
                     </div>
                     <button onClick={loadPrices} disabled={priceLoading}
@@ -266,11 +334,13 @@ export default function QuotePanel({ geometry, fileMetrics }) {
                         <div className="flex justify-between items-center">
                             <span className="text-[10px] text-gray-500">{mat?.name || materialId}</span>
                             <span className="text-[11px] font-mono text-cyan-300 font-bold">
-                                {livePriceKg != null ? `$${fmt(livePriceKg)}/kg` : '—'}
+                                {livePriceInr != null ? `₹${fmt(livePriceInr)}/kg` : '—'}
                             </span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-[10px] text-gray-600">Al · Cu · Ni · SS</span>
+                            <span className="text-[10px] text-gray-600">
+                                {exchangeRate ? `USD→INR: ₹${exchangeRate.toFixed(2)}` : ''}
+                            </span>
                             <span className={`text-[9px] font-mono ${sourceColor}`}>{sourceLabel}</span>
                         </div>
                     </div>
@@ -281,12 +351,45 @@ export default function QuotePanel({ geometry, fileMetrics }) {
                 )}
             </div>
 
-            {/* ── Configuration selectors ─────────────────────────────────────── */}
+            {/* ── Client Info ──────────────────────────────────────────────── */}
+            <div className="rounded-2xl bg-gradient-to-br from-white/[0.05] to-white/[0.01]
+                border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-md p-4 space-y-3">
+                <div className="flex items-center gap-2 border-b border-white/[0.05] pb-2">
+                    <User size={14} className="text-cyan-400" />
+                    <span className="text-[11px] font-bold text-gray-200 uppercase tracking-widest">
+                        Client Details
+                    </span>
+                </div>
+                <TextInput label="Client Name" value={clientName} onChange={setClientName}
+                    placeholder="e.g. Vishal Jadhav" icon={User} />
+                <TextInput label="Company" value={clientCompany} onChange={setClientCompany}
+                    placeholder="e.g. Aerochamp Aviation Pvt. Ltd." icon={Building} />
+            </div>
+
+            {/* ── PDF auto-fill indicator ─────────────────────────────────── */}
+            {fileMetrics?.source === 'pdf' && (
+                <div className="rounded-xl bg-purple-500/8 border border-purple-500/20 px-3 py-2.5
+                    flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse flex-shrink-0"
+                        style={{ boxShadow: '0 0 6px rgba(168,85,247,0.8)' }} />
+                    <div>
+                        <p className="text-[10px] text-purple-300 font-mono font-bold">
+                            AI Auto-Fill Active
+                        </p>
+                        <p className="text-[9px] text-purple-400/70 font-mono">
+                            Material, process & tolerance pre-selected from PDF analysis.
+                            {fileMetrics.partName && ` Part: ${fileMetrics.partName}`}
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Configuration selectors ─────────────────────────────────── */}
             <div className="rounded-2xl bg-gradient-to-br from-white/[0.05] to-white/[0.01]
                 border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-md p-4 space-y-4">
                 <div className="flex items-center gap-2 border-b border-white/[0.05] pb-2">
                     <Wrench size={14} className="text-cyan-400 drop-shadow-[0_0_8px_rgba(103,232,249,0.8)]" />
-                    <span className="text-[11px] font-display font-bold text-gray-200 uppercase tracking-widest">
+                    <span className="text-[11px] font-bold text-gray-200 uppercase tracking-widest">
                         Configuration
                     </span>
                     {catLoading && <RefreshCw size={10} className="ml-auto text-gray-600 animate-spin" />}
@@ -318,7 +421,7 @@ export default function QuotePanel({ geometry, fileMetrics }) {
                 <button
                     onClick={generateQuote}
                     disabled={loading || !geometry}
-                    className={`w-full py-3 mt-1 rounded-xl text-[12px] font-display font-bold tracking-wider
+                    className={`w-full py-3 mt-1 rounded-xl text-[12px] font-bold tracking-wider
                         transition-all duration-300 flex items-center justify-center gap-2
                         ${geometry
                             ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 shadow-[0_0_20px_rgba(34,211,238,0.3)] hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] hover:scale-[1.02] active:scale-[0.98]'
@@ -327,11 +430,11 @@ export default function QuotePanel({ geometry, fileMetrics }) {
                     {loading
                         ? <><RefreshCw size={14} className="animate-spin" /> Computing…</>
                         : <><Zap size={14} className="drop-shadow-md" />
-                            {geometry ? 'Generate Quote' : 'Upload STEP File First'}</>
+                            {geometry ? 'Generate Quote (₹)' : 'Upload STEP/PDF First'}</>
                     }
                 </button>
 
-                {/* Error message */}
+                {/* Error */}
                 {error && (
                     <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
                         <AlertCircle size={12} className="text-red-400 mt-0.5 flex-shrink-0" />
@@ -340,7 +443,7 @@ export default function QuotePanel({ geometry, fileMetrics }) {
                 )}
             </div>
 
-            {/* ── Quote result ─────────────────────────────────────────────────── */}
+            {/* ── Quote result (INR) ──────────────────────────────────────── */}
             {quote && (
                 <div className="rounded-2xl bg-gradient-to-b from-cyan-900/30 to-black/60
                     border border-cyan-500/30 shadow-[0_0_30px_rgba(34,211,238,0.15)]
@@ -349,8 +452,8 @@ export default function QuotePanel({ geometry, fileMetrics }) {
                     {/* Header */}
                     <div className="flex items-center gap-2 border-b border-cyan-500/20 pb-2">
                         <CheckCircle size={15} className="text-green-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.8)]" />
-                        <span className="text-[11px] font-display font-bold text-white uppercase tracking-widest">
-                            Quote Result
+                        <span className="text-[11px] font-bold text-white uppercase tracking-widest">
+                            Quote Result (₹ INR)
                         </span>
                         <span className={`ml-auto text-[9px] font-mono font-medium ${quote.price_source === 'metals_dev' ? 'text-green-300' :
                                 quote.price_source === 'world_bank' ? 'text-blue-300' : 'text-amber-300'}`}>
@@ -359,28 +462,46 @@ export default function QuotePanel({ geometry, fileMetrics }) {
                         </span>
                     </div>
 
-                    {/* Cost breakdown */}
+                    {/* Quote Number */}
+                    {quote.quote_number && (
+                        <div className="bg-gray-900/70 rounded-lg px-3 py-2">
+                            <p className="text-[9px] text-gray-500 uppercase tracking-widest">Quotation No.</p>
+                            <p className="text-[12px] font-mono text-cyan-300 font-bold">{quote.quote_number}</p>
+                        </div>
+                    )}
+
+                    {/* Cost breakdown (INR) */}
                     <div className="bg-gray-900/50 rounded-lg p-2 space-y-0.5">
-                        <LineItem label="Material Cost" value={`$${fmt(quote.breakdown?.material_cost)}`} />
-                        <LineItem label="Machining Cost" value={`$${fmt(quote.breakdown?.machining_cost)}`} />
+                        <LineItem label="Material Cost" value={`₹${fmt(quote.breakdown?.material_cost)}`} />
+                        <LineItem label="Machining Cost" value={`₹${fmt(quote.breakdown?.machining_cost)}`} />
                         {(quote.breakdown?.drilling_cost > 0) &&
-                            <LineItem label="Drilling Surcharge" value={`$${fmt(quote.breakdown.drilling_cost)}`} />}
-                        <LineItem label="Setup (amort.)" value={`$${fmt(quote.breakdown?.setup_cost)}`} />
-                        <LineItem label="Overhead (18%)" value={`$${fmt(quote.breakdown?.overhead)}`} />
-                        <LineItem label="Profit Margin" value={`$${fmt(quote.breakdown?.profit_margin)}`} />
+                            <LineItem label="Drilling Surcharge" value={`₹${fmt(quote.breakdown.drilling_cost)}`} />}
+                        <LineItem label="Setup (amort.)" value={`₹${fmt(quote.breakdown?.setup_cost)}`} />
+                        <LineItem label="Overhead (18%)" value={`₹${fmt(quote.breakdown?.overhead)}`} />
+                        <LineItem label="Profit Margin" value={`₹${fmt(quote.breakdown?.profit_margin)}`} />
                     </div>
 
-                    {/* Totals */}
+                    {/* Totals (INR) */}
                     <div className="border-t border-gray-700/60 pt-2 space-y-0.5">
-                        <LineItem label="Unit Price" value={`$${fmt(quote.unit_price)}`} />
+                        <LineItem label="Unit Price" value={`₹${fmt(quote.unit_price)}`} />
                         {quote.discount_pct > 0 &&
                             <LineItem
                                 label={`Qty Discount (${quote.discount_pct}%)`}
-                                value={`−$${fmt((quote.unit_price || 0) - (quote.unit_price_discounted || 0))}`}
+                                value={`−₹${fmt((quote.unit_price || 0) - (quote.unit_price_discounted || 0))}`}
                             />}
                         <LineItem
                             label={`Order Total (×${quote.quantity})`}
-                            value={`$${fmt(quote.order_total)}`}
+                            value={`₹${fmt(quote.order_total)}`}
+                        />
+                    </div>
+
+                    {/* GST */}
+                    <div className="border-t border-gray-700/40 pt-2 space-y-0.5">
+                        <LineItem label="SGST (9%)" value={`₹${fmt(quote.sgst)}`} />
+                        <LineItem label="CGST (9%)" value={`₹${fmt(quote.cgst)}`} />
+                        <LineItem
+                            label="Grand Total (incl. GST)"
+                            value={`₹${fmt(quote.grand_total)}`}
                             highlight large
                         />
                     </div>
@@ -392,14 +513,16 @@ export default function QuotePanel({ geometry, fileMetrics }) {
                         <LineItem label="Complexity" value={quote.complexity || '—'} />
                         {(quote.holes_count > 0) &&
                             <LineItem label="Holes Detected" value={String(quote.holes_count)} />}
-                        <LineItem label="Metal Price" value={`$${fmt(quote.metal_price_usd_kg)}/kg`} />
+                        <LineItem label="Metal Price" value={`₹${fmt(quote.metal_price_inr_kg)}/kg`} />
+                        <LineItem label="Machine Rate" value={`₹${fmt(quote.machine_rate_inr_hr)}/hr`} />
+                        <LineItem label="Exchange Rate" value={`₹${fmt(quote.exchange_rate, 2)}/USD`} />
                     </div>
 
                     {/* Download PDF */}
                     <button
                         onClick={downloadPdf}
                         disabled={pdfLoading}
-                        className="w-full py-2.5 rounded-xl text-[12px] font-display font-bold tracking-wider
+                        className="w-full py-2.5 rounded-xl text-[12px] font-bold tracking-wider
                             transition-all duration-300 flex items-center justify-center gap-2
                             border border-cyan-500/30 bg-white/5 text-cyan-300
                             hover:bg-cyan-500/10 hover:border-cyan-400 active:scale-[0.98]
@@ -407,7 +530,7 @@ export default function QuotePanel({ geometry, fileMetrics }) {
                     >
                         {pdfLoading
                             ? <><RefreshCw size={14} className="animate-spin" /> Generating PDF…</>
-                            : <><FileText size={14} /> Download PDF Quote</>}
+                            : <><FileText size={14} /> Download ACCU DESIGN Quote (PDF)</>}
                     </button>
                 </div>
             )}

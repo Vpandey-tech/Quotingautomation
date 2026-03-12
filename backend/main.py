@@ -1,27 +1,30 @@
 """
-AccuDesign Quoting Agent — Phase 3 Backend
-FastAPI + CadQuery geometry analysis + Live pricing + Quote engine
+AccuDesign Quoting Agent — Phase 4 Backend (INR Edition)
+FastAPI + CadQuery geometry analysis + Live pricing (INR) + Quote engine + PDF analysis
 
 Endpoints:
   GET  /api/health              — Health check
   GET  /api/materials           — All supported materials
   GET  /api/processes           — All manufacturing processes
   GET  /api/tolerances          — All tolerance tiers
-  GET  /api/prices              — Current metal prices (live or cached)
+  GET  /api/prices              — Current metal prices (INR with exchange rate)
+  GET  /api/exchange-rate       — Current USD → INR rate
   POST /api/analyze             — Upload STEP → B-Rep geometry analysis
-  POST /api/quote               — Full quote from geometry + selections
-  POST /api/quote/pdf           — Full quote as downloadable PDF
+  POST /api/analyze/pdf         — Upload PDF drawing → Gemini AI analysis
+  POST /api/quote               — Full quote from geometry + selections (INR)
+  POST /api/quote/pdf           — Full quote as downloadable PDF (ACCU DESIGN format)
 
 Run:
   py -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 """
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.background import BackgroundTasks
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
+from typing import Optional, List
 import tempfile, os
 from dotenv import load_dotenv
 
@@ -30,16 +33,19 @@ load_dotenv()
 from services.pricing import MATERIALS, get_live_prices
 from services.costing import compute_quote, TOLERANCE_MULTIPLIERS, PROCESS_RATES
 from services.pdf import generate_quote_pdf
+from services.currency import get_usd_to_inr, convert_material_price
+from services.quote_number import generate_quote_number
+from services.pdf_analyzer import analyze_pdf_drawing
 
 app = FastAPI(
     title="AccuDesign Quoting API",
-    description="Phase 3: Live metal pricing + MRR-based quote engine",
-    version="0.3.0",
+    description="Phase 4: INR pricing + ACCU DESIGN PDF + PDF drawing analysis",
+    version="0.4.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # Open for local dev. Lock to domain on prod.
+    allow_origins=["*"],   # Lock to domain in production
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -47,35 +53,53 @@ app.add_middleware(
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 class QuoteRequest(BaseModel):
-    geometry:     dict  = Field(..., description="Result from /api/analyze or mesh fallback")
-    material_id:  str   = Field(..., example="aluminum_6061")
-    process_id:   str   = Field(..., example="cnc_milling_3ax")
-    tolerance_id: str   = Field("standard", example="standard")
-    quantity:     int   = Field(1, ge=1, le=10000)
+    geometry:       dict = Field(..., description="Result from /api/analyze or mesh fallback")
+    material_id:    str  = Field(..., example="aluminum_6061")
+    process_id:     str  = Field(..., example="cnc_milling_3ax")
+    tolerance_id:   str  = Field("standard", example="standard")
+    quantity:       int  = Field(1, ge=1, le=10000)
+    client_name:    str  = Field("", example="Vishal Jadhav")
+    client_company: str  = Field("", example="Aerochamp Aviation (Intl.) Pvt. Ltd.")
+    source_filename: str = Field("", example="shaft_drawing.pdf")
+    screenshot:     Optional[str] = Field(None, description="Base64 isometric view screenshot")
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
 @app.get("/api/health", tags=["System"])
-def health():
+async def health():
+    fx = await get_usd_to_inr()
     return {
         "status": "ok",
-        "phase": 3,
-        "version": "0.3.0",
+        "phase": 4,
+        "version": "0.4.0",
+        "currency": "INR",
+        "exchange_rate": fx["rate"],
+        "exchange_source": fx["source"],
         "materials": len(MATERIALS),
         "processes": len(PROCESS_RATES),
         "tolerances": len(TOLERANCE_MULTIPLIERS),
     }
 
 
+# ── Exchange Rate ─────────────────────────────────────────────────────────────
+@app.get("/api/exchange-rate", tags=["Pricing"])
+async def get_exchange_rate():
+    """Get current USD → INR exchange rate."""
+    return await get_usd_to_inr()
+
+
 # ── Materials & Processes catalogue ───────────────────────────────────────────
 @app.get("/api/materials", tags=["Catalogue"])
-def get_materials():
-    """Return all supported materials with properties."""
+async def get_materials():
+    """Return all supported materials with INR prices."""
+    fx = await get_usd_to_inr()
+    rate = fx["rate"]
     return {
         mid: {
             "name":          m["name"],
             "density":       m["density"],
             "price_usd_kg":  m["price_usd_kg"],
+            "price_inr_kg":  convert_material_price(m["price_usd_kg"], rate),
             "machinability": m["machinability"],
         }
         for mid, m in MATERIALS.items()
@@ -83,14 +107,19 @@ def get_materials():
 
 
 @app.get("/api/processes", tags=["Catalogue"])
-def get_processes():
-    """Return all supported manufacturing processes."""
+async def get_processes():
+    """Return all supported manufacturing processes with INR rates."""
+    fx = await get_usd_to_inr()
+    rate = fx["rate"]
+    from services.currency import convert_machine_rate, convert_setup_fee
     return {
         pid: {
-            "name":      p["name"],
-            "rate_hr":   p["rate_hr"],
-            "setup_usd": p["setup_usd"],
-            "axes":      p["axes"],
+            "name":         p["name"],
+            "rate_usd_hr":  p["rate_hr"],
+            "rate_inr_hr":  convert_machine_rate(p["rate_hr"], rate),
+            "setup_usd":    p["setup_usd"],
+            "setup_inr":    convert_setup_fee(p["setup_usd"], rate),
+            "axes":         p["axes"],
         }
         for pid, p in PROCESS_RATES.items()
     }
@@ -100,34 +129,42 @@ def get_processes():
 def get_tolerances():
     """Return all supported tolerance tiers."""
     return {
-        tid: {
-            "label":      t["label"],
-            "multiplier": t["multiplier"],
-        }
+        tid: {"label": t["label"], "multiplier": t["multiplier"]}
         for tid, t in TOLERANCE_MULTIPLIERS.items()
     }
 
 
-# ── Live metal prices ─────────────────────────────────────────────────────────
+# ── Live metal prices (INR) ──────────────────────────────────────────────────
 @app.get("/api/prices", tags=["Pricing"])
 async def get_prices():
     """
-    Fetch current metal prices.
-    Priority: metals.dev → World Bank → hardcoded fallback.
-    Results are cached for 6 hours.
+    Fetch current metal prices converted to INR.
+    Section A formula: INR/kg = (USD/kg × exchange_rate) + ₹150
     """
-    return await get_live_prices()
+    price_data = await get_live_prices()
+    fx = await get_usd_to_inr()
+    rate = fx["rate"]
+
+    inr_prices = {}
+    for mid, usd_price in price_data["prices"].items():
+        inr_prices[mid] = convert_material_price(usd_price, rate)
+
+    return {
+        "prices_usd": price_data["prices"],
+        "prices_inr": inr_prices,
+        "exchange_rate": rate,
+        "exchange_source": fx["source"],
+        "price_source": price_data["source"],
+        "timestamp": price_data["timestamp"],
+        "note": price_data.get("note", ""),
+        "currency": "INR",
+    }
 
 
 # ── STEP File Analysis ────────────────────────────────────────────────────────
 @app.post("/api/analyze", tags=["Geometry"])
 async def analyze_step(file: UploadFile = File(...)):
-    """
-    Upload a STEP file → returns full B-Rep geometric analysis via CadQuery.
-    This result is then passed verbatim to /api/quote.
-    Falls back gracefully — even if CadQuery fails, /api/quote still works
-    with the mesh-derived geometry from the frontend.
-    """
+    """Upload a STEP file → returns full B-Rep geometric analysis via CadQuery."""
     fname = (file.filename or "").lower()
     if not (fname.endswith('.step') or fname.endswith('.stp')):
         raise HTTPException(400, "Only STEP/STP files are accepted.")
@@ -135,6 +172,8 @@ async def analyze_step(file: UploadFile = File(...)):
     contents = await file.read()
     if len(contents) == 0:
         raise HTTPException(400, "Uploaded file is empty.")
+    if len(contents) > 50 * 1024 * 1024:  # 50MB limit
+        raise HTTPException(400, "File too large. Maximum 50MB.")
 
     with tempfile.NamedTemporaryFile(suffix='.step', delete=False) as tmp:
         tmp.write(contents)
@@ -154,35 +193,80 @@ async def analyze_step(file: UploadFile = File(...)):
             pass
 
 
-# ── Quote endpoint ────────────────────────────────────────────────────────────
-@app.post("/api/quote", tags=["Quoting"])
-async def generate_quote(req: QuoteRequest):
+# ── PDF Drawing Analysis (Gemini) ─────────────────────────────────────────────
+@app.post("/api/analyze/pdf", tags=["Geometry"])
+async def analyze_pdf(file: UploadFile = File(...)):
     """
-    Generate a full manufacturing quote.
+    Upload a PDF engineering drawing → Gemini AI extracts dimensions,
+    materials, holes, and manufacturing requirements.
+    Returns structured part data compatible with the quote engine.
+    """
+    fname = (file.filename or "").lower()
+    if not fname.endswith('.pdf'):
+        raise HTTPException(400, "Only PDF files are accepted for drawing analysis.")
 
-    Steps:
-    1. Validate material/process/tolerance IDs
-    2. Fetch live metal price for selected material
-    3. Run MRR-based machining time estimation
-    4. Apply complexity, tolerance, overhead, profit multipliers
-    5. Return itemised cost breakdown
+    contents = await file.read()
+    if len(contents) == 0:
+        raise HTTPException(400, "Uploaded file is empty.")
+    if len(contents) > 20 * 1024 * 1024:  # 20MB limit
+        raise HTTPException(400, "PDF too large. Maximum 20MB.")
+
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if not gemini_key or gemini_key == "your_gemini_api_key_here":
+        raise HTTPException(503,
+            "PDF analysis requires a valid GEMINI_API_KEY. "
+            "Get one free at https://aistudio.google.com/app/apikey "
+            "and set it in backend/.env"
+        )
+
+    result = await run_in_threadpool(_run_pdf_analysis, contents, file.filename)
+    if result is None:
+        raise HTTPException(500, "PDF analysis failed. Check server logs.")
+
+    return JSONResponse(content=result)
+
+
+def _run_pdf_analysis(pdf_bytes: bytes, filename: str):
+    """Synchronous wrapper for PDF analysis (runs in threadpool)."""
+    import asyncio
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(analyze_pdf_drawing(pdf_bytes, filename))
+    finally:
+        loop.close()
+
+
+# ── Quote endpoint (INR) ─────────────────────────────────────────────────────
+@app.post("/api/quote", tags=["Quoting"])
+async def gen_quote(req: QuoteRequest):
+    """
+    Generate a full manufacturing quote in INR.
+    Uses Section A formula for material prices and Section B for machine rates.
     """
     if req.material_id not in MATERIALS:
         raise HTTPException(400, f"Unknown material: '{req.material_id}'. "
-                                 f"Valid values: {list(MATERIALS.keys())}")
+                                 f"Valid: {list(MATERIALS.keys())}")
     if req.process_id not in PROCESS_RATES:
         raise HTTPException(400, f"Unknown process: '{req.process_id}'. "
-                                 f"Valid values: {list(PROCESS_RATES.keys())}")
+                                 f"Valid: {list(PROCESS_RATES.keys())}")
     if req.tolerance_id not in TOLERANCE_MULTIPLIERS:
         raise HTTPException(400, f"Unknown tolerance: '{req.tolerance_id}'. "
-                                 f"Valid values: {list(TOLERANCE_MULTIPLIERS.keys())}")
+                                 f"Valid: {list(TOLERANCE_MULTIPLIERS.keys())}")
 
-    # Get live price for this material
+    # Get live prices and exchange rate
     price_data = await get_live_prices()
-    metal_price = price_data["prices"].get(
+    fx = await get_usd_to_inr()
+    rate = fx["rate"]
+
+    # Get material price in USD, then convert to INR (Section A)
+    usd_price = price_data["prices"].get(
         req.material_id,
-        MATERIALS[req.material_id]["price_usd_kg"]  # fallback
+        MATERIALS[req.material_id]["price_usd_kg"]
     )
+    metal_price_inr = convert_material_price(usd_price, rate)
+
+    # Generate quotation number
+    quote_number = generate_quote_number(req.client_company or req.client_name)
 
     try:
         quote = compute_quote(
@@ -191,10 +275,16 @@ async def generate_quote(req: QuoteRequest):
             process_id=req.process_id,
             tolerance_id=req.tolerance_id,
             quantity=req.quantity,
-            metal_price=metal_price,
+            metal_price_inr=metal_price_inr,
+            exchange_rate=rate,
         )
-        quote["price_source"] = price_data["source"]
-        quote["price_note"]   = price_data.get("note", "")
+        quote["price_source"]    = price_data["source"]
+        quote["price_note"]      = price_data.get("note", "")
+        quote["exchange_rate"]   = rate
+        quote["exchange_source"] = fx["source"]
+        quote["quote_number"]    = quote_number
+        quote["client_name"]     = req.client_name
+        quote["client_company"]  = req.client_company
         return JSONResponse(content=quote)
     except Exception as e:
         import traceback
@@ -202,10 +292,10 @@ async def generate_quote(req: QuoteRequest):
         raise HTTPException(500, f"Quote computation failed: {str(e)}")
 
 
-# ── PDF quote endpoint ────────────────────────────────────────────────────────
+# ── PDF quote endpoint (ACCU DESIGN format) ──────────────────────────────────
 @app.post("/api/quote/pdf", tags=["Quoting"])
-async def generate_quote_pdf_endpoint(req: QuoteRequest, background_tasks: BackgroundTasks):
-    """Generate a full manufacturing quote and return as downloadable PDF."""
+async def gen_quote_pdf(req: QuoteRequest, background_tasks: BackgroundTasks):
+    """Generate a quotation PDF in ACCU DESIGN format (INR)."""
     if req.material_id not in MATERIALS:
         raise HTTPException(400, f"Unknown material: '{req.material_id}'")
     if req.process_id not in PROCESS_RATES:
@@ -214,10 +304,15 @@ async def generate_quote_pdf_endpoint(req: QuoteRequest, background_tasks: Backg
         raise HTTPException(400, f"Unknown tolerance: '{req.tolerance_id}'")
 
     price_data = await get_live_prices()
-    metal_price = price_data["prices"].get(
+    fx = await get_usd_to_inr()
+    rate = fx["rate"]
+
+    usd_price = price_data["prices"].get(
         req.material_id,
         MATERIALS[req.material_id]["price_usd_kg"]
     )
+    metal_price_inr = convert_material_price(usd_price, rate)
+    quote_number = generate_quote_number(req.client_company or req.client_name)
 
     try:
         quote = compute_quote(
@@ -226,15 +321,25 @@ async def generate_quote_pdf_endpoint(req: QuoteRequest, background_tasks: Backg
             process_id=req.process_id,
             tolerance_id=req.tolerance_id,
             quantity=req.quantity,
-            metal_price=metal_price,
+            metal_price_inr=metal_price_inr,
+            exchange_rate=rate,
         )
         quote["price_source"] = price_data["source"]
-        pdf_path = generate_quote_pdf(quote)
+        quote["quote_number"] = quote_number
+
+        pdf_path = generate_quote_pdf(
+            quote_data=quote,
+            quote_number=quote_number,
+            client_name=req.client_name,
+            client_company=req.client_company,
+            source_filename=req.source_filename,
+            screenshot_b64=req.screenshot,
+        )
         background_tasks.add_task(_safe_delete, pdf_path)
         return FileResponse(
             pdf_path,
             media_type="application/pdf",
-            filename="AccuDesign_Quote.pdf"
+            filename=f"AccuDesign_Quote_{quote_number.replace('/', '_')}.pdf"
         )
     except Exception as e:
         import traceback
@@ -243,36 +348,20 @@ async def generate_quote_pdf_endpoint(req: QuoteRequest, background_tasks: Backg
 
 
 def _safe_delete(path: str):
-    """Delete a file, ignoring errors (used as background task after FileResponse)."""
     try:
         os.unlink(path)
     except Exception:
         pass
 
 
-# ── Private: CadQuery geometry analysis ───────────────────────────────────────
+# ── CadQuery geometry analysis ────────────────────────────────────────────────
 def _analyze_with_cadquery(path: str, original_name: str) -> dict:
-    """
-    Full B-Rep analysis using CadQuery.
-    Extracts: bounding box, volume, surface area, holes, complexity score.
-
-    CadQuery Solid API (cadquery 2.x):
-      .BoundingBox() → bb.xmin/xmax/ymin/ymax/zmin/zmax
-      .Volume()      → float, mm³
-      .Area()        → float, mm²
-      .Center()      → Vector with .x/.y/.z   ← NOT CenterOfMass()
-      .Faces()       → list of Face objects
-      .Edges()       → list of Edge objects
-      .Vertices()    → list of Vertex objects
-    """
-    import traceback
-
+    """Full B-Rep analysis using CadQuery."""
     try:
         import cadquery as cq
     except Exception as e:
         raise RuntimeError(f"CadQuery import failed: {e}")
 
-    # OCC imports for hole detection — handle both OCC.Core and OCP install paths
     BRepAdaptor_Surface = None
     GeomAbs_Cylinder = None
     try:
@@ -283,7 +372,7 @@ def _analyze_with_cadquery(path: str, original_name: str) -> dict:
             from OCP.BRepAdaptor import BRepAdaptor_Surface
             from OCP.GeomAbs import GeomAbs_Cylinder
         except ImportError:
-            pass  # Hole detection gracefully skipped
+            pass
 
     try:
         shape = cq.importers.importStep(path)
@@ -292,31 +381,24 @@ def _analyze_with_cadquery(path: str, original_name: str) -> dict:
 
     solid = shape.val()
 
-    # ── Bounding box ──────────────────────────────────────────────────────────
     bb     = solid.BoundingBox()
     size_x = round(bb.xmax - bb.xmin, 4)
     size_y = round(bb.ymax - bb.ymin, 4)
     size_z = round(bb.zmax - bb.zmin, 4)
 
-    # ── Volume & Surface ──────────────────────────────────────────────────────
-    volume       = round(abs(solid.Volume()), 4)   # mm³
-    surface_area = round(solid.Area(), 4)           # mm²
+    volume       = round(abs(solid.Volume()), 4)
+    surface_area = round(solid.Area(), 4)
 
-    # ── Center of mass — CadQuery uses .Center() NOT .CenterOfMass() ─────────
     try:
         centroid_vec = solid.Center()
-        centroid = {"x": round(centroid_vec.x, 4),
-                    "y": round(centroid_vec.y, 4),
-                    "z": round(centroid_vec.z, 4)}
+        centroid = {"x": round(centroid_vec.x, 4), "y": round(centroid_vec.y, 4), "z": round(centroid_vec.z, 4)}
     except Exception:
         centroid = {"x": 0.0, "y": 0.0, "z": 0.0}
 
-    # ── Topology ──────────────────────────────────────────────────────────────
     faces    = solid.Faces()
     edges    = solid.Edges()
     vertices = solid.Vertices()
 
-    # ── Hole detection via OCC cylindrical face adaptor ───────────────────────
     holes = []
     if BRepAdaptor_Surface and GeomAbs_Cylinder:
         for face in faces:
@@ -326,29 +408,22 @@ def _analyze_with_cadquery(path: str, original_name: str) -> dict:
                     continue
                 cylinder = adaptor.Cylinder()
                 radius   = cylinder.Radius()
-                if radius <= 0 or radius > 500:   # sanity filter (mm)
+                if radius <= 0 or radius > 500:
                     continue
                 diameter = round(radius * 2, 4)
-                # Bounding box of the face to estimate depth
                 fbb   = face.BoundingBox()
-                depth = round(max(
-                    fbb.xmax - fbb.xmin,
-                    fbb.ymax - fbb.ymin,
-                    fbb.zmax - fbb.zmin,
-                ), 4)
+                depth = round(max(fbb.xmax - fbb.xmin, fbb.ymax - fbb.ymin, fbb.zmax - fbb.zmin), 4)
                 hole_type = "through" if depth > diameter * 0.5 else "blind"
                 holes.append({"diameter": diameter, "depth": depth, "type": hole_type})
             except Exception:
-                continue  # Skip malformed faces gracefully
+                continue
 
-    # ── Complexity scoring ────────────────────────────────────────────────────
     n_faces = len(faces)
     n_edges = len(edges)
     n_holes = len(holes)
     score   = n_faces * 1 + n_edges * 0.5 + n_holes * 10
-    tier    = ("Simple"       if score < 100  else
-               "Moderate"     if score < 300  else
-               "Complex"      if score < 800  else "Very Complex")
+    tier    = ("Simple" if score < 100 else "Moderate" if score < 300 else
+               "Complex" if score < 800 else "Very Complex")
 
     return {
         "fileName":    original_name,

@@ -34,3 +34,25 @@ __pycache__/
 .gsd/
 GEMINI.md
 PROJECT_RULES.md
+
+# Python
+env/
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Uploaded Files / Temp
+backend/uploads/
+*.step
+*.stp
+*.pdf
+setup_logo.py
+
+# API Keys and Secrets
+.env
+.env.*
+!.env.example
+backend/.env

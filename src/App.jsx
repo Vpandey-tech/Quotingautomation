@@ -81,6 +81,17 @@ export default function App() {
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const viewerRef = useRef(null);
 
+  // Capture screenshot of 3D canvas for PDF isometric view
+  const captureScreenshot = useCallback(() => {
+    try {
+      const canvas = document.querySelector('canvas');
+      if (canvas) return canvas.toDataURL('image/png');
+    } catch (e) {
+      console.warn('Screenshot capture failed:', e);
+    }
+    return null;
+  }, []);
+
   const handleSidebarEnter = useCallback(() => {
     setSidebarHovered(true);
     // Directly block pointer events on canvas so OrbitControls can't see wheel
@@ -97,6 +108,8 @@ export default function App() {
   }, []);
 
   // Called by Viewer with mesh metrics + original File object
+  // For STEP files: file is passed, triggers B-Rep analysis
+  // For PDF files: file is null, geometry comes from Gemini AI
   const handleMetrics = async (m, file) => {
     if (!m) {
       setMetrics(null);
@@ -105,7 +118,9 @@ export default function App() {
       return;
     }
     setMetrics(m);
-    const meshGeom = {
+
+    // Build geometry object from metrics
+    const geom = {
       volume: parseFloat(m.volume) || 0,
       surfaceArea: parseFloat(m.surfaceArea) || 0,
       boundingBox: {
@@ -114,9 +129,18 @@ export default function App() {
         sizeZ: parseFloat(m.sizeZ) || 0,
       },
       complexity: { tier: 'Moderate', score: 150, faces: 0, edges: 0, holes: 0 },
-      holes: [],
+      holes: m.holes || [],
     };
-    setGeometry(meshGeom);
+
+    // For PDF files — geometry is already extracted by Gemini, no B-Rep needed
+    if (m.source === 'pdf') {
+      setGeometry(geom);
+      setBrepStatus('pdf');
+      return;
+    }
+
+    // For STEP files — set mesh geometry first, then try B-Rep
+    setGeometry(geom);
 
     if (!file) return;
     setBrepStatus('loading');
@@ -214,9 +238,21 @@ export default function App() {
               ◐ Mesh Only
             </span>
           )}
+          {brepStatus === 'pdf' && (
+            <span className="text-[10px] font-mono font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5"
+              style={{
+                background: 'rgba(168,85,247,0.08)',
+                border: '1px solid rgba(168,85,247,0.25)',
+                color: '#c084fc',
+              }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block animate-pulse"
+                style={{ boxShadow: '0 0 6px rgba(168,85,247,0.8)' }} />
+              AI Analyzed
+            </span>
+          )}
           <span className="text-[10px] text-gray-600 font-mono px-2.5 py-1 rounded-full"
             style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
-            v0.3.0
+            v0.4.0
           </span>
         </div>
       </header>
@@ -313,32 +349,38 @@ export default function App() {
 
                 {/* B-Rep status */}
                 {brepStatus !== 'idle' && (
-                  <div className="rounded-lg px-3 py-2 text-[10px] font-mono"
+                <div className="rounded-lg px-3 py-2 text-[10px] font-mono"
                     style={{
                       background: brepStatus === 'ready'
                         ? 'rgba(34,211,238,0.06)'
                         : brepStatus === 'loading'
                           ? 'rgba(96,165,250,0.06)'
-                          : 'rgba(251,191,36,0.06)',
+                          : brepStatus === 'pdf'
+                            ? 'rgba(168,85,247,0.06)'
+                            : 'rgba(251,191,36,0.06)',
                       border: `1px solid ${brepStatus === 'ready'
                         ? 'rgba(34,211,238,0.15)'
                         : brepStatus === 'loading'
                           ? 'rgba(96,165,250,0.15)'
-                          : 'rgba(251,191,36,0.15)'}`,
+                          : brepStatus === 'pdf'
+                            ? 'rgba(168,85,247,0.15)'
+                            : 'rgba(251,191,36,0.15)'}`,
                       color: brepStatus === 'ready' ? '#67e8f9'
                         : brepStatus === 'loading' ? '#93c5fd'
-                          : '#fcd34d',
+                          : brepStatus === 'pdf' ? '#c084fc'
+                            : '#fcd34d',
                     }}>
                     {brepStatus === 'ready' && '✓ Exact B-Rep analysis complete'}
                     {brepStatus === 'loading' && '⟳ Running CadQuery B-Rep analysis…'}
                     {brepStatus === 'offline' && '◐ Using mesh geometry (backend offline)'}
+                    {brepStatus === 'pdf' && '✓ AI-extracted geometry from PDF drawing'}
                   </div>
                 )}
               </>
             )}
 
             {tab === 'quote' && (
-              <QuotePanel geometry={geometry} fileMetrics={metrics} />
+              <QuotePanel geometry={geometry} fileMetrics={metrics} captureScreenshot={captureScreenshot} />
             )}
           </div>
         </aside>
