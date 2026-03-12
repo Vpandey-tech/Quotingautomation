@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Wrench, ChevronDown,
+    Wrench, ChevronDown, Plus, X,
     RefreshCw, AlertCircle, CheckCircle, Zap, FileText,
-    User, Building, IndianRupee
+    User, Building, IndianRupee, Layers
 } from 'lucide-react';
 
 const API = '/api';
@@ -58,23 +58,94 @@ function Select({ label, value, onChange, options, disabled }) {
 }
 
 /* ─── Text Input ─────────────────────────────────────────────────────────── */
-function TextInput({ label, value, onChange, placeholder, icon: Icon }) {
+function TextInput({ label, value, onChange, placeholder, icon: Icon, type = "text", min, max, step }) {
     return (
         <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase tracking-widest">{label}</label>
-            <div className="relative">
-                {Icon && <Icon size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />}
+            <label className="text-[10px] text-gray-500 uppercase tracking-widest flex items-center justify-between">
+                {label}
+                {type === 'range' && <span className="text-cyan-400 font-mono">{value}%</span>}
+            </label>
+            <div className="relative flex items-center">
+                {Icon && type !== 'range' && <Icon size={12} className="absolute left-3 text-gray-600" />}
                 <input
-                    type="text"
+                    type={type}
+                    min={min}
+                    max={max}
+                    step={step}
                     value={value}
-                    onChange={e => onChange(e.target.value)}
+                    onChange={e => onChange(type === 'range' || type === 'number' ? parseFloat(e.target.value) : e.target.value)}
                     placeholder={placeholder}
-                    className={`w-full bg-gray-800/70 border border-gray-700/60 text-gray-200
-                        text-[11px] rounded-lg ${Icon ? 'pl-8' : 'px-3'} pr-3 py-2 focus:outline-none
-                        focus:border-cyan-500/50 font-mono placeholder:text-gray-700
-                        hover:border-gray-600 transition-colors`}
+                    className={`w-full bg-gray-800/70 text-gray-200 text-[11px] rounded-lg
+                        ${type !== 'range' ? `border border-gray-700/60 py-2 focus:outline-none focus:border-cyan-500/50 hover:border-gray-600 ${Icon ? 'pl-8 pr-3' : 'px-3'}` : 'accent-cyan-500'}
+                        font-mono placeholder:text-gray-700 transition-colors cursor-pointer`}
                 />
             </div>
+        </div>
+    );
+}
+
+/* ─── MultiSelect with Chips ─────────────────────────────────────────────── */
+function MultiSelect({ label, selectedIds = [], onChange, options = [], disabled }) {
+    
+    const unselectedOptions = options.filter(o => !selectedIds.includes(o.value));
+    
+    return (
+        <div className="space-y-2">
+            <label className="text-[10px] text-gray-500 uppercase tracking-widest">{label}</label>
+            
+            {/* Chips Area */}
+            {selectedIds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                    {selectedIds.map(id => {
+                        const opt = options.find(o => o.value === id);
+                        return (
+                            <div key={id} className="flex items-center gap-1.5 bg-cyan-900/30 border border-cyan-500/30 text-cyan-300 text-[10px] px-2 py-1 rounded-full font-medium">
+                                <span>{opt ? opt.label : id}</span>
+                                <button
+                                    onClick={() => onChange(selectedIds.filter(x => x !== id))}
+                                    disabled={disabled}
+                                    className="hover:text-cyan-100 hover:bg-cyan-500/20 rounded-full p-0.5 transition-colors"
+                                >
+                                    <X size={10} />
+                                </button>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+            
+            {/* Add Dropdown */}
+            <div className="relative group">
+                <select
+                    value=""
+                    onChange={e => {
+                        if (e.target.value) {
+                            onChange([...selectedIds, e.target.value]);
+                        }
+                    }}
+                    disabled={disabled || unselectedOptions.length === 0}
+                    className="w-full bg-gray-800/70 border border-gray-700/60 text-gray-400
+                        text-[11px] rounded-lg px-3 py-2 appearance-none focus:outline-none
+                        focus:border-cyan-500/50 cursor-pointer font-mono
+                        group-hover:border-gray-600 transition-colors
+                        disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                    <option value="" disabled>
+                        {unselectedOptions.length === 0 ? 'No more options available' : '+ Add an option...'}
+                    </option>
+                    {unselectedOptions.map(o => (
+                        <option key={o.value} value={o.value} className="bg-gray-900 text-gray-200">{o.label}</option>
+                    ))}
+                </select>
+                <Plus size={14} className="absolute right-3 top-1/2 -translate-y-1/2
+                    text-gray-500 pointer-events-none group-hover:text-cyan-400 transition-colors" />
+            </div>
+            
+            {selectedIds.length >= 5 && label.includes('Process') && (
+                <p className="text-[9px] text-amber-400/80 font-mono mt-1 flex items-center gap-1">
+                    <AlertCircle size={9} /> ≥5 processes forces "Very Complex" tier.
+                </p>
+            )}
         </div>
     );
 }
@@ -95,13 +166,16 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
 
     // ── Selection state
     const [materialId, setMaterialId] = useState('aluminum_6061');
-    const [processId, setProcessId] = useState('cnc_milling_3ax');
+    const [processIds, setProcessIds] = useState(['cnc_milling_3ax']);
+    const [surfaceTreatmentIds, setSurfaceTreatmentIds] = useState([]);
     const [toleranceId, setToleranceId] = useState('standard');
     const [quantity, setQuantity] = useState(1);
+    const [profitMarginPct, setProfitMarginPct] = useState(22);
 
     // ── Client info
     const [clientName, setClientName] = useState('');
     const [clientCompany, setClientCompany] = useState('');
+    const [hsnCode, setHsnCode] = useState('84669310'); // Default HSN code
 
     // ── Output state
     const [quote, setQuote] = useState(null);
@@ -109,17 +183,29 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
     const [pdfLoading, setPdfLoading] = useState(false);
     const [error, setError] = useState('');
 
+    const resultRef = React.useRef(null);
+
     // ── Auto-fill selections from PDF analysis if available
     useEffect(() => {
         if (fileMetrics?.source === 'pdf') {
             if (fileMetrics.materialId) setMaterialId(fileMetrics.materialId);
-            if (fileMetrics.processId) setProcessId(fileMetrics.processId);
+            if (fileMetrics.processId) setProcessIds([fileMetrics.processId]);
             if (fileMetrics.toleranceId) setToleranceId(fileMetrics.toleranceId);
             // Auto-fill client info extracted from PDF (admin can still edit)
             if (fileMetrics.clientName) setClientName(fileMetrics.clientName);
             if (fileMetrics.clientCompany) setClientCompany(fileMetrics.clientCompany);
+            if (fileMetrics.hsnCode) setHsnCode(fileMetrics.hsnCode);
         }
     }, [fileMetrics]);
+
+    useEffect(() => {
+        if (quote && resultRef.current) {
+            // Scroll down smoothly instantly when quote block appears
+            setTimeout(() => {
+                resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        }
+    }, [quote]);
 
     // ── Load catalogue + prices on mount
     useEffect(() => {
@@ -219,11 +305,14 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                 body: JSON.stringify({
                     geometry,
                     material_id: materialId,
-                    process_id: processId,
+                    process_ids: processIds,
+                    surface_treatment_ids: surfaceTreatmentIds,
+                    profit_margin_pct: profitMarginPct,
                     tolerance_id: toleranceId,
                     quantity: qty,
                     client_name: clientName,
                     client_company: clientCompany,
+                    hsn_code: hsnCode,
                     source_filename: fileMetrics?.fileName || '',
                     screenshot,
                 }),
@@ -259,11 +348,14 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                 body: JSON.stringify({
                     geometry,
                     material_id: materialId,
-                    process_id: processId,
+                    process_ids: processIds,
+                    surface_treatment_ids: surfaceTreatmentIds,
+                    profit_margin_pct: profitMarginPct,
                     tolerance_id: toleranceId,
                     quantity: qty,
                     client_name: clientName,
                     client_company: clientCompany,
+                    hsn_code: hsnCode,
                     source_filename: fileMetrics?.fileName || '',
                     screenshot,
                 }),
@@ -292,6 +384,16 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
     const matOptions = Object.entries(materials).map(([k, v]) => ({ value: k, label: v.name }));
     const procOptions = Object.entries(processes).map(([k, v]) => ({ value: k, label: v.name }));
     const tolOptions = Object.entries(tolerances).map(([k, v]) => ({ value: k, label: v.label }));
+    
+    const surfaceOptions = [
+        { value: 'anodize_clear', label: 'Anodize (Clear)' },
+        { value: 'anodize_black', label: 'Anodize (Black)' },
+        { value: 'powder_coat', label: 'Powder Coating' },
+        { value: 'heat_treatment', label: 'Heat Treatment' },
+        { value: 'bead_blast', label: 'Bead Blasting' },
+        { value: 'passivation', label: 'Passivation' },
+        { value: 'electroless_nickel', label: 'Electroless Nickel' },
+    ];
 
     const livePriceInr = prices?.[materialId];
     const mat = materials[materialId];
@@ -364,6 +466,8 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                     placeholder="e.g. Vishal Jadhav" icon={User} />
                 <TextInput label="Company" value={clientCompany} onChange={setClientCompany}
                     placeholder="e.g. Aerochamp Aviation Pvt. Ltd." icon={Building} />
+                <TextInput label="HSN/SAC Code" value={hsnCode} onChange={setHsnCode}
+                    placeholder="e.g. 84669310" icon={FileText} />
             </div>
 
             {/* ── PDF auto-fill indicator ─────────────────────────────────── */}
@@ -397,10 +501,20 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
 
                 <Select label="Material" value={materialId} onChange={setMaterialId}
                     options={matOptions} disabled={catLoading} />
-                <Select label="Process" value={processId} onChange={setProcessId}
+                <MultiSelect label="Manufacturing Processes" selectedIds={processIds} onChange={setProcessIds}
                     options={procOptions} disabled={catLoading} />
+                <MultiSelect label="Surface Treatment" selectedIds={surfaceTreatmentIds} onChange={setSurfaceTreatmentIds}
+                    options={surfaceOptions} disabled={catLoading} />
                 <Select label="Tolerance" value={toleranceId} onChange={setToleranceId}
                     options={tolOptions} disabled={catLoading} />
+                    
+                <TextInput 
+                    label="Profit Margin" 
+                    type="range" 
+                    min={15} max={30} step={1}
+                    value={profitMarginPct} 
+                    onChange={setProfitMarginPct} 
+                />
 
                 {/* Quantity */}
                 <div className="space-y-1">
@@ -445,7 +559,7 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
 
             {/* ── Quote result (INR) ──────────────────────────────────────── */}
             {quote && (
-                <div className="rounded-2xl bg-gradient-to-b from-cyan-900/30 to-black/60
+                <div ref={resultRef} className="rounded-2xl bg-gradient-to-b from-cyan-900/30 to-black/60
                     border border-cyan-500/30 shadow-[0_0_30px_rgba(34,211,238,0.15)]
                     backdrop-blur-xl p-4 space-y-3">
 
@@ -530,7 +644,7 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                     >
                         {pdfLoading
                             ? <><RefreshCw size={14} className="animate-spin" /> Generating PDF…</>
-                            : <><FileText size={14} /> Download ACCU DESIGN Quote (PDF)</>}
+                            : <><FileText size={14} /> Download ACCU AI Quote (PDF)</>}
                     </button>
                 </div>
             )}

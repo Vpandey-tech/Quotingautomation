@@ -26,10 +26,15 @@ def generate_quote_number(client_name: str = "") -> str:
     """
     now = datetime.now()
 
-    # Customer initials
-    if client_name.strip():
-        words = client_name.strip().split()
-        initials = "".join(w[0].upper() for w in words if w)[:3]
+    # Customer initials (Rule: 1st and 5th character, or last character if < 4)
+    # Example: 'QuinTrans' -> 'QT', 'ABC' -> 'C'
+    clean_name = client_name.strip()
+    if clean_name:
+        flat_name = clean_name.replace(" ", "")
+        if len(flat_name) < 4:
+            initials = flat_name[-1].upper() if flat_name else "XX"
+        else:
+            initials = flat_name[0].upper() + (flat_name[4].upper() if len(flat_name) > 4 else flat_name[-1].upper())
     else:
         initials = "XX"
 

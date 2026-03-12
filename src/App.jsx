@@ -3,7 +3,7 @@ import Viewer from './components/viewer/Viewer';
 import QuotePanel from './components/quote/QuotePanel';
 import {
   Box, FileText, Activity, Ruler, FlaskConical,
-  DollarSign, Layers, ChevronRight
+  DollarSign, Layers, ChevronRight, MessageSquare, Send
 } from 'lucide-react';
 
 /* ─── Metric row ─────────────────────────────────────────────────────────── */
@@ -76,6 +76,9 @@ export default function App() {
   const [geometry, setGeometry] = useState(null);
   const [brepStatus, setBrepStatus] = useState('idle'); // idle|loading|ready|offline
   const [tab, setTab] = useState('details');
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState([]);
+  const [isAiTyping, setIsAiTyping] = useState(false);
 
   // Track sidebar hover to block pointer events on 3D canvas
   const [sidebarHovered, setSidebarHovered] = useState(false);
@@ -136,6 +139,17 @@ export default function App() {
     if (m.source === 'pdf') {
       setGeometry(geom);
       setBrepStatus('pdf');
+      
+      // Initialize chat with the AI's reasoning from the analysis
+      if (m.reasoning) {
+        setChatMessages([
+          { role: 'assistant', text: "ACCU AI Analysis Complete.\n" + m.reasoning }
+        ]);
+      } else {
+        setChatMessages([
+          { role: 'assistant', text: "ACCU AI Analysis Complete. I've populated the quote details based on the provided PDF drawing. Let me know if you need to adjust any parameters." }
+        ]);
+      }
       return;
     }
 
@@ -144,10 +158,17 @@ export default function App() {
 
     if (!file) return;
     setBrepStatus('loading');
+    
+    // Auto-clear loading state after 3.5 seconds
+    const loadingTimeout = setTimeout(() => {
+      setBrepStatus(prev => prev === 'loading' ? 'ready' : prev); // Optimistic UI assumption for rapid user experience
+    }, 3500);
+
     try {
       const fd = new FormData();
       fd.append('file', file);
       const resp = await fetch('/api/analyze', { method: 'POST', body: fd });
+      clearTimeout(loadingTimeout); // clear if it comes back faster
       if (resp.ok) {
         setGeometry(await resp.json());
         setBrepStatus('ready');
@@ -155,7 +176,43 @@ export default function App() {
         setBrepStatus('offline');
       }
     } catch {
+      clearTimeout(loadingTimeout);
       setBrepStatus('offline');
+    }
+  };
+
+  const handleSendChat = async (e) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isAiTyping) return;
+    
+    const newMsgs = [...chatMessages, { role: 'user', text: chatInput }];
+    setChatMessages(newMsgs);
+    setChatInput('');
+    setIsAiTyping(true);
+    
+    try {
+        const resp = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ message: chatInput, metrics: metrics })
+        });
+        const data = await resp.json();
+        
+        if (data.metrics) {
+            setMetrics(data.metrics);
+        }
+        
+        setChatMessages([...newMsgs, { 
+            role: 'assistant', 
+            text: data.response || "Updated."
+        }]);
+    } catch (err) {
+        setChatMessages([...newMsgs, { 
+            role: 'assistant', 
+            text: "Network error trying to reach ACCU AI." 
+        }]);
+    } finally {
+        setIsAiTyping(false);
     }
   };
 
@@ -376,6 +433,60 @@ export default function App() {
                     {brepStatus === 'pdf' && '✓ AI-extracted geometry from PDF drawing'}
                   </div>
                 )}
+                
+                {/* ── ACCU AI Chat Interface ── */}
+                {brepStatus === 'pdf' && (
+                  <SectionCard icon={MessageSquare} title="ACCU AI Copilot" accent="rgba(168,85,247,0.1)">
+                    <div className="flex flex-col h-[280px]">
+                      <div className="flex-1 overflow-y-auto pr-1 space-y-2 mb-2 custom-scrollbar">
+                        {chatMessages.length === 0 ? (
+                           <p className="text-[10px] text-gray-500 italic text-center mt-4">Upload a PDF to start chat.</p>
+                        ) : (
+                          chatMessages.map((msg, i) => (
+                            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`text-[10px] rounded-lg px-2.5 py-1.5 max-w-[85%] leading-relaxed ${
+                                msg.role === 'user' 
+                                  ? 'bg-cyan-600/30 border border-cyan-500/20 text-cyan-100' 
+                                  : 'bg-purple-500/10 border border-purple-500/20 text-gray-300'
+                              }`}>
+                                {msg.role === 'assistant' && (
+                                    <span className="font-bold text-purple-400 block mb-0.5 text-[9px] uppercase tracking-wider">ACCU AI</span>
+                                )}
+                                {msg.text}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                        {isAiTyping && (
+                            <div className="flex justify-start">
+                                <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg px-2.5 py-1.5 flex gap-1 items-center">
+                                    <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce delay-75"></span>
+                                    <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce delay-150"></span>
+                                    <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce delay-300"></span>
+                                </div>
+                            </div>
+                        )}
+                      </div>
+                      <form onSubmit={handleSendChat} className="relative flex items-center">
+                        <input
+                          type="text"
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          placeholder="Ask ACCU AI to modify interpretation..."
+                          className="w-full bg-gray-900/80 border border-gray-700/50 rounded-lg pl-3 pr-8 py-1.5 text-[10px] text-gray-200 focus:outline-none focus:border-purple-500/50 font-mono"
+                        />
+                        <button 
+                          type="submit" 
+                          disabled={isAiTyping || !chatInput.trim()}
+                          className="absolute right-1.5 p-1 text-gray-500 hover:text-cyan-400 disabled:opacity-50"
+                        >
+                          <Send size={12} />
+                        </button>
+                      </form>
+                    </div>
+                  </SectionCard>
+                )}
+                
               </>
             )}
 

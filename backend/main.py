@@ -56,13 +56,19 @@ app.add_middleware(
 class QuoteRequest(BaseModel):
     geometry:       dict = Field(..., description="Result from /api/analyze or mesh fallback")
     material_id:    str  = Field(..., example="aluminum_6061")
-    process_id:     str  = Field(..., example="cnc_milling_3ax")
+    process_ids:    list = Field(default=["cnc_milling_3ax"], description="List of selected manufacturing processes")
     tolerance_id:   str  = Field("standard", example="standard")
     quantity:       int  = Field(1, ge=1, le=10000)
+    surface_treatment_ids: list = Field(default=[], description="List of selected surface treatments")
+    profit_margin_pct: float = Field(22.0, ge=15.0, le=30.0, description="Profit margin between 15% and 30%")
     client_name:    str  = Field("", example="Vishal Jadhav")
     client_company: str  = Field("", example="Aerochamp Aviation (Intl.) Pvt. Ltd.")
     source_filename: str = Field("", example="shaft_drawing.pdf")
     screenshot:     Optional[str] = Field(None, description="Base64 isometric view screenshot")
+
+class ChatRequest(BaseModel):
+    message: str
+    metrics: dict
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -222,7 +228,7 @@ async def analyze_pdf(file: UploadFile = File(...)):
 
     result = await run_in_threadpool(_run_pdf_analysis, contents, file.filename)
     if result is None:
-        raise HTTPException(500, "PDF analysis failed. Check server logs.")
+        raise HTTPException(429, "Google Gemini API Limit Exceeded. Your free tier quota has run out. Please wait for the daily reset.")
 
     return JSONResponse(content=result)
 
@@ -237,6 +243,53 @@ def _run_pdf_analysis(pdf_bytes: bytes, filename: str):
         loop.close()
 
 
+# ── Chat Assistant (Gemini) ───────────────────────────────────────────────────
+@app.post("/api/chat", tags=["AI"])
+async def chat_adjust(req: ChatRequest):
+    """
+    Interpret user chat instructions to update the quote metrics object.
+    It returns a conversational response + the newly modified JSON.
+    """
+    import google.generativeai as genai
+    import json
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        return JSONResponse(content={"response": "I'm offline since GEMINI_API_KEY is not set. Please manually configure.", "metrics": req.metrics})
+        
+    try:
+        genai.configure(api_key=api_key)
+        prompt = f"""You are ACCU AI Copilot, a helpful manufacturing quoting assistant. 
+The user wants to adjust their quote parameters based on their message: "{req.message}"
+Current configuration metrics state:
+{json.dumps(req.metrics, indent=2)}
+
+Please smartly interpret their request and update the configuration metrics variables accordingly.
+For example, if they specify material: "Aluminium 6061", change the "materialId" to "aluminum_6061", and "material" to "Aluminum 6061".
+Try to match their terms loosely. E.g if they say 'commercial aluminium' pick 'commercial_aluminium_he30'. If they say 'turning', set 'processId' to 'cnc_turning'.
+
+Return ONLY valid JSON in this exact format, without code blocks or markdown, just the raw braces:
+{{
+  "response": "Brief professional conversational response acknowledging changes made.",
+  "metrics": {{ ... complete updated metrics object ... }}
+}}"""
+        
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        res = model.generate_content(prompt)
+        text = res.text.strip()
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0]
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0]
+            
+        data = json.loads(text.strip())
+        return JSONResponse(content={
+            "response": data.get("response", "Updated configuration."),
+            "metrics": data.get("metrics", req.metrics)
+        })
+    except Exception as e:
+        print("Chat API Error:", e)
+        return JSONResponse(content={"response": "I had trouble parsing that change. Please adjust it manually.", "metrics": req.metrics})
+
 # ── Quote endpoint (INR) ─────────────────────────────────────────────────────
 @app.post("/api/quote", tags=["Quoting"])
 async def gen_quote(req: QuoteRequest):
@@ -247,9 +300,11 @@ async def gen_quote(req: QuoteRequest):
     if req.material_id not in MATERIALS:
         raise HTTPException(400, f"Unknown material: '{req.material_id}'. "
                                  f"Valid: {list(MATERIALS.keys())}")
-    if req.process_id not in PROCESS_RATES:
-        raise HTTPException(400, f"Unknown process: '{req.process_id}'. "
-                                 f"Valid: {list(PROCESS_RATES.keys())}")
+    
+    for pid in req.process_ids:
+        if pid not in PROCESS_RATES:
+            raise HTTPException(400, f"Unknown process: '{pid}'. "
+                                     f"Valid: {list(PROCESS_RATES.keys())}")
     if req.tolerance_id not in TOLERANCE_MULTIPLIERS:
         raise HTTPException(400, f"Unknown tolerance: '{req.tolerance_id}'. "
                                  f"Valid: {list(TOLERANCE_MULTIPLIERS.keys())}")
@@ -273,11 +328,13 @@ async def gen_quote(req: QuoteRequest):
         quote = compute_quote(
             geometry=req.geometry,
             material_id=req.material_id,
-            process_id=req.process_id,
+            process_ids=req.process_ids,
             tolerance_id=req.tolerance_id,
             quantity=req.quantity,
             metal_price_inr=metal_price_inr,
             exchange_rate=rate,
+            surface_treatment_ids=req.surface_treatment_ids,
+            profit_margin_pct=req.profit_margin_pct,
         )
         quote["price_source"]    = price_data["source"]
         quote["price_note"]      = price_data.get("note", "")
@@ -299,8 +356,10 @@ async def gen_quote_pdf(req: QuoteRequest, background_tasks: BackgroundTasks):
     """Generate a quotation PDF in ACCU DESIGN format (INR)."""
     if req.material_id not in MATERIALS:
         raise HTTPException(400, f"Unknown material: '{req.material_id}'")
-    if req.process_id not in PROCESS_RATES:
-        raise HTTPException(400, f"Unknown process: '{req.process_id}'")
+        
+    for pid in req.process_ids:
+        if pid not in PROCESS_RATES:
+            raise HTTPException(400, f"Unknown process: '{pid}'")
     if req.tolerance_id not in TOLERANCE_MULTIPLIERS:
         raise HTTPException(400, f"Unknown tolerance: '{req.tolerance_id}'")
 
@@ -319,11 +378,13 @@ async def gen_quote_pdf(req: QuoteRequest, background_tasks: BackgroundTasks):
         quote = compute_quote(
             geometry=req.geometry,
             material_id=req.material_id,
-            process_id=req.process_id,
+            process_ids=req.process_ids,
             tolerance_id=req.tolerance_id,
             quantity=req.quantity,
             metal_price_inr=metal_price_inr,
             exchange_rate=rate,
+            surface_treatment_ids=req.surface_treatment_ids,
+            profit_margin_pct=req.profit_margin_pct,
         )
         quote["price_source"] = price_data["source"]
         quote["quote_number"] = quote_number
@@ -340,7 +401,7 @@ async def gen_quote_pdf(req: QuoteRequest, background_tasks: BackgroundTasks):
         return FileResponse(
             pdf_path,
             media_type="application/pdf",
-            filename=f"AccuDesign_Quote_{quote_number.replace('/', '_')}.pdf"
+            filename=f"accudesign_quote_{quote_number.replace('/', '_')}.pdf"
         )
     except Exception as e:
         import traceback
@@ -470,4 +531,8 @@ if os.path.isdir(dist_path):
 
         # Fallback to index.html for React SPA
         return FileResponse(os.path.join(dist_path, "index.html"))
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 

@@ -27,6 +27,16 @@ MATERIALS = {
         "machinability": 1.00,
         "finish_factor": 1.0,
     },
+    "commercial_aluminium_he30": {
+        "name":          "Commercial Aluminium (HE30)",
+        "density":       2.70,
+        "price_usd_kg":  2.20,
+        "metals_dev_key": "lme_aluminum",
+        "wb_code":       "PALUM",
+        "mrr_cm3_hr":    400,
+        "machinability": 0.95,
+        "finish_factor": 1.0,
+    },
     "stainless_steel_304": {
         "name":          "Stainless Steel 304",
         "density":       7.93,
@@ -205,6 +215,8 @@ async def _fetch_metals_dev(api_key: str, fallback: dict) -> Optional[dict]:
                 raw_price = float(metals[dev_key])
                 if mid == "inconel_718":
                     prices[mid] = round(raw_price * 6, 2)
+                elif mid == "commercial_aluminium_he30":
+                    prices[mid] = round(raw_price * 0.88, 4)
                 else:
                     prices[mid] = round(raw_price, 4)
 

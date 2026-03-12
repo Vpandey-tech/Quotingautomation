@@ -16,8 +16,22 @@ Changes from Phase 3:
   - GST calculation (SGST 9% + CGST 9%)
   - Surface Treatment, Logistics, Engineering Charges line items
 """
-
 import math
+import re
+
+def safe_float(val, default_val=0.0):
+    """Safely convert any mixed string (e.g., '1/2\" BSP', '~10mm') to float by extracting the first numeric sequence."""
+    try:
+        if val is None:
+            return float(default_val)
+        return float(val)
+    except (ValueError, TypeError):
+        if isinstance(val, str):
+            m = re.search(r"[-+]?\d*\.?\d+", val)
+            if m:
+                return float(m.group(0))
+        return float(default_val)
+
 try:
     from services.pricing import MATERIALS
     from services.currency import convert_material_price, convert_machine_rate, convert_setup_fee
@@ -123,11 +137,13 @@ GST_RATE      = 0.18   # 18% GST (9% SGST + 9% CGST)
 def compute_quote(
     geometry:       dict,
     material_id:    str,
-    process_id:     str,
+    process_ids:    list,
     tolerance_id:   str,
     quantity:        int,
     metal_price_inr: float,    # INR/kg — already converted via Section A
     exchange_rate:   float,    # USD → INR rate for machine rate conversion
+    surface_treatment_ids: list = None,
+    profit_margin_pct: float = 22.0, # e.g. 22.0 = 22%
 ) -> dict:
     """
     Full cost calculation in INR.
@@ -135,18 +151,20 @@ def compute_quote(
     Machine rates are converted inside this function using Section B formula:
       INR/hr = (USD/hr ÷ 10) × exchange_rate × 1.5
     """
+    if not surface_treatment_ids:
+        surface_treatment_ids = []
+
     mat  = MATERIALS[material_id]
-    proc = PROCESS_RATES[process_id]
     tol  = TOLERANCE_MULTIPLIERS[tolerance_id]
 
-    # Convert machine rate and setup fee to INR (Section B)
-    proc_rate_inr = convert_machine_rate(proc["rate_hr"], exchange_rate)
-    setup_inr     = convert_setup_fee(proc["setup_usd"], exchange_rate)
-
-    volume_mm3  = float(geometry.get("volume", 0))
-    surface_mm2 = float(geometry.get("surfaceArea", 0))
+    volume_mm3  = safe_float(geometry.get("volume"), 0.0)
+    surface_mm2 = safe_float(geometry.get("surfaceArea"), 0.0)
     complexity  = geometry.get("complexity", {})
     comp_tier   = complexity.get("tier", "Simple") if isinstance(complexity, dict) else "Simple"
+
+    # ── Rule: if > 5 processes, force Very Complex ─────────────────────────────
+    if len(process_ids) >= 5:
+        comp_tier = "Very Complex"
 
     # ── Volume conversions ────────────────────────────────────────────────────
     volume_cm3 = max(volume_mm3 / 1000.0, 0.001)
@@ -156,64 +174,89 @@ def compute_quote(
     raw_stock_kg  = mass_kg * (1 + SCRAP_RATE)
     mat_cost_unit = raw_stock_kg * metal_price_inr
 
-    # ── Machining Time Estimation ─────────────────────────────────────────────
-    if proc["axes"] == 0:
-        # NON-SUBTRACTIVE
-        if "fdm" in process_id:
-            fill_rate_cm3_hr = 57.6
-        elif "sla" in process_id:
-            fill_rate_cm3_hr = 25.5
-        elif "dmls" in process_id:
-            fill_rate_cm3_hr = 8.0
-        elif "injection" in process_id:
-            fill_rate_cm3_hr = 120.0
-        else:
-            fill_rate_cm3_hr = 30.0
-        machining_hr = volume_cm3 / fill_rate_cm3_hr
-    else:
-        # SUBTRACTIVE (CNC)
-        bb = geometry.get("boundingBox", {})
-        if bb and bb.get("sizeX") and bb.get("sizeY") and bb.get("sizeZ"):
-            bbox_vol_cm3 = (
-                float(bb["sizeX"]) * float(bb["sizeY"]) * float(bb["sizeZ"])
-            ) / 1000.0
-            stock_removal_cm3 = max(bbox_vol_cm3 - volume_cm3, volume_cm3 * 0.15)
-        else:
-            stock_removal_cm3 = volume_cm3 * 0.30
+    # ── Machining Time & Cost Estimation (Loop over processes) ────────────────
+    total_machining_hr = 0.0
+    total_mach_cost_unit = 0.0
+    total_setup_inr = 0.0
+    total_drill_cost = 0.0
 
-        eff_mrr = mat["mrr_cm3_hr"] * mat["machinability"]
-        machining_hr = stock_removal_cm3 / max(eff_mrr, 1.0)
-
-        finish_hr = (surface_mm2 / 10000.0) * mat["finish_factor"] * 0.05
-        machining_hr += finish_hr
-
-    # ── Apply complexity & tolerance multipliers ──────────────────────────────
-    comp_mult   = COMPLEXITY_MULTIPLIERS.get(comp_tier, 1.0)
-    tol_mult    = tol["multiplier"]
-    adj_mach_hr = machining_hr * comp_mult * tol_mult
-
-    # C_machining = Machining Time × Machine Rate (INR)
-    mach_cost_unit = adj_mach_hr * proc_rate_inr
-
-    # ── Hole drilling surcharge (INR) ─────────────────────────────────────────
     holes = geometry.get("holes", [])
-    drill_cost = 0.0
-    for hole in holes:
-        d = float(hole.get("diameter", 1))
-        depth = float(hole.get("depth", d))
-        h_type = hole.get("type", "through")
-        depth_factor = 1.5 if h_type == "blind" else 1.0
-        drill_cost += 2.0 * depth_factor * (depth / max(d, 1)) * (proc_rate_inr / 60.0)
+    mfg_processes = []
+
+    for process_id in process_ids:
+        if process_id not in PROCESS_RATES:
+            continue
+        proc = PROCESS_RATES[process_id]
+        mfg_processes.append(proc["name"])
+        
+        proc_rate_inr = convert_machine_rate(proc["rate_hr"], exchange_rate)
+        total_setup_inr += convert_setup_fee(proc["setup_usd"], exchange_rate)
+
+        if proc["axes"] == 0:
+            # NON-SUBTRACTIVE
+            if "fdm" in process_id:
+                fill_rate_cm3_hr = 57.6
+            elif "sla" in process_id:
+                fill_rate_cm3_hr = 25.5
+            elif "dmls" in process_id:
+                fill_rate_cm3_hr = 8.0
+            elif "injection" in process_id:
+                fill_rate_cm3_hr = 120.0
+            else:
+                fill_rate_cm3_hr = 30.0
+            machining_hr = volume_cm3 / fill_rate_cm3_hr
+        else:
+            # SUBTRACTIVE (CNC) - roughly split stock removal if multiple, but simplest
+            # is just to run the base formula for each for now, or just once if primary.
+            # Assuming if they picked it, it contributes. 
+            bb = geometry.get("boundingBox", {})
+            if bb and bb.get("sizeX") and bb.get("sizeY") and bb.get("sizeZ"):
+                bbox_vol_cm3 = (
+                    safe_float(bb.get("sizeX"), 1.0) * safe_float(bb.get("sizeY"), 1.0) * safe_float(bb.get("sizeZ"), 1.0)
+                ) / 1000.0
+                stock_removal_cm3 = max(bbox_vol_cm3 - volume_cm3, volume_cm3 * 0.15)
+            else:
+                stock_removal_cm3 = volume_cm3 * 0.30
+
+            eff_mrr = mat["mrr_cm3_hr"] * mat["machinability"]
+            machining_hr = stock_removal_cm3 / max(eff_mrr, 1.0)
+            
+            # Divide base machining time by number of CNC processes selected to avoid 5x inflation?
+            # For authenticity, if multiple CNC processes are picked they likely perform different ops.
+            # We'll just distribute stock removal across them linearly to keep it sane.
+            machining_hr = machining_hr / sum(1 for p in process_ids if PROCESS_RATES.get(p, {}).get("axes", 0) > 0)
+
+            finish_hr = (surface_mm2 / 10000.0) * mat["finish_factor"] * 0.05
+            machining_hr += finish_hr
+
+        # ── Apply complexity & tolerance multipliers per process ───────────────
+        comp_mult   = COMPLEXITY_MULTIPLIERS.get(comp_tier, 1.0)
+        tol_mult    = tol["multiplier"]
+        adj_mach_hr = machining_hr * comp_mult * tol_mult
+        
+        total_machining_hr += adj_mach_hr
+        total_mach_cost_unit += adj_mach_hr * proc_rate_inr
+
+        # ── Hole drilling surcharge (INR) ONLY IF first subtractive process ──
+        if proc["axes"] > 0 and holes and total_drill_cost == 0.0:
+            for hole in holes:
+                d = safe_float(hole.get("diameter"), 1.0)
+                depth = safe_float(hole.get("depth"), d)
+                h_type = hole.get("type", "through")
+                depth_factor = 1.5 if h_type == "blind" else 1.0
+                total_drill_cost += 2.0 * depth_factor * (depth / max(d, 1)) * (proc_rate_inr / 60.0)
 
     # ── Setup cost (amortised over quantity, INR) ─────────────────────────────
-    setup_per_unit = setup_inr / max(quantity, 1)
+    setup_per_unit = total_setup_inr / max(quantity, 1)
 
     # ── Subtotal per unit ─────────────────────────────────────────────────────
-    subtotal_unit = mat_cost_unit + mach_cost_unit + drill_cost + setup_per_unit
+    subtotal_unit = mat_cost_unit + total_mach_cost_unit + total_drill_cost + setup_per_unit
 
     # ── Overhead + Profit ─────────────────────────────────────────────────────
     overhead_unit = subtotal_unit * OVERHEAD_RATE
-    profit_unit   = (subtotal_unit + overhead_unit) * PROFIT_MARGIN
+    # Profit calculated dynamically based on user input
+    profit_margin_val = max(15.0, min(30.0, profit_margin_pct)) / 100.0
+    profit_unit   = (subtotal_unit + overhead_unit) * profit_margin_val
     total_unit    = subtotal_unit + overhead_unit + profit_unit
 
     # ── Quantity discount (unchanged) ─────────────────────────────────────────
@@ -235,25 +278,28 @@ def compute_quote(
     grand_total = total_order + sgst + cgst
 
     # ── Manufacturing processes description ──────────────────────────────────
-    mfg_processes = [proc["name"]]
-    if len(holes) > 0:
+    if len(holes) > 0 and "Drilling" not in mfg_processes:
         mfg_processes.append("Drilling")
+        
+    for st_id in surface_treatment_ids:
+        # A simple map or we can just capitalize for now
+        mfg_processes.append(st_id.replace("_", " ").title())
 
     return {
         "material":     mat["name"],
-        "process":      proc["name"],
+        "process":      ", ".join(mfg_processes),
         "tolerance":    tol["label"],
         "complexity":   comp_tier,
         "quantity":     quantity,
         "metal_price_inr_kg": round(metal_price_inr, 2),
         "exchange_rate":      round(exchange_rate, 2),
-        "machine_rate_inr_hr": round(proc_rate_inr, 2),
+        "machine_rate_inr_hr": round(proc_rate_inr, 2) if 'proc_rate_inr' in locals() else 0.0,
 
         # Per-unit breakdown (INR)
         "breakdown": {
             "material_cost":    round(mat_cost_unit,    2),
-            "machining_cost":   round(mach_cost_unit,   2),
-            "drilling_cost":    round(drill_cost,       2),
+            "machining_cost":   round(total_mach_cost_unit,   2),
+            "drilling_cost":    round(total_drill_cost,       2),
             "setup_cost":       round(setup_per_unit,   2),
             "overhead":         round(overhead_unit,    2),
             "profit_margin":    round(profit_unit,      2),
@@ -273,7 +319,7 @@ def compute_quote(
 
         # Derived
         "mass_kg":              round(mass_kg,          4),
-        "machining_hours":      round(adj_mach_hr,      3),
+        "machining_hours":      round(total_machining_hr,      3),
         "holes_count":          len(holes),
         "manufacturing_processes": mfg_processes,
         "currency":             "INR",
