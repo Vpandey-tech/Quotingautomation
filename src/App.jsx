@@ -147,8 +147,7 @@ export default function App() {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const resp = await fetch(`${API_URL}/api/analyze`, { method: 'POST', body: fd });
+      const resp = await fetch('/api/analyze', { method: 'POST', body: fd });
       if (resp.ok) {
         setGeometry(await resp.json());
         setBrepStatus('ready');
