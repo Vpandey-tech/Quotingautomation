@@ -127,4 +127,50 @@
   .btn-lift:active {
     transform: translateY(0);
   }
+
+  /* ── Sidebar resize handle ─────────────────────────────────────────────── */
+  .sidebar-resize-handle {
+    width: 6px;
+    cursor: col-resize;
+    background: rgba(255,255,255,0.03);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 50;
+    transition: background 0.15s ease;
+    border-left: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .sidebar-resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 36px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.08);
+    opacity: 0;
+    transition: opacity 0.2s ease, background 0.2s ease;
+  }
+
+  .sidebar-resize-handle:hover {
+    background: rgba(34, 211, 238, 0.08);
+    border-left-color: rgba(34, 211, 238, 0.3);
+  }
+
+  .sidebar-resize-handle:hover::after {
+    opacity: 1;
+    background: rgba(34, 211, 238, 0.4);
+  }
+
+  .sidebar-resize-handle:active {
+    background: rgba(34, 211, 238, 0.15);
+    border-left-color: rgba(34, 211, 238, 0.5);
+  }
+
+  .sidebar-resize-handle:active::after {
+    opacity: 1;
+    background: rgba(34, 211, 238, 0.7);
+  }
 }

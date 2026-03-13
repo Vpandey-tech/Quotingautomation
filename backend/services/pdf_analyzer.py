@@ -7,7 +7,7 @@ data that can be used to generate a manufacturing quotation.
 
 Features:
   - Auto-retry on rate limit (429) errors
-  - Fallback from gemini-2.0-flash → gemini-1.5-flash
+  - Fallback from gemini-2.5-flash → gemini-2.0-flash → gemini-2.5-pro
   - Structured JSON output compatible with quote engine
 """
 
@@ -38,28 +38,45 @@ def _configure_gemini():
 EXTRACTION_PROMPT = """You are an expert manufacturing engineer analyzing an engineering drawing PDF.
 Your job is to extract ALL manufacturing-relevant information for creating a quotation.
 
+CRITICAL INSTRUCTION FOR CONSISTENCY: 
+If this drawing contains multiple parts (e.g., an assembly), you MUST extract the parts in a strictly logical order. 
+1. If there is a Bill of Materials (BOM) or Parts List, extract the parts in the EXACT order they appear in the BOM (from top to bottom or bottom to top as listed).
+2. If there is no BOM, extract the MAIN or LARGEST constituent part first, followed by others in decreasing order of size.
+This ensures your output is completely deterministic between multiple runs.
+
+CRITICAL INSTRUCTION FOR DIMENSIONS AND BOUNDING BOX:
+- `boundingBox` MUST represent the absolute MAXIMUM overall outer dimensions of the part.
+- For a cylindrical part like a rod or shaft: `sizeX` MUST be the TOTAL maximum overall length of the part (look for the largest length dimension line that spans the FULL part). DO NOT use partial segment lengths or thread lengths. `sizeY` and `sizeZ` MUST BOTH be equal to the MAXIMUM outer diameter of the part.
+- For rectangular parts: `sizeX`, `sizeY` and `sizeZ` are the Max Length, Max Width, and Max Thickness respectively.
+- You MUST be completely deterministic and solely use the largest explicit dimension spanning the part.
+
 Extract the following information for EACH part visible in the drawing:
 
-1. Part name/description
-2. ALL dimensions (length, width, height, diameter, radius, depth) in mm
-3. Material specified (if any)
-4. Tolerances mentioned (e.g., ±0.1 mm, H7, etc.)
-5. Surface finish requirements (Ra values, plating, coating)
-6. ALL holes: type (through/blind/threaded), diameter, depth, count
-7. Weight if mentioned (in kg)
-8. Quantity if mentioned
-9. Manufacturing processes suggested or visible
-10. Special notes, chamfers, fillets, threads (M6, M8, etc.)
-11. Estimate the volume in mm³ from dimensions
-12. Estimate the surface area in mm² from dimensions
-13. Bounding box: sizeX, sizeY, sizeZ in mm
+1. Item Number (from Bill of Materials)
+2. Part name/description
+3. ALL dimensions (length, width, height, diameter, radius, depth) in mm
+4. Material specified (if any)
+5. Tolerances mentioned (e.g., ±0.1 mm, H7, etc.)
+6. Surface finish requirements (Ra values, plating, coating)
+7. ALL holes: type (through/blind/threaded), diameter, depth, count
+8. Weight if mentioned (in kg)
+9. Quantity if mentioned
+10. Manufacturing processes suggested or visible
+11. Special notes, chamfers, fillets, threads (M6, M8, etc.)
+12. Estimate the volume in mm³ from dimensions
+13. Estimate the surface area in mm² from dimensions
+14. Bounding box: sizeX, sizeY, sizeZ in mm
+15. Determine if it is a "machined part" or "buyout item" (e.g. O-Rings, off-the-shelf bolts).
+16. Extract Critical Machining Considerations (e.g. Maintaining straightness, critical boring tolerances, multi-sided complex pocketing).
 
 Return as valid JSON (no markdown, no code fences):
 {
     "parts": [
         {
+            "item_number": "18",
             "name": "Part Name",
             "description": "Brief description",
+            "part_category": "machined part or buyout item",
             "dimensions": {
                 "length": 0, "width": 0, "height": 0,
                 "diameter": 0, "radius": 0
@@ -78,6 +95,7 @@ Return as valid JSON (no markdown, no code fences):
             "manufacturing_processes": ["turning", "milling", "drilling"],
             "process_id": "best matching from: cnc_turning, cnc_milling_2ax, cnc_milling_3ax, cnc_milling_5ax, swiss_machining, edm_wire, laser_cutting, injection_molding, fdm_3d_print, sla_3d_print, dmls_metal_print",
             "notes": "chamfers, threads, special requirements",
+            "critical_considerations": "e.g. maintaining straightness, deep pocketing, tight angular hole precision",
             "estimated_volume_mm3": 0,
             "estimated_surface_area_mm2": 0
         }
@@ -101,6 +119,7 @@ CRITICAL RULES — DO NOT HALLUCINATE:
 - ONLY extract values that are EXPLICITLY VISIBLE in the drawing. If a dimension, material, tolerance, or any value is NOT written or shown in the PDF, set it to null or 0. NEVER guess or invent values.
 - If you are unsure about any value, set it to null. It is better to leave a field null than to provide a wrong number.
 - Dimensions MUST be read directly from dimension lines, callouts, or text in the drawing. If a dimension is not labeled, set it to 0.
+- For bounding box `sizeX`, NEVER guess. ONLY select the single largest explicit length dimension line given. DO NOT add multiple smaller dimensions together and DO NOT select a partial feature length.
 - Material MUST only be filled if it is explicitly written in the drawing (e.g., "EN-8", "SS 304", "Al 6061"). Do NOT assume material from part appearance.
 - Tolerance MUST only be filled if tolerance values are explicitly shown (e.g., "±0.1", "H7", "IT6").
 - Holes MUST only be listed if they are visible in the drawing with diameter callouts. Do NOT invent holes.
@@ -151,7 +170,12 @@ async def analyze_pdf_drawing(pdf_bytes: bytes, filename: str) -> Optional[dict]
                 try:
                     print(f"[PDF_ANALYZER] Trying {model_name} (attempt {attempt + 1})")
                     model = genai.GenerativeModel(model_name)
-                    response = model.generate_content([EXTRACTION_PROMPT, uploaded_file])
+                    response = model.generate_content(
+                        [EXTRACTION_PROMPT, uploaded_file],
+                        generation_config=genai.types.GenerationConfig(
+                            temperature=0.0
+                        )
+                    )
                     text = response.text.strip()
                     last_error = None
                     break  # Success — exit retry loop

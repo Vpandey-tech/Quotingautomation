@@ -70,6 +70,15 @@ class ChatRequest(BaseModel):
     message: str
     metrics: dict
 
+class BomPdfRequest(BaseModel):
+    parts:          list  = Field(..., description="List of part objects from the BOM quote")
+    quote_number:   str   = Field("")
+    client_name:    str   = Field("")
+    client_company: str   = Field("")
+    hsn_code:       str   = Field("84669310")
+    source_filename: str  = Field("")
+    profit_margin_pct: float = Field(22.0, ge=15.0, le=30.0)
+
 
 # ── Health ────────────────────────────────────────────────────────────────────
 @app.get("/api/health", tags=["System"])
@@ -267,15 +276,50 @@ Please smartly interpret their request and update the configuration metrics vari
 For example, if they specify material: "Aluminium 6061", change the "materialId" to "aluminum_6061", and "material" to "Aluminum 6061".
 Try to match their terms loosely. E.g if they say 'commercial aluminium' pick 'commercial_aluminium_he30'. If they say 'turning', set 'processId' to 'cnc_turning'.
 
+CRITICAL INSTRUCTIONS FOR 'response':
+1. It MUST be highly conversational, extremely brief, and punchy (1 to 3 sentences maximum).
+2. NEVER output a giant wall of text, massive lists, or excessive markdown formatting. If the user asks what parameters or numbers were found, just give a quick one-sentence high-level summary (e.g. "I found X parts with a total volume of Y mm³"). Focus on clarity, not overwhelming detail.
+3. ALWAYS ensure numerical values are accurately preserved and stated if relevant.
+
 Return ONLY valid JSON in this exact format, without code blocks or markdown, just the raw braces:
 {{
   "response": "Brief professional conversational response acknowledging changes made.",
   "metrics": {{ ... complete updated metrics object ... }}
 }}"""
         
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        res = model.generate_content(prompt)
-        text = res.text.strip()
+        models_to_try = [
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-2.5-pro"
+        ]
+        
+        text = None
+        last_error = None
+        
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                res = model.generate_content(
+                    prompt, 
+                    generation_config=genai.types.GenerationConfig(temperature=0.0)
+                )
+                text = res.text.strip()
+                break
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                if "429" in error_str or "quota" in error_str.lower() or "ResourceExhausted" in error_str:
+                    continue  # try next model on rate limit
+                else:
+                    break  # non rate limit error, break out
+        
+        if text is None:
+            if last_error:
+                error_str = str(last_error)
+                if "429" in error_str or "quota" in error_str.lower() or "ResourceExhausted" in error_str:
+                    return JSONResponse(content={"response": "I am currently receiving too many requests (API Rate Limit). Please wait a moment and try again.", "metrics": req.metrics})
+            raise Exception("Failed to generate content: " + str(last_error))
+
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0]
         elif "```" in text:
@@ -286,9 +330,11 @@ Return ONLY valid JSON in this exact format, without code blocks or markdown, ju
             "response": data.get("response", "Updated configuration."),
             "metrics": data.get("metrics", req.metrics)
         })
+    except json.JSONDecodeError:
+        return JSONResponse(content={"response": "I had trouble understanding that change. Could you please rephrase it or adjust manually?", "metrics": req.metrics})
     except Exception as e:
         print("Chat API Error:", e)
-        return JSONResponse(content={"response": "I had trouble parsing that change. Please adjust it manually.", "metrics": req.metrics})
+        return JSONResponse(content={"response": "I had an unexpected issue processing your request. Please adjust it manually.", "metrics": req.metrics})
 
 # ── Quote endpoint (INR) ─────────────────────────────────────────────────────
 @app.post("/api/quote", tags=["Quoting"])
@@ -414,6 +460,34 @@ def _safe_delete(path: str):
         os.unlink(path)
     except Exception:
         pass
+
+
+# ── BOM Assembly PDF endpoint ───────────────────────────────────────────────
+@app.post("/api/quote/bom-pdf", tags=["Quoting"])
+async def gen_bom_quote_pdf(req: BomPdfRequest, background_tasks: BackgroundTasks):
+    """Generate a BOM assembly quotation PDF in landscape format."""
+    try:
+        from services.pdf import generate_bom_quote_pdf
+
+        pdf_path = generate_bom_quote_pdf(
+            parts=req.parts,
+            quote_number=req.quote_number,
+            client_name=req.client_name,
+            client_company=req.client_company,
+            hsn_code=req.hsn_code,
+            source_filename=req.source_filename,
+            profit_margin_pct=req.profit_margin_pct,
+        )
+        background_tasks.add_task(_safe_delete, pdf_path)
+        return FileResponse(
+            pdf_path,
+            media_type="application/pdf",
+            filename=f"accudesign_bom_{req.quote_number.replace('/', '_')}.pdf"
+        )
+    except Exception as e:
+        import traceback
+        print(f"\n{'='*60}\n[BOM PDF ERROR]\n{traceback.format_exc()}\n{'='*60}\n")
+        raise HTTPException(500, f"BOM PDF generation failed: {str(e)}")
 
 
 # ── CadQuery geometry analysis ────────────────────────────────────────────────

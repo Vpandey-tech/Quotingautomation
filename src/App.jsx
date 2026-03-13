@@ -82,6 +82,13 @@ export default function App() {
 
   // Track sidebar hover to block pointer events on 3D canvas
   const [sidebarHovered, setSidebarHovered] = useState(false);
+
+  // ── Draggable sidebar width ──
+  const [sidebarWidth, setSidebarWidth] = useState(340);
+  const isDraggingRef = useRef(false);
+  const dragStartX = useRef(0);
+  const dragStartWidth = useRef(340);
+
   const viewerRef = useRef(null);
 
   // Capture screenshot of 3D canvas for PDF isometric view
@@ -109,6 +116,43 @@ export default function App() {
       viewerRef.current.style.pointerEvents = 'auto';
     }
   }, []);
+
+  // ── Sidebar resize drag handler ──
+  const handleResizeStart = useCallback((e) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    dragStartX.current = e.clientX;
+    dragStartWidth.current = sidebarWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    if (viewerRef.current) {
+      viewerRef.current.style.pointerEvents = 'none';
+    }
+
+    const onMove = (moveE) => {
+      if (!isDraggingRef.current) return;
+      const delta = moveE.clientX - dragStartX.current;
+      const clamped = Math.min(Math.max(dragStartWidth.current + delta, 280), window.innerWidth * 0.75);
+      setSidebarWidth(clamped);
+    };
+
+    const onUp = () => {
+      isDraggingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      
+      // Restore pointer events UNLESS sidebar is currently hovered
+      if (viewerRef.current && !sidebarHovered) {
+        viewerRef.current.style.pointerEvents = 'auto';
+      }
+      
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [sidebarWidth]);
 
   // Called by Viewer with mesh metrics + original File object
   // For STEP files: file is passed, triggers B-Rep analysis
@@ -319,8 +363,8 @@ export default function App() {
 
         {/* ── Sidebar ────────────────────────────────────────────────────────── */}
         <aside
-          className="w-[320px] flex-shrink-0 flex flex-col z-40 sidebar-bg"
-          style={{ borderRight: '1px solid rgba(255,255,255,0.05)' }}
+          className="flex-shrink-0 flex flex-col z-40 sidebar-bg"
+          style={{ width: sidebarWidth, minWidth: 280, maxWidth: '75vw' }}
           onMouseEnter={handleSidebarEnter}
           onMouseLeave={handleSidebarLeave}
         >
@@ -358,32 +402,6 @@ export default function App() {
                   )}
                 </SectionCard>
 
-                {/* Mesh details */}
-                <SectionCard icon={Activity} title="Mesh Details">
-                  {metrics ? (
-                    <>
-                      <MetricRow label="Vertices" value={metrics.vertices.toLocaleString()} />
-                      <MetricRow label="Triangles" value={metrics.triangles.toLocaleString()} highlight />
-                      <MetricRow label="Meshes" value={metrics.meshCount} />
-                      <MetricRow label="Unit" value={metrics.unit} />
-                    </>
-                  ) : (
-                    <p className="text-[10px] text-gray-700 py-2">Upload a file.</p>
-                  )}
-                </SectionCard>
-
-                {/* Bounding box */}
-                <SectionCard icon={Ruler} title="Bounding Box">
-                  {metrics ? (
-                    <>
-                      <MetricRow label="Size X" value={`${metrics.sizeX} mm`} />
-                      <MetricRow label="Size Y" value={`${metrics.sizeY} mm`} />
-                      <MetricRow label="Size Z" value={`${metrics.sizeZ} mm`} />
-                    </>
-                  ) : (
-                    <p className="text-[10px] text-gray-700 py-2">Upload a file.</p>
-                  )}
-                </SectionCard>
 
                 {/* Properties */}
                 <SectionCard icon={FlaskConical} title="Properties">
@@ -452,7 +470,7 @@ export default function App() {
                                 {msg.role === 'assistant' && (
                                     <span className="font-bold text-purple-400 block mb-0.5 text-[9px] uppercase tracking-wider">ACCU AI</span>
                                 )}
-                                {msg.text}
+                                <div dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }} />
                               </div>
                             </div>
                           ))
@@ -495,6 +513,13 @@ export default function App() {
             )}
           </div>
         </aside>
+
+        {/* ── Sidebar Resize Handle ── */}
+        <div
+          className="sidebar-resize-handle"
+          onMouseDown={handleResizeStart}
+          title="Drag to resize"
+        />
 
         {/* ── 3D Viewer ────────────────────────────────────────────────────── */}
         <section

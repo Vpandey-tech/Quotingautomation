@@ -222,42 +222,6 @@ export default function Viewer({ onMetrics }) {
                         />
                     </div>
 
-                    {/* Extracted Metrics Overlay Box */}
-                    {status === 'pdf_loaded' && extractedMetrics && (
-                        <div className="absolute top-16 right-4 z-20 w-[220px] bg-gray-900/80 backdrop-blur-xl border border-purple-500/40 rounded-xl shadow-[0_8px_32px_rgba(168,85,247,0.15)] overflow-hidden scale-in-center transition-all duration-300">
-                            <div className="px-3 py-2 border-b border-purple-500/20 bg-purple-500/10 flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <FileText size={12} className="text-purple-400" />
-                                    <span className="text-[10px] font-bold text-gray-200 uppercase tracking-wider">Analysis Result</span>
-                                </div>
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]"></span>
-                            </div>
-                            <div className="p-3 space-y-2">
-                                <div className="flex justify-between items-center text-[10px] pb-1 border-b border-gray-700/50">
-                                    <span className="text-gray-400">Dim X</span>
-                                    <span className="text-gray-200 font-mono tracking-wide">{extractedMetrics.sizeX} mm</span>
-                                </div>
-                                <div className="flex justify-between items-center text-[10px] pb-1 border-b border-gray-700/50">
-                                    <span className="text-gray-400">Dim Y</span>
-                                    <span className="text-gray-200 font-mono tracking-wide">{extractedMetrics.sizeY} mm</span>
-                                </div>
-                                <div className="flex justify-between items-center text-[10px] pb-1 border-b border-gray-700/50">
-                                    <span className="text-gray-400">Dim Z</span>
-                                    <span className="text-gray-200 font-mono tracking-wide">{extractedMetrics.sizeZ} mm</span>
-                                </div>
-                                <div className="flex justify-between items-center text-[10px] pb-1 border-b border-gray-700/50">
-                                    <span className="text-gray-400">Volume</span>
-                                    <span className="text-cyan-300 font-mono tracking-wide">{extractedMetrics.volume} mm³</span>
-                                </div>
-                                {extractedMetrics.material && (
-                                    <div className="flex justify-between items-center text-[10px] pt-0.5">
-                                        <span className="text-gray-400">Material</span>
-                                        <span className="text-gray-200 truncate ml-2 text-right font-medium max-w-[120px]" title={extractedMetrics.material}>{extractedMetrics.material}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
 
                     {/* Status bar at bottom */}
                     {status === 'loading' && (

@@ -179,6 +179,7 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
 
     // ── Output state
     const [quote, setQuote] = useState(null);
+    const [multiQuote, setMultiQuote] = useState(null);
     const [loading, setLoading] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
     const [error, setError] = useState('');
@@ -199,13 +200,13 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
     }, [fileMetrics]);
 
     useEffect(() => {
-        if (quote && resultRef.current) {
+        if ((quote || multiQuote) && resultRef.current) {
             // Scroll down smoothly instantly when quote block appears
             setTimeout(() => {
-                resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 100);
         }
-    }, [quote]);
+    }, [quote, multiQuote]);
 
     // ── Load catalogue + prices on mount
     useEffect(() => {
@@ -284,13 +285,14 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
 
     // ── Generate quote
     const generateQuote = async () => {
-        if (!geometry) {
+        if (!geometry && !fileMetrics?.allParts) {
             setError('Please upload a STEP file or PDF drawing first.');
             return;
         }
         setLoading(true);
         setError('');
         setQuote(null);
+        setMultiQuote(null);
         try {
             const qty = Math.max(1, Math.min(10000, parseInt(String(quantity), 10) || 1));
 
@@ -299,29 +301,121 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                 try { screenshot = captureScreenshot(); } catch { }
             }
 
-            const resp = await fetch(`${API}/quote`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    geometry,
-                    material_id: materialId,
-                    process_ids: processIds,
-                    surface_treatment_ids: surfaceTreatmentIds,
-                    profit_margin_pct: profitMarginPct,
-                    tolerance_id: toleranceId,
-                    quantity: qty,
-                    client_name: clientName,
-                    client_company: clientCompany,
-                    hsn_code: hsnCode,
-                    source_filename: fileMetrics?.fileName || '',
-                    screenshot,
-                }),
-            });
-            if (!resp.ok) {
-                const err = await resp.json().catch(() => ({ detail: 'Unknown error' }));
-                throw new Error(err.detail || `Server error ${resp.status}`);
+            // If it's a PDF with multiple parts (BOM), generate tabular quote
+            if (fileMetrics?.source === 'pdf' && fileMetrics?.allParts?.length > 1) {
+                const results = await Promise.all(fileMetrics.allParts.map(async (part, index) => {
+                    const isBuyout = (part.part_category || '').toLowerCase().includes('buyout');
+                    const partGeometry = {
+                        volume: parseFloat(part.estimated_volume_mm3) || 0,
+                        surfaceArea: parseFloat(part.estimated_surface_area_mm2) || 0,
+                        boundingBox: {
+                            sizeX: parseFloat(part.bounding_box?.sizeX) || 0,
+                            sizeY: parseFloat(part.bounding_box?.sizeY) || 0,
+                            sizeZ: parseFloat(part.bounding_box?.sizeZ) || 0,
+                        },
+                        holes: part.holes || [],
+                        complexity: { tier: 'Moderate', score: 150 },
+                    };
+                    
+                    const pName = part.name || part.description || `Part ${index+1}`;
+                    const pDim = `${part.bounding_box?.sizeX||0}x${part.bounding_box?.sizeY||0}x${part.bounding_box?.sizeZ||0}`;
+                    const pQty = part.quantity || 1;
+                    const pCons = part.critical_considerations || '-';
+
+                    if (isBuyout) {
+                        return {
+                            isBuyout: true,
+                            item_number: part.item_number || '-',
+                            name: pName,
+                            material: part.material || '-',
+                            dimensions: pDim,
+                            qty: pQty,
+                            process: 'Buyout Item',
+                            machining_cost: 0,
+                            material_cost: 0,
+                            cycle_time: 0,
+                            critical_considerations: pCons,
+                            unit_price: 0,
+                        };
+                    }
+
+                    const fallbackMatId = Object.keys(materials).length > 0 ? Object.keys(materials)[0] : 'aluminum_6061';
+                    const fallbackProcId = Object.keys(processes).length > 0 ? Object.keys(processes)[0] : 'cnc_milling_3ax';
+
+                    const resp = await fetch(`${API}/quote`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            geometry: partGeometry,
+                            material_id: part.material_id || materialId || fallbackMatId,
+                            process_ids: part.process_id ? [part.process_id] : (processIds.length ? processIds : [fallbackProcId]),
+                            surface_treatment_ids: surfaceTreatmentIds,
+                            profit_margin_pct: profitMarginPct,
+                            tolerance_id: part.tolerance_id || toleranceId,
+                            quantity: pQty,
+                            client_name: clientName,
+                            client_company: clientCompany,
+                            hsn_code: hsnCode,
+                            source_filename: fileMetrics?.fileName || '',
+                            screenshot: null, 
+                        }),
+                    });
+
+                    if (!resp.ok) {
+                        return { 
+                            isBuyout: false, error: true, item_number: part.item_number, 
+                            name: pName, material: part.material, dimensions: pDim, qty: pQty 
+                        };
+                    }
+                    const qData = await resp.json();
+                    
+                    // Format for table
+                    return {
+                        isBuyout: false,
+                        item_number: part.item_number || '-',
+                        name: pName,
+                        material: materials[part.material_id || materialId]?.name || part.material || '-',
+                        dimensions: pDim,
+                        qty: pQty,
+                        process: processes[part.process_id || processIds[0]]?.name || 'Machining',
+                        machining_cost: qData.breakdown?.machining_cost || 0,
+                        material_cost: qData.breakdown?.material_cost || 0,
+                        cycle_time: qData.machining_hours || 0,
+                        critical_considerations: pCons,
+                        unit_price: qData.unit_price || 0,
+                        total_price: qData.order_total || 0,
+                    };
+                }));
+                setMultiQuote({
+                    parts: results,
+                    quote_number: `AD/BOM/${Math.floor(Math.random()*9000)+1000}`
+                });
+            } else {
+                // Single part quote processing
+                const resp = await fetch(`${API}/quote`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        geometry,
+                        material_id: materialId,
+                        process_ids: processIds,
+                        surface_treatment_ids: surfaceTreatmentIds,
+                        profit_margin_pct: profitMarginPct,
+                        tolerance_id: toleranceId,
+                        quantity: qty,
+                        client_name: clientName,
+                        client_company: clientCompany,
+                        hsn_code: hsnCode,
+                        source_filename: fileMetrics?.fileName || '',
+                        screenshot,
+                    }),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({ detail: 'Unknown error' }));
+                    throw new Error(err.detail || `Server error ${resp.status}`);
+                }
+                setQuote(await resp.json());
             }
-            setQuote(await resp.json());
         } catch (e) {
             setError(e.message || 'Network error — is the backend running?');
         } finally {
@@ -331,10 +425,11 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
 
     // ── Download PDF
     const downloadPdf = async () => {
-        if (!geometry) return;
+        if (!geometry && !multiQuote) return;
         setPdfLoading(true);
         setError('');
         try {
+            // NOTE: Batch PDF generation feature is WIP. For now, we fallback to first part or single logic.
             const qty = Math.max(1, Math.min(10000, parseInt(String(quantity), 10) || 1));
 
             let screenshot = null;
@@ -342,23 +437,25 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                 try { screenshot = captureScreenshot(); } catch { }
             }
 
+            const reqBody = {
+                geometry,
+                material_id: materialId,
+                process_ids: processIds,
+                surface_treatment_ids: surfaceTreatmentIds,
+                profit_margin_pct: profitMarginPct,
+                tolerance_id: toleranceId,
+                quantity: qty,
+                client_name: clientName,
+                client_company: clientCompany,
+                hsn_code: hsnCode,
+                source_filename: fileMetrics?.fileName || '',
+                screenshot,
+            };
+
             const resp = await fetch(`${API}/quote/pdf`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    geometry,
-                    material_id: materialId,
-                    process_ids: processIds,
-                    surface_treatment_ids: surfaceTreatmentIds,
-                    profit_margin_pct: profitMarginPct,
-                    tolerance_id: toleranceId,
-                    quantity: qty,
-                    client_name: clientName,
-                    client_company: clientCompany,
-                    hsn_code: hsnCode,
-                    source_filename: fileMetrics?.fileName || '',
-                    screenshot,
-                }),
+                body: JSON.stringify(reqBody),
             });
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({ detail: 'PDF generation failed' }));
@@ -375,6 +472,45 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
             window.URL.revokeObjectURL(url);
         } catch (e) {
             setError(e.message || 'PDF generation failed');
+        } finally {
+            setPdfLoading(false);
+        }
+    };
+
+    // ── Download BOM PDF (multi-part assembly)
+    const downloadBomPdf = async () => {
+        if (!multiQuote) return;
+        setPdfLoading(true);
+        setError('');
+        try {
+            const resp = await fetch(`${API}/quote/bom-pdf`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    parts: multiQuote.parts,
+                    quote_number: multiQuote.quote_number,
+                    client_name: clientName,
+                    client_company: clientCompany,
+                    hsn_code: hsnCode,
+                    source_filename: fileMetrics?.fileName || '',
+                    profit_margin_pct: profitMarginPct,
+                }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({ detail: 'PDF generation failed' }));
+                throw new Error(err.detail || `Server error ${resp.status}`);
+            }
+            const blob = await resp.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `AccuDesign_BOM_Quote_${Date.now()}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (e) {
+            setError(e.message || 'BOM PDF generation failed');
         } finally {
             setPdfLoading(false);
         }
@@ -534,17 +670,17 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                 {/* Generate button */}
                 <button
                     onClick={generateQuote}
-                    disabled={loading || !geometry}
+                    disabled={loading || (!geometry && !(fileMetrics?.allParts?.length > 1))}
                     className={`w-full py-3 mt-1 rounded-xl text-[12px] font-bold tracking-wider
                         transition-all duration-300 flex items-center justify-center gap-2
-                        ${geometry
+                        ${(geometry || fileMetrics?.allParts?.length > 1)
                             ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 shadow-[0_0_20px_rgba(34,211,238,0.3)] hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] hover:scale-[1.02] active:scale-[0.98]'
                             : 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/10'}`}
                 >
                     {loading
                         ? <><RefreshCw size={14} className="animate-spin" /> Computing…</>
                         : <><Zap size={14} className="drop-shadow-md" />
-                            {geometry ? 'Generate Quote (₹)' : 'Upload STEP/PDF First'}</>
+                            {(geometry || fileMetrics?.allParts?.length > 1) ? 'Generate Quote (₹)' : 'Upload STEP/PDF First'}</>
                     }
                 </button>
 
@@ -556,6 +692,97 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                     </div>
                 )}
             </div>
+
+            {/* ── Multi-Part Tabular Quote (for assemblies) ──────────────── */}
+            {multiQuote && (
+                <div ref={resultRef} className="rounded-2xl bg-gradient-to-b from-purple-900/30 to-black/60
+                    border border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.15)]
+                    backdrop-blur-xl p-4 space-y-3 relative overflow-hidden">
+                    
+                    {/* Header */}
+                    <div className="flex items-center gap-2 border-b border-purple-500/20 pb-2">
+                        <Layers size={15} className="text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
+                        <span className="text-[11px] font-bold text-white uppercase tracking-widest">
+                            BOM Assembly Quote (₹ INR)
+                        </span>
+                    </div>
+
+                    {/* Quote Number */}
+                    {multiQuote.quote_number && (
+                        <div className="bg-gray-900/70 rounded-lg px-3 py-2 flex justify-between items-center">
+                            <div>
+                                <p className="text-[9px] text-gray-500 uppercase tracking-widest">Quotation No.</p>
+                                <p className="text-[12px] font-mono text-purple-300 font-bold">{multiQuote.quote_number}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[9px] text-gray-500 uppercase tracking-widest">Total Parts</p>
+                                <p className="text-[12px] font-mono text-gray-300 font-bold">{multiQuote.parts.length}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tabular Data */}
+                    <div className="overflow-x-auto custom-scrollbar rounded-lg border border-purple-500/10">
+                        <table className="w-full text-left border-collapse whitespace-nowrap text-[10px]">
+                            <thead>
+                                <tr className="bg-purple-500/10 text-purple-200 border-b border-purple-500/20">
+                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase">Item #</th>
+                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase">Part Name / Desc</th>
+                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase">Material</th>
+                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase">Dimensions (mm)</th>
+                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase">Qty</th>
+                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase">Process</th>
+                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase whitespace-nowrap">Machining Cost (₹)</th>
+                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase whitespace-nowrap">Material Cost (₹)</th>
+                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase whitespace-nowrap">Critical Considerations</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {multiQuote.parts.map((p, i) => (
+                                    <tr key={i} className={`hover:bg-white/5 transition-colors ${p.isBuyout ? 'opacity-80 bg-black/20' : ''}`}>
+                                        <td className="px-2 py-2 font-mono text-gray-400">{p.item_number}</td>
+                                        <td className="px-2 py-2 text-cyan-100 max-w-[150px] truncate" title={p.name}>{p.name}</td>
+                                        <td className="px-2 py-2 text-gray-300 max-w-[120px] truncate">{p.material}</td>
+                                        <td className="px-2 py-2 text-gray-400 font-mono text-[9px]">{p.dimensions}</td>
+                                        <td className="px-2 py-2 font-mono text-cyan-300">{p.qty}</td>
+                                        <td className="px-2 py-2 text-gray-300">
+                                            {p.isBuyout ? <span className="text-amber-400/80 text-[9px] uppercase tracking-wider bg-amber-400/10 px-1 py-0.5 rounded border border-amber-400/20">{p.process}</span> : p.process}
+                                        </td>
+                                        <td className="px-2 py-2 font-mono text-gray-300">{p.isBuyout ? '—' : `₹${fmt(p.machining_cost)}`}</td>
+                                        <td className="px-2 py-2 font-mono text-gray-300">{p.isBuyout ? '—' : `₹${fmt(p.material_cost)}`}</td>
+                                        <td className="px-2 py-2 text-gray-400 text-[9px] max-w-[200px] truncate" title={p.critical_considerations}>{p.critical_considerations}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Totals */}
+                    <div className="border-t border-purple-500/20 pt-2 space-y-0.5 mt-2">
+                        <LineItem 
+                            label="Grand Total (Estimated, Excl. Buyouts)"
+                            value={`₹${fmt(multiQuote.parts.reduce((sum, p) => sum + (p.total_price || 0), 0))}`}
+                            highlight large
+                        />
+                        <p className="text-[9px] text-gray-500 text-right italic pt-1">All prices in ₹ INR. Buyout items quoted separately.</p>
+                        
+                        {/* Download BOM PDF */}
+                        <button
+                            onClick={downloadBomPdf}
+                            disabled={pdfLoading}
+                            className="w-full py-2.5 mt-2 rounded-xl text-[12px] font-bold tracking-wider
+                                transition-all duration-300 flex items-center justify-center gap-2
+                                border border-purple-500/30 bg-white/5 text-purple-300
+                                hover:bg-purple-500/10 hover:border-purple-400 active:scale-[0.98]
+                                disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {pdfLoading
+                                ? <><RefreshCw size={14} className="animate-spin" /> Generating PDF…</>
+                                : <><FileText size={14} /> Download BOM Quote (PDF)</>}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* ── Quote result (INR) ──────────────────────────────────────── */}
             {quote && (

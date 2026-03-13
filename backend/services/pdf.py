@@ -435,6 +435,10 @@ def generate_quote_pdf(
 
     pdf.ln(10)
 
+    # Prevent footer overlap: if Y is deep on the page, add page before T&C block
+    if pdf.get_y() > 210:
+        pdf.add_page()
+
     # ── TERMS & CONDITIONS ───────────────────────────────────────────────────
     pdf._set_font("B", 8)
     pdf.cell(0, 5, "Terms & Conditions:", ln=True)
@@ -469,4 +473,290 @@ def generate_quote_pdf(
             except:
                 pass
                 
+        return tmp.name
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BOM Assembly Quote PDF — Portrait A4 Layout (Industry Standard)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def generate_bom_quote_pdf(
+    parts: list,
+    quote_number: str = "",
+    client_name: str = "",
+    client_company: str = "",
+    hsn_code: str = "84669310",
+    source_filename: str = "",
+    profit_margin_pct: float = 22.0,
+) -> str:
+    """Generate a clean, professional BOM assembly quotation PDF in Portrait A4."""
+
+    pdf = AccuDesignAuthenticPDF()
+    pdf.set_auto_page_break(auto=True, margin=35)
+    pdf.add_page()
+    now = datetime.now()
+
+    # ── "Quotation" title center ─────────────────────────────────────────────
+    pdf._set_font("B", 11)
+    pdf.cell(0, 8, "Quotation", align="C", ln=True)
+    pdf.ln(2)
+
+    # ── Date and Quotation Number ────────────────────────────────────────────
+    pdf._set_font("", 9)
+    # Start X pos
+    x_left = pdf.get_x()
+    pdf.cell(40, 5, "Date", ln=False)
+    pdf.cell(50, 5, f": {now.strftime('%d/%m/%Y')}", ln=True)
+
+    pdf.cell(40, 5, "Quotation No.", ln=False)
+    pdf.cell(50, 5, f": {quote_number}", ln=True)
+    pdf.ln(3)
+
+    # ── Client Info ──────────────────────────────────────────────────────────
+    pdf._set_font("B", 8)
+    pdf.cell(0, 5, "To,", ln=True)
+    if client_company:
+        pdf.cell(0, 5, client_company, ln=True)
+    
+    if source_filename:
+        pdf._set_font("I", 8)
+        pdf.cell(0, 5, f"Subject: {source_filename}", ln=True)
+
+    pdf.ln(2)
+    pdf._set_font("B", 9)
+    name_display = f"Mr. {client_name}" if client_name else "Purchasing Manager"
+    pdf.cell(0, 5, f"Kindly Attention: {name_display}", ln=True)
+    pdf.ln(3)
+
+    # ── Subject Line ─────────────────────────────────────────────────────────
+    pdf._set_font("", 9)
+    part_label = source_filename.replace('.pdf', '').replace('.step', '') if source_filename else "parts"
+    subj_text = f"We are hereby pleased to share with you the best Techno - commercial offer for the\n{part_label} for your perusal."
+    pdf.multi_cell(0, 5, subj_text)
+    pdf.ln(6)
+
+    # ═══════════════════════ EXACT INVOICE TABLE BOM ═════════════════════════
+    # 10 columns matching EXACTLY the user's latest image layout:
+    # Sr#, DESCRIPTION, DIMENSIONS, CATEGORY, PART NO., MATERIAL, QTY., Weight(kg), MANUFACTURING PROCESS, Cost
+    COL_W = [7, 24, 23, 16, 14, 20, 9, 13, 43, 21]  # sum = 190
+    COL_H = ["Sr#", "DESCRIPTION", "DIMENSIONS", "CATEGORY", "PART\nNO.", "MATERIAL", "QTY.", "Weight\n(kg)", "MANUFACTURING\nPROCESS", "Cost"]
+    HDR_H = 8
+    
+    def _draw_table_header():
+        pdf._set_font("B", 6)
+        pdf.set_fill_color(240, 245, 255) # Light blueish header fill
+        pdf.set_draw_color(0, 0, 0)
+        pdf.set_line_width(0.2)
+        
+        y = pdf.get_y()
+        for i, h in enumerate(COL_H):
+            pdf.set_xy(10 + sum(COL_W[:i]), y)
+            # Use multi_cell for headers with newlines
+            if "\n" in h:
+                x_start = pdf.get_x()
+                pdf.multi_cell(COL_W[i], HDR_H/2, h, border=1, align="C", fill=True)
+                pdf.set_xy(x_start + COL_W[i], y)
+            else:
+                pdf.cell(COL_W[i], HDR_H, h, border=1, align="C", fill=True)
+        
+        pdf.set_y(y + HDR_H)
+
+    _draw_table_header()
+
+    machined_total = 0.0
+
+    pdf._set_font("B", 6)
+    
+    # Yellow highlighted "Assembly" row just like the image
+    part_label = source_filename.replace('.pdf', '').replace('.step', '') if source_filename else "ASSEMBLY"
+    y = pdf.get_y()
+    pdf.cell(COL_W[0], 6, "A", border=1, align="C")
+    pdf.cell(COL_W[1], 6, str(part_label)[:25].upper(), border=1, align="C")
+    pdf.cell(COL_W[2], 6, "", border=1, align="C")
+    pdf.set_fill_color(255, 255, 150)
+    pdf.cell(COL_W[3], 6, "Assembly", border=1, align="C", fill=True)
+    pdf.cell(COL_W[4], 6, "", border=1, align="C")
+    pdf.cell(COL_W[5], 6, "", border=1, align="C")
+    pdf.cell(COL_W[6], 6, "1 SET", border=1, align="C")
+    pdf.cell(COL_W[7], 6, "", border=1, align="C")
+    pdf.cell(COL_W[8], 6, "", border=1, align="C")
+    pdf.cell(COL_W[9], 6, "", border=1, align="C")
+    pdf.ln(6)
+    
+    pdf._set_font("", 6)
+
+    for idx, p in enumerate(parts):
+        if pdf.get_y() + 8 > 260:
+            pdf.add_page()
+            _draw_table_header()
+            pdf._set_font("", 6)
+
+        is_buyout = bool(p.get('isBuyout', False))
+        qty = int(p.get('qty', 1))
+        unit_price = p.get('unit_price', 0) or 0
+        if is_buyout:
+            unit_price = 0
+            
+        row_amount = unit_price * qty
+        
+        item_num = str(p.get('item_number', str(idx+1).zfill(2)))
+        part_name = p.get('name', 'PART').upper()
+        dims = str(p.get('dimensions', '-'))
+        material = str(p.get('material', 'EN-8')).upper()
+        weight = str(p.get('weight_kg', '-'))
+        process = p.get('process', 'Machining')
+
+        cost_str = "-" if is_buyout else _fmt_inr(row_amount)
+
+        # Row Height matching content
+        y_start = pdf.get_y()
+        
+        pdf.set_xy(10, y_start)
+        pdf.cell(COL_W[0], 8, str(idx+1), border=1, align="C")
+        
+        pdf.set_xy(10 + sum(COL_W[:1]), y_start)
+        pdf.cell(COL_W[1], 8, part_name[:30], border=1, align="C")
+        
+        pdf.set_xy(10 + sum(COL_W[:2]), y_start)
+        pdf.cell(COL_W[2], 8, dims[:22], border=1, align="C")
+        
+        pdf.set_xy(10 + sum(COL_W[:3]), y_start)
+        pdf.cell(COL_W[3], 8, "Buyout" if is_buyout else "Part", border=1, align="C")
+        
+        pdf.set_xy(10 + sum(COL_W[:4]), y_start)
+        pdf.cell(COL_W[4], 8, item_num[:8], border=1, align="C")
+        
+        pdf.set_xy(10 + sum(COL_W[:5]), y_start)
+        pdf.cell(COL_W[5], 8, material[:18], border=1, align="C")
+        
+        pdf.set_xy(10 + sum(COL_W[:6]), y_start)
+        pdf.cell(COL_W[6], 8, str(qty), border=1, align="C")
+        
+        pdf.set_xy(10 + sum(COL_W[:7]), y_start)
+        pdf.cell(COL_W[7], 8, weight[:8], border=1, align="C")
+        
+        # Multiline for processes potentially
+        x_proc = 10 + sum(COL_W[:8])
+        pdf.set_xy(x_proc, y_start)
+        if len(process) > 28:
+            pdf.multi_cell(COL_W[8], 4, process[:50], border=1, align="C")
+            pdf.set_xy(x_proc + COL_W[8], y_start)
+        else:
+            pdf.cell(COL_W[8], 8, process[:50], border=1, align="C")
+            
+        pdf.set_xy(10 + sum(COL_W[:9]), y_start)
+        pdf.cell(COL_W[9], 8, cost_str, border=1, align="C")
+        
+        pdf.set_y(y_start + 8)
+
+        if not is_buyout:
+            machined_total += row_amount
+
+    # ═══════════════════════ EXACT TOTALS BLOCK ══════════════════════════════
+    if pdf.get_y() + 65 > 260:
+        pdf.add_page()
+    
+    pdf.ln(4)
+    y = pdf.get_y()
+    
+    # Calculate the dynamic starting number for the Totals block based on the number of parts
+    start_idx = len(parts) + 1
+    
+    w_left = COL_W[0]
+    w_mid = sum(COL_W[1:-1])
+    w_right = COL_W[-1]
+    
+    def total_row(num, text, amount, is_bold=False):
+        pdf._set_font("B" if is_bold else "", 7)
+        pdf.cell(w_left, 6, str(num), border=1, align="C")
+        pdf.cell(w_mid, 6, text, border=1, align="C")
+        pdf.cell(w_right, 6, amount, border=1, align="R")
+        pdf.ln(6)
+
+    total_row(start_idx, "TOTAL A", _fmt_inr(machined_total), is_bold=True)
+    
+    surface_treatment = machined_total * 0.05
+    internal_ops = machined_total * 0.05
+    eng_charges = machined_total * 0.05
+    
+    total_row(start_idx + 1, "SURFACE TREATMENT/COATING", _fmt_inr(surface_treatment))
+    total_row(start_idx + 2, "Internal Logistics, Manufacturing Ops, Rework", _fmt_inr(internal_ops))
+    total_row(start_idx + 3, "Engineering Charges", _fmt_inr(eng_charges))
+    
+    total_b = machined_total + surface_treatment + internal_ops + eng_charges
+    total_row(start_idx + 4, "TOTAL B", _fmt_inr(total_b), is_bold=True)
+    
+    # Taxation Row
+    sgst = total_b * 0.09
+    cgst = total_b * 0.09
+    
+    pdf._set_font("", 7)
+    y_tax = pdf.get_y()
+    pdf.cell(w_left, 12, str(start_idx + 5), border=1, align="C")
+    
+    # Mid section split
+    w_mid_left = sum(COL_W[1:7]) # 106 
+    w_mid_mid1 = COL_W[7] # 13
+    w_mid_mid2 = COL_W[8] # 43
+    
+    # "Taxation C" cell spanning vertically
+    pdf.cell(w_mid_left, 12, "Taxation C", border=1, align="C")
+    
+    x_split = pdf.get_x()
+    # Top half (SGST)
+    pdf.cell(w_mid_mid1, 6, "SGST", border=1, align="C")
+    pdf.cell(w_mid_mid2, 6, "9%", border=1, align="C")
+    pdf.cell(w_right, 6, _fmt_inr(sgst), border=1, align="R")
+    pdf.ln(6)
+    
+    # Bottom half (CGST)
+    pdf.set_x(x_split)
+    pdf.cell(w_mid_mid1, 6, "CGST", border=1, align="C")
+    pdf.cell(w_mid_mid2, 6, "9%", border=1, align="C")
+    pdf.cell(w_right, 6, _fmt_inr(cgst), border=1, align="R")
+    pdf.ln(6)
+    
+    grand_total = total_b + sgst + cgst
+    rounded_total = round(grand_total)
+    
+    # Grand Total Row
+    pdf._set_font("B", 7)
+    pdf.cell(w_left, 6, str(start_idx + 6), border=1, align="C")
+    pdf.cell(w_mid, 6, "GRAND TOTAL = (A+B+C)", border=1, align="C")
+    pdf.cell(w_right, 6, _fmt_inr(rounded_total), border=1, align="R")
+    pdf.ln(6)
+    
+    # Amount in Words with Green Background
+    pdf.set_fill_color(200, 240, 180) # Light green
+    pdf.cell(w_left, 7, str(start_idx + 7), border=1, align="C", fill=True)
+    num_txt = "Amount in Words: " + amount_in_words(rounded_total) + " Rupees Only"
+    pdf.cell(w_mid + w_right, 7, num_txt, border=1, align="C", fill=True)
+    pdf.ln(7)
+
+    # ═══════════════════════ TERMS & CONDITIONS ══════════════════════════════
+    pdf.ln(8)
+    if pdf.get_y() > 250:
+        pdf.add_page()
+
+    pdf._set_font("B", 9)
+    pdf.cell(0, 5, "Terms & Conditions:", ln=True)
+    pdf._set_font("", 8)
+
+    terms = [
+        f"GST @18% against supply order.",
+        "Delivery Time within 3 weeks, Inclusive of Transportation.",
+        "70% Advance and remaining payment successful quality acceptance by client.",
+        "Validity of the above quotation for 15 days.",
+        f"All disputes are subject to Pune jurisdiction only."
+    ]
+    for i, t in enumerate(terms, 1):
+        pdf.cell(0, 4.5, f"{i}. {t}", ln=True)
+
+    # NO SIGNATURE As per user request matching the image!
+    
+    # Note: Footer is auto-drawn by FPDF because we use AccuDesignAuthenticPDF
+
+    # ── Save ─────────────────────────────────────────────────────────────────
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        pdf.output(tmp.name)
         return tmp.name

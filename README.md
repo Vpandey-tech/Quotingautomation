@@ -1,116 +1,120 @@
-# Accu Design ⚙️
-**Advanced Manufacturing Quoting & Engineering Automation System**
+# ACCU DESIGN Quoting Automation System
 
-Accu Design is an autonomous, high-performance manufacturing quotation platform designed for precision CAD engineers, procurement teams, and CNC machine shops. It allows users to upload **3D CAD models (.step)** or **2D Engineering Drawings (.pdf)**, visualize them instantly in the browser, extract precise geometric properties, and generate instant, highly accurate production quotes based on live global metal prices, USD-to-INR currency exchange rates, and explicit machine hour configurations.
+## 🚀 Overview
 
----
+The **ACCU DESIGN Quoting Automation System** is an AI-powered, intelligent manufacturing quotation engine. It accelerates the otherwise manual and time-consuming estimation process for engineering parts and assemblies by automatically extracting precise metrics (volumes, bounding boxes, processes, holes) straight from industrial 2D PDFs or 3D STEP files, and dynamically pricing them based on live global metal market rates and exchange APIs.
 
-## 🔥 Key Features (Phase 4 Updates)
-
-* **Dual Format Analysis (3D CAD & 2D PDF)**: Drop a `.step` file for immediate 3D in-browser B-Rep calculation constraints, or drop a `.pdf` engineering drawing to witness the document seamlessly rendered while Google Gemini AI autonomously extracts dimensions, materials, tolerances, and client details.
-* **Authentic Quote Generation**: The quoting engine dynamically compiles the exact, perfectly symmetrical **ACCU DESIGN** quotation template natively inside a high-performance Python PDF generator, supporting Unicode Indian Rupee (`₹`) symbols and aesthetic HTML/PDF color codes matching your brand. Fully custom logic calculates CGST, SGST, Total A/B calculations, and translates the Grand Total into Indian numbering words dynamically.
-* **Smart Anti-Hallucination OCR Engine**: A state-of-the-art backend built precisely around `gemini-2.5-flash` with aggressive fallback architectures (`gemini-2.0-flash` -> `gemini-2.5-pro` -> etc.) programmed explicitly to extract client letterheads (to auto-fill quote destination details) and dimension sets, whilst enforcing strict nil responses over hallucinations.
-* **Live Pricing Engine**: Queries live commodity markets (LME via metals.dev) for base USD rates, dynamically converts them to live INR via global currency APIs, and feeds the output directly into CNC hour complexity algorithms to guarantee quoting accuracy against live metal shifts.
+With its sleek, glassmorphic Dark Mode UI, built-in interactive 3D WebGL Viewer, and an intelligent **ACCU AI Copilot**, quoting shifts from hours of tedious spreadsheet work to a seamless, precise, and highly professional automated workflow.
 
 ---
 
-## 🏗️ Architecture & Flow
+## 🔥 Key Technical Capabilities
 
-1. **Client-Side Rendering**: User drags and drops a `.step` or `.pdf` file. The frontend automatically detects the MIME type. STEP files are parsed instantly into a lightweight Three.js mesh. PDF files are seamlessly piped into an `iframe` for live previewing.
-2. **Backend Engine**: Simultaneously, the original file is sent to the backend. CAD files undergo deep Boundary Representation (B-Rep) via `CadQuery` to extract mathematically precise geometry (exact volume, bounding boxes). PDF files are streamed into `google-generativeai` multi-modal analysis buffers.
-3. **Quoting Algorithm (INR)**: Dynamic algorithms execute against the extracted geometry or document metrics. It divides USD benchmark machine rates, converts to live INR, applies 1.5x manufacturing overhead factors, bounds the final cost safely, and pushes the itemized results into the final payload.
-4. **PDF Generation**: Users download a formalized, authentic Accu Design quotation. 
+### 1. Intelligent File Analysis
+- **3D Geometry (STEP Files):**
+  - Powered by **[CadQuery](https://github.com/CadQuery/cadquery)** and **OpenCASCADE** running on the Python backend.
+  - Automatically calculates bounding box dimensions (Max X, Y, Z), precise calculated volume, surface area, and complex topologies (detecting vertices, faces, edges, threaded/blind/through holes).
+  - Determines complexity scores (Simple, Moderate, Complex) based on geometric features.
 
----
+- **2D Drawing Parsing (PDF Files):**
+  - Driven by **Google Gemini AI 2.5 Flash / Pro Multimodal Vision Models**.
+  - Systematically parses industrial PDF drawings (Orthographic projections, Isometric views).
+  - Extracts Multi-part Bill of Materials (BOM), determining bounding boxes, quantities, dimensions, weights, tolerances (H7, etc.), client names, and machining processes automatically.
+  - Differentiates automatically between "Machined Parts" (calculated rates) and "Buyout Items" (off-the-shelf).
 
-## 🛠️ Tech Stack 
+### 2. Live Pricing & Economics Engine
+- **Global Market Integration:**
+  - Pulls live metal spot prices in USD/kg (via `metals.dev` integration).
+  - Converts dynamically via active live USD → INR exchange rate lookups.
+- **Complex Costing Algorithm:**
+  - Calculates Machine Setup Time + Operation Time based on Part Complexity, Machine Rate (per hour), Material Cost, and Manufacturing Tolerances (Multiplier parameters).
+  - Calculates specific processing times varying for Turning, 3-Axis / 5-Axis Milling, Wire EDM.
+  - Includes adjustable logic for Scrap factors, Margin padding (% profit), internal logistics, and Taxation (18% GST).
 
-### Frontend (User Interface & 3D Environment)
-* **React + Vite**: Blazing fast development environment.
-* **Tailwind CSS**: Glassmorphism premium dark-mode UI customized specially for Accu Design branding metrics.
-* **Three.js / @react-three/fiber**: Core 3D rendering engine for `.step` manipulation.
-* **occt-import-js (WASM)**: Running as an in-browser WebAssembly module for native performance CAD parsing.
-* **React Dropzone**: Secure and aesthetic file drop mechanics supporting high-payload CAD binaries.
+### 3. High-Fidelity PDF Quotation Generation
+- **Authentic Industry Formatting:**
+  - Employs **`fpdf2`** utilizing strict coordinates and precise Unicode fonts (`ArialUni`).
+  - Capable of generating two distinct PDF formats:
+    - **Single Component Quote:** Standard landscape/portrait quotation styling.
+    - **BOM Assembly Quote:** Strict industrial invoice matching (including exact custom columns like `HSN`, `QTY`, `RATE`, `TAX`, dynamically numbered Total sections, and dynamically sized multiline tracking).
+- **Automation Logic:** 
+  - Predicts Y-axis page overlap to ensure clean page breaks rather than overlapping static footers.
+  - Translates massive numerical sums into professional "Amount in Words" (e.g., *Forty Six Thousand Rupees Only*).
 
-### Backend (Geometry Engine, AI & APIs)
-* **FastAPI**: A high-performance, asynchronous Python web framework providing endpoint architecture (`/api/quote`, `/api/analyze`, `/api/analyze/pdf`).
-* **Google Generative AI**: Gemini 2.5 architecture implementation specifically tuned for engineering drawing (OCR/Visual) extraction.
-* **CadQuery (OpenCASCADE)**: Heavyweight B-Rep geometric kernel. Reads the true mathematical topological surfaces of the STEP file.
-* **FPDF2**: Modern PDF generation library heavily customized to load native Windows Unicode TTF (Arial) fonts dynamically on the server for `₹` mapping without layout destruction.
-* **Uvicorn**: Lightning-fast ASGI web server.
-
----
-
-## 🚀 Setup & Execution Guide
-
-### Prerequisites
-* **Node.js**: v18+ (v20+ recommended)
-* **Python**: v3.9+ (v3.11/v3.12 recommended)
-* Local install of **Arial** TTF fonts (built-in on Windows systems)
-
----
-
-### 1️⃣ Backend Setup (Python / FastAPI)
-
-1. **Open a new terminal** and navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-
-2. **Python Virtual Environment (Recommended)**:
-   ```bash
-   python -m venv venv
-   # On Windows:
-   venv\Scripts\activate
-   # On Mac/Linux:
-   source venv/bin/activate
-   ```
-
-3. **Install Dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Environment Variables Config**:
-   Copy the example config file:
-   ```bash
-   cp .env.example .env
-   ```
-   Open `backend/.env` and configure your API keys:
-   * `METALS_DEV_API_KEY`: Required for live metal USD querying.
-   * `GEMINI_API_KEY`: Strictly required for `.pdf` drawing analysis endpoints.
-
-5. **Start the Backend Server**:
-   *(Ensure you run this from the `/backend` directory)*
-   ```bash
-   python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-   ```
+### 4. Interactive Frontend Application
+- **Modern React + Vite Frontend:**
+  - Responsive, high-performance UI styled entirely with native customized **Tailwind CSS**.
+  - **Draggable Context Sidebar:** Users can simultaneously view 3D geometries or 2D PDFs alongside the active quoting configuration sidebar, seamlessly dragging to resize the UI workspace securely bypassing 3D hover-locks.
+- **3D Viewer Module:**
+  - Built with `@react-three/fiber` and `three.js`. Runs `.wasm` based OpenCASCADE mesh loading directly in-browser.
+- **ACCU AI Conversational Copilot:**
+  - Allows the user to naturally speak to the loaded assembly. E.g., *"Make this part EN-8 Steel with Ultra Precision tolerances."* The AI parses conversational text, updating the internal application states securely.
 
 ---
 
-### 2️⃣ Frontend Setup (React / Vite)
+## 🏗️ Technology Stack
 
-1. **Open a separate new terminal** in the root directory (`/Quotingautomation`).
+### Backend Environment 🐍
+- **Framework:** `FastAPI` (Asynchronous ultra-fast Python APi)
+- **Geometry Kernel:** `CadQuery` / `OpenCASCADE` (OCP/OCC via Python)
+- **AI Core:** `google-generativeai` (Gemini Models 2.5 Flash & 2.5 Pro)
+- **PDF Engine:** `fpdf2`
+- **Concurrency:** Uses `asyncio` and optimized thread pools for CAD heavy-lifting.
 
-2. **Install Node modules**:
-   ```bash
-   npm install
-   ```
-
-3. **Start the Frontend Development Server**:
-   ```bash
-   npm run dev
-   ```
-
-4. **Access the App**: Click the local link provided by Vite (usually `http://localhost:5173`).
+### Frontend Environment ⚛️
+- **Framework:** React 18 / Vite
+- **Web 3D Visualization:** `@react-three/fiber`, `@react-three/drei`, `three.js`, `occt-import-js`
+- **Icons & Styling:** `lucide-react`, `@heroicons/react`, `Tailwind CSS 3`, Custom Glassmorphism.
+- **File Handling:** `react-dropzone`
 
 ---
 
-## ⚙️ Running the Demo
-1. Make sure both servers are running cleanly.
-2. Drag and drop a `.step` CAD file **OR** a `.pdf` Engineering Drawing into the viewport.
-3. Observe the live preview mechanism while the backend (FastAPI / Gemini / CadQuery) asynchronously analyzes the payload.
-4. If a `.pdf` drawing is dropped, ensure the "Client details" auto-populate securely from the title block of the drawing.
-5. In the left panel, configure the specific Material, Surface Treatment, or custom overrides.
-6. The app computes the exact manufacturing cost (in INR).
-7. Click **Generate PDF** to download the perfectly formatted, authentic ACCU DESIGN quotation matching exact industry standards!
+## ⚙️ Architecture & Data Workflow
+
+1. **User Uploads File:** 
+   - Application detects if the file is `.step` or `.pdf`.
+2. **Analysis Route:**
+   - **STEP:** Dispatched to `/api/analyze`. CadQuery ingests the 3D file, computes B-Rep data, and responds with geometric statistics.
+   - **PDF:** Dispatched to `/api/analyze/pdf`. Gemini Vision visually reviews the drawing grid, identifies parts/dimensions, and replies with a highly structured deterministic JSON matrix.
+3. **Quoting Context:**
+   - Data enters the `QuotePanel.jsx` React context. 
+   - `fetch("/api/prices")` runs simultaneously to capture daily live USD/INR material costs.
+4. **Interactive Adjustment:**
+   - User edits material properties, processes, markup percentages, and surfaces.
+5. **Report Generation:**
+   - User selects `Download BOM Quote (PDF)`.
+   - The React app submits verified, formatted JSON definitions to `main.py` -> `/api/quote/bom-pdf`.
+   - Python processes the numerical sums and dynamically spins up an `AccuDesignAuthenticPDF()` payload and responds with a downloadable stream of the final PDF.
+
+---
+
+## 🔧 Setup & Installation (Local Development)
+
+### 1. Requirements
+* Node.js v18+
+* Python 3.10+
+* Google Gemini API Key
+* Metals API Key (Optional but recommended)
+
+### 2. Backend Setup
+1. Navigate to the `/backend` folder.
+2. Create your virtual environment: `python -m venv venv`
+3. Activate the environment: `.\venv\Scripts\activate` (Windows)
+4. Install dependencies: `pip install -r requirements.txt` *(Note: Ensure CadQuery is installed cleanly according to OS limitations).*
+5. Create `.env` file holding secrets:
+   ```env
+   GEMINI_API_KEY="your-gemini-key"
+   METALS_DEV_API_KEY="your-metals-dev-key"
+   ```
+6. Start Server: `uvicorn main:app --reload`
+
+### 3. Frontend Setup
+1. Navigate to the root directory `/`.
+2. Install npm packages: `npm install`
+3. Execute the WASM library command (Important for 3D): `npm run copy-wasm`
+4. Run Dev Server: `npm run dev`
+5. Visit `http://localhost:5173` to experience the Quoting Interface.
+
+---
+
+*System designed exclusively for ACCU DESIGN.*
