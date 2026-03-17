@@ -457,12 +457,29 @@ def generate_quote_pdf(
     pdf.ln(8)
 
     # ── SIGNATURE ────────────────────────────────────────────────────────────
+    if pdf.get_y() > 240:
+        pdf.add_page()
+        
     pdf._set_font("", 9)
     pdf.cell(0, 5, "Yours Faithfully,", ln=True)
-    pdf.ln(8)
-    pdf._set_font("B", 9)
-    pdf.cell(0, 5, "For ACCU DESIGN", ln=True)
-    pdf.ln(8)
+    pdf.ln(4)
+    
+    stamp_placed = False
+    for path in [os.path.join(ASSETS_DIR, "stamp.png"), os.path.join(ASSETS_DIR, "stamp.jpg"), os.path.join(ASSETS_DIR, "stamp.jpeg")]:
+        if os.path.isfile(path):
+            try:
+                pdf.image(path, x=10, y=pdf.get_y(), w=60)
+                pdf.set_y(pdf.get_y() + 25)
+                stamp_placed = True
+                break
+            except Exception:
+                pass
+                
+    if not stamp_placed:
+        pdf._set_font("B", 9)
+        pdf.cell(0, 5, "For ACCU DESIGN", ln=True)
+        pdf.ln(8)
+        
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         pdf.output(tmp.name)
         
@@ -752,8 +769,31 @@ def generate_bom_quote_pdf(
     for i, t in enumerate(terms, 1):
         pdf.cell(0, 4.5, f"{i}. {t}", ln=True)
 
-    # NO SIGNATURE As per user request matching the image!
+    pdf.ln(8)
+    if pdf.get_y() > 240:
+        pdf.add_page()
+        
+    # ── SIGNATURE ────────────────────────────────────────────────────────────
+    pdf._set_font("", 9)
+    pdf.cell(0, 5, "Yours Faithfully,", ln=True)
+    pdf.ln(4)
     
+    stamp_placed = False
+    for path in [os.path.join(ASSETS_DIR, "stamp.png"), os.path.join(ASSETS_DIR, "stamp.jpg"), os.path.join(ASSETS_DIR, "stamp.jpeg")]:
+        if os.path.isfile(path):
+            try:
+                pdf.image(path, x=10, y=pdf.get_y(), w=60)
+                pdf.set_y(pdf.get_y() + 25)
+                stamp_placed = True
+                break
+            except Exception:
+                pass
+                
+    if not stamp_placed:
+        pdf._set_font("B", 9)
+        pdf.cell(0, 5, "For ACCU DESIGN", ln=True)
+        pdf.ln(8)
+
     # Note: Footer is auto-drawn by FPDF because we use AccuDesignAuthenticPDF
 
     # ── Save ─────────────────────────────────────────────────────────────────
