@@ -1,5 +1,5 @@
 """
-Costing Engine — Phase 4 (INR Edition)
+Costing Engine — Phase 5 (Envelope-Based Material + Senior Enhancements)
 
 Formula:
   C_total = C_material + C_machining + C_drilling + C_setup + C_overhead + C_profit
@@ -10,11 +10,14 @@ Machine rates and material prices are converted from USD using:
   Section A (materials): INR = (USD/kg × rate) + ₹150
   Section B (machines):  INR = (USD/hr ÷ 10) × rate × 1.5
 
-Changes from Phase 3:
-  - Added CNC Milling 2-Axis (same rate as CNC Turning)
-  - All outputs in INR
-  - GST calculation (SGST 9% + CGST 9%)
-  - Surface Treatment, Logistics, Engineering Charges line items
+Changes from Phase 4 (Senior's Requirements):
+  - Envelope-based raw material weight (NOT part weight)
+  - Standard stock size lookup (Machinery's Handbook)
+  - 5% scrap factor for material handling
+  - Setup cost include/exclude toggle
+  - User-adjustable hole count override
+  - Material utilization percentage in output
+  - Gross weight per part and total batch weight in output
 """
 import math
 import re
@@ -35,9 +38,11 @@ def safe_float(val, default_val=0.0):
 try:
     from services.pricing import MATERIALS
     from services.currency import convert_material_price, convert_machine_rate, convert_setup_fee
+    from services.material_calculator import calculate_raw_material
 except ImportError:
     from pricing import MATERIALS
     from currency import convert_material_price, convert_machine_rate, convert_setup_fee
+    from material_calculator import calculate_raw_material
 
 
 # ── Machine rates (USD/hr) — source of truth in USD ──────────────────────────
@@ -128,7 +133,6 @@ COMPLEXITY_MULTIPLIERS = {
 }
 
 # ── Business parameters (unchanged per senior) ───────────────────────────────
-SCRAP_RATE    = 0.12   # 12% material scrap
 OVERHEAD_RATE = 0.18   # 18% overhead
 PROFIT_MARGIN = 0.22   # 22% profit margin
 GST_RATE      = 0.18   # 18% GST (9% SGST + 9% CGST)
@@ -144,12 +148,21 @@ def compute_quote(
     exchange_rate:   float,    # USD → INR rate for machine rate conversion
     surface_treatment_ids: list = None,
     profit_margin_pct: float = 22.0, # e.g. 22.0 = 22%
+    include_setup_cost: bool = True,  # Senior Req: toggle setup cost
+    hole_count_override: int = -1,    # Senior Req: -1 = use detected, >=0 = override
+    stock_type: str = "round_bar",    # Senior Req: stock type for material calc
 ) -> dict:
     """
-    Full cost calculation in INR.
+    Full cost calculation in INR using envelope-based material costing.
 
     Machine rates are converted inside this function using Section B formula:
       INR/hr = (USD/hr ÷ 10) × exchange_rate × 1.5
+
+    Senior's enhancements:
+      - Envelope-based material weight from standard stock sizes
+      - Setup cost include/exclude toggle
+      - Hole count override for user accuracy
+      - Material utilization percentage output
     """
     if not surface_treatment_ids:
         surface_treatment_ids = []
@@ -166,13 +179,60 @@ def compute_quote(
     if len(process_ids) >= 5:
         comp_tier = "Very Complex"
 
-    # ── Volume conversions ────────────────────────────────────────────────────
-    volume_cm3 = max(volume_mm3 / 1000.0, 0.001)
+    # ── Get bounding box dimensions ──────────────────────────────────────────
+    bb = geometry.get("boundingBox", {})
+    size_x = safe_float(bb.get("sizeX"), 1.0)
+    size_y = safe_float(bb.get("sizeY"), 1.0)
+    size_z = safe_float(bb.get("sizeZ"), 1.0)
 
-    # ── Material Cost (INR) ──────────────────────────────────────────────────
-    mass_kg       = volume_cm3 * mat["density"] / 1000.0
-    raw_stock_kg  = mass_kg * (1 + SCRAP_RATE)
+    # ── ENVELOPE-BASED Material Calculation (Senior's Core Requirement) ──────
+    # This replaces the old volume-based calculation.
+    # Logic: Part Dimension + Machining Allowance → Standard Stock Size → Weight
+    material_estimate = calculate_raw_material(
+        size_x_mm=size_x,
+        size_y_mm=size_y,
+        size_z_mm=size_z,
+        density_g_cm3=mat["density"],
+        quantity=quantity,
+        stock_type=stock_type,
+        part_volume_mm3=volume_mm3,
+    )
+
+    # Use the envelope-based raw stock weight (NOT part weight)
+    raw_stock_kg = material_estimate["raw_stock_kg"]
     mat_cost_unit = raw_stock_kg * metal_price_inr
+
+    # Keep part mass for informational display
+    volume_cm3 = max(volume_mm3 / 1000.0, 0.001)
+    part_mass_kg = volume_cm3 * mat["density"] / 1000.0
+
+    # ── Hole count handling (Senior Req: user override) ──────────────────────
+    holes = geometry.get("holes", [])
+    if hole_count_override >= 0:
+        # User has overridden the hole count
+        if hole_count_override == 0:
+            effective_holes = []
+        elif hole_count_override <= len(holes):
+            effective_holes = holes[:hole_count_override]
+        else:
+            # User says more holes than detected — replicate average hole params
+            effective_holes = list(holes)
+            if holes:
+                avg_hole = {
+                    "diameter": sum(safe_float(h.get("diameter", 5), 5) for h in holes) / len(holes),
+                    "depth": sum(safe_float(h.get("depth", 5), 5) for h in holes) / len(holes),
+                    "type": "through",
+                }
+                for _ in range(hole_count_override - len(holes)):
+                    effective_holes.append(avg_hole)
+            else:
+                # No holes detected but user says there are — use default 6mm through hole
+                for _ in range(hole_count_override):
+                    effective_holes.append({"diameter": 6.0, "depth": 10.0, "type": "through"})
+    else:
+        effective_holes = holes
+
+    effective_hole_count = len(effective_holes)
 
     # ── Machining Time & Cost Estimation (Loop over processes) ────────────────
     total_machining_hr = 0.0
@@ -180,7 +240,6 @@ def compute_quote(
     total_setup_inr = 0.0
     total_drill_cost = 0.0
 
-    holes = geometry.get("holes", [])
     mfg_processes = []
 
     for process_id in process_ids:
@@ -206,24 +265,14 @@ def compute_quote(
                 fill_rate_cm3_hr = 30.0
             machining_hr = volume_cm3 / fill_rate_cm3_hr
         else:
-            # SUBTRACTIVE (CNC) - roughly split stock removal if multiple, but simplest
-            # is just to run the base formula for each for now, or just once if primary.
-            # Assuming if they picked it, it contributes. 
-            bb = geometry.get("boundingBox", {})
-            if bb and bb.get("sizeX") and bb.get("sizeY") and bb.get("sizeZ"):
-                bbox_vol_cm3 = (
-                    safe_float(bb.get("sizeX"), 1.0) * safe_float(bb.get("sizeY"), 1.0) * safe_float(bb.get("sizeZ"), 1.0)
-                ) / 1000.0
-                stock_removal_cm3 = max(bbox_vol_cm3 - volume_cm3, volume_cm3 * 0.15)
-            else:
-                stock_removal_cm3 = volume_cm3 * 0.30
+            # SUBTRACTIVE (CNC) — use envelope volume for stock removal calculation
+            envelope_vol_cm3 = material_estimate.get("envelope_volume_cm3", volume_cm3 * 1.3)
+            stock_removal_cm3 = max(envelope_vol_cm3 - volume_cm3, volume_cm3 * 0.15)
 
             eff_mrr = mat["mrr_cm3_hr"] * mat["machinability"]
             machining_hr = stock_removal_cm3 / max(eff_mrr, 1.0)
             
-            # Divide base machining time by number of CNC processes selected to avoid 5x inflation?
-            # For authenticity, if multiple CNC processes are picked they likely perform different ops.
-            # We'll just distribute stock removal across them linearly to keep it sane.
+            # Distribute stock removal across CNC processes
             machining_hr = machining_hr / sum(1 for p in process_ids if PROCESS_RATES.get(p, {}).get("axes", 0) > 0)
 
             finish_hr = (surface_mm2 / 10000.0) * mat["finish_factor"] * 0.05
@@ -238,16 +287,19 @@ def compute_quote(
         total_mach_cost_unit += adj_mach_hr * proc_rate_inr
 
         # ── Hole drilling surcharge (INR) ONLY IF first subtractive process ──
-        if proc["axes"] > 0 and holes and total_drill_cost == 0.0:
-            for hole in holes:
+        if proc["axes"] > 0 and effective_holes and total_drill_cost == 0.0:
+            for hole in effective_holes:
                 d = safe_float(hole.get("diameter"), 1.0)
                 depth = safe_float(hole.get("depth"), d)
                 h_type = hole.get("type", "through")
                 depth_factor = 1.5 if h_type == "blind" else 1.0
                 total_drill_cost += 2.0 * depth_factor * (depth / max(d, 1)) * (proc_rate_inr / 60.0)
 
-    # ── Setup cost (amortised over quantity, INR) ─────────────────────────────
-    setup_per_unit = total_setup_inr / max(quantity, 1)
+    # ── Setup cost (amortised over quantity, INR) — CONDITIONAL ──────────────
+    if include_setup_cost:
+        setup_per_unit = total_setup_inr / max(quantity, 1)
+    else:
+        setup_per_unit = 0.0
 
     # ── Subtotal per unit ─────────────────────────────────────────────────────
     subtotal_unit = mat_cost_unit + total_mach_cost_unit + total_drill_cost + setup_per_unit
@@ -278,11 +330,10 @@ def compute_quote(
     grand_total = total_order + sgst + cgst
 
     # ── Manufacturing processes description ──────────────────────────────────
-    if len(holes) > 0 and "Drilling" not in mfg_processes:
+    if effective_hole_count > 0 and "Drilling" not in mfg_processes:
         mfg_processes.append("Drilling")
         
     for st_id in surface_treatment_ids:
-        # A simple map or we can just capitalize for now
         mfg_processes.append(st_id.replace("_", " ").title())
 
     return {
@@ -317,10 +368,37 @@ def compute_quote(
         "cgst":        round(cgst, 2),
         "grand_total": round(grand_total, 2),
 
-        # Derived
-        "mass_kg":              round(mass_kg,          4),
+        # Derived — part info
+        "mass_kg":              round(part_mass_kg,     4),
         "machining_hours":      round(total_machining_hr,      3),
-        "holes_count":          len(holes),
+        "holes_count":          effective_hole_count,
         "manufacturing_processes": mfg_processes,
         "currency":             "INR",
+
+        # ── NEW: Senior's envelope-based material estimation outputs ─────────
+        "include_setup_cost":   include_setup_cost,
+        "stock_type":           material_estimate.get("stock_type", stock_type),
+        "stock_type_name":      material_estimate.get("stock_type_name", "Round Bar"),
+        "material_estimate": {
+            "gross_weight_per_part_kg": material_estimate["gross_weight_per_part_kg"],
+            "total_batch_weight_kg":    material_estimate["total_batch_weight_kg"],
+            "material_utilization_pct": material_estimate["material_utilization_pct"],
+            "envelope_volume_mm3":      material_estimate.get("envelope_volume_mm3", 0),
+            "standard_stock_size":      _get_standard_size_label(material_estimate),
+            "parts_per_bar":            material_estimate.get("parts_per_bar", 0),
+            "bars_needed":              material_estimate.get("bars_needed", 0),
+            "allowances":               material_estimate.get("allowances", {}),
+        },
     }
+
+
+def _get_standard_size_label(estimate: dict) -> str:
+    """Build a human-readable label for the matched standard stock size."""
+    st = estimate.get("stock_type", "round_bar")
+    if st == "round_bar":
+        return f"Ø{estimate.get('standard_diameter_mm', 0)} mm Round Bar"
+    elif st == "hex_bar":
+        return f"{estimate.get('standard_af_mm', 0)} mm AF Hex Bar"
+    elif st == "plate":
+        return f"{estimate.get('standard_thickness_mm', 0)} × {estimate.get('standard_width_mm', 0)} mm Plate"
+    return "N/A"

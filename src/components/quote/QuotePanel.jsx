@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
     Wrench, ChevronDown, Plus, X,
     RefreshCw, AlertCircle, CheckCircle, Zap, FileText,
-    User, Building, IndianRupee, Layers
+    User, Building, IndianRupee, Layers, Scale, ToggleLeft,
+    Minus, Eye, CircleDot, ShieldCheck
 } from 'lucide-react';
 
 const API = '/api';
@@ -16,10 +17,10 @@ const fmt = (n, dec = 0) =>
 /* ─── LineItem row ───────────────────────────────────────────────────────── */
 function LineItem({ label, value, highlight, large }) {
     return (
-        <div className={`flex items-center justify-between ${large ? 'py-3' : 'py-1.5'}
-            border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] px-1.5 rounded transition-colors`}>
-            <span className={`${large ? 'text-[13px] font-medium' : 'text-[11px]'} text-gray-400`}>{label}</span>
-            <span className={`font-mono ${large ? 'text-sm font-bold tracking-wide' : 'text-[12px] font-semibold'}
+        <div className={`flex items-center justify-between gap-2 ${large ? 'py-3' : 'py-1.5'}
+            border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] px-1.5 rounded transition-colors overflow-hidden`}>
+            <span className={`${large ? 'text-[13px] font-medium' : 'text-[11px]'} text-gray-400 shrink-0`}>{label}</span>
+            <span className={`font-mono text-right truncate min-w-0 ${large ? 'text-sm font-bold tracking-wide' : 'text-[11px] font-semibold'}
                 ${highlight ? 'text-cyan-300 drop-shadow-[0_0_8px_rgba(103,232,249,0.5)]' : 'text-gray-100'}`}>
                 {value}
             </span>
@@ -172,6 +173,15 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
     const [quantity, setQuantity] = useState(1);
     const [profitMarginPct, setProfitMarginPct] = useState(22);
 
+    // ── Senior Phase 5: New controls
+    const [includeSetupCost, setIncludeSetupCost] = useState(true);
+    const [holeCountOverride, setHoleCountOverride] = useState(-1); // -1 = auto
+    const [stockType, setStockType] = useState('round_bar');
+    const [materialEstimate, setMaterialEstimate] = useState(null);
+    const [estimateLoading, setEstimateLoading] = useState(false);
+    const [aiValidation, setAiValidation] = useState(null);
+    const [aiValidating, setAiValidating] = useState(false);
+
     // ── Client info
     const [clientName, setClientName] = useState('');
     const [clientCompany, setClientCompany] = useState('');
@@ -283,6 +293,80 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
         }
     };
 
+    // ── Fetch material estimate (pre-quote verification — Senior Req)
+    const fetchMaterialEstimate = async () => {
+        if (!geometry) return;
+        setEstimateLoading(true);
+        try {
+            const bb = geometry.boundingBox || {};
+            const resp = await fetch(`${API}/material-estimate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    size_x: parseFloat(bb.sizeX) || 1,
+                    size_y: parseFloat(bb.sizeY) || 1,
+                    size_z: parseFloat(bb.sizeZ) || 1,
+                    material_id: materialId,
+                    quantity: Math.max(1, quantity),
+                    stock_type: stockType,
+                    part_volume_mm3: parseFloat(geometry.volume) || 0,
+                }),
+            });
+            if (resp.ok) {
+                setMaterialEstimate(await resp.json());
+            }
+        } catch { /* silent */ }
+        finally { setEstimateLoading(false); }
+    };
+
+    // Auto-refresh material estimate when key params change
+    useEffect(() => {
+        if (geometry) fetchMaterialEstimate();
+        setAiValidation(null); // Reset AI validation on param change
+    }, [geometry, materialId, stockType, quantity]);
+
+    // ── Validate with Gemini AI (on-demand only)
+    const validateWithAI = async () => {
+        if (!materialEstimate) return;
+        setAiValidating(true);
+        setAiValidation(null);
+        try {
+            const bb = geometry?.boundingBox || {};
+            const resp = await fetch(`${API}/validate-material`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    size_x: parseFloat(bb.sizeX) || 1,
+                    size_y: parseFloat(bb.sizeY) || 1,
+                    size_z: parseFloat(bb.sizeZ) || 1,
+                    material_id: materialId,
+                    quantity: Math.max(1, quantity),
+                    stock_type: stockType,
+                    part_volume_mm3: parseFloat(geometry?.volume) || 0,
+                    our_stock_size: materialEstimate.standard_diameter_mm
+                        ? `Ø${materialEstimate.standard_diameter_mm}mm`
+                        : materialEstimate.standard_thickness_mm
+                        ? `${materialEstimate.standard_thickness_mm}×${materialEstimate.standard_width_mm}mm`
+                        : '',
+                    our_envelope_vol: materialEstimate.envelope_volume_mm3 || 0,
+                    our_gross_weight: materialEstimate.gross_weight_per_part_kg || 0,
+                    our_batch_weight: materialEstimate.total_batch_weight_kg || 0,
+                    our_utilization: materialEstimate.material_utilization_pct || 0,
+                    our_material_cost: materialEstimate.estimated_material_cost_inr || 0,
+                }),
+            });
+            if (resp.ok) {
+                setAiValidation(await resp.json());
+            } else {
+                setAiValidation({ success: false, error: 'Validation failed' });
+            }
+        } catch {
+            setAiValidation({ success: false, error: 'Network error' });
+        } finally {
+            setAiValidating(false);
+        }
+    };
+
     // ── Generate quote
     const generateQuote = async () => {
         if (!geometry && !fileMetrics?.allParts) {
@@ -357,7 +441,10 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                             client_company: clientCompany,
                             hsn_code: hsnCode,
                             source_filename: fileMetrics?.fileName || '',
-                            screenshot: null, 
+                            screenshot: null,
+                            include_setup_cost: includeSetupCost,
+                            hole_count_override: holeCountOverride,
+                            stock_type: stockType, 
                         }),
                     });
 
@@ -408,6 +495,9 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                         hsn_code: hsnCode,
                         source_filename: fileMetrics?.fileName || '',
                         screenshot,
+                        include_setup_cost: includeSetupCost,
+                        hole_count_override: holeCountOverride,
+                        stock_type: stockType,
                     }),
                 });
                 if (!resp.ok) {
@@ -652,6 +742,14 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                     onChange={setProfitMarginPct} 
                 />
 
+                {/* Stock Type (Senior Req) */}
+                <Select label="Stock Type" value={stockType} onChange={setStockType}
+                    options={[
+                        { value: 'round_bar', label: 'Round Bar' },
+                        { value: 'plate', label: 'Plate / Flat Bar' },
+                        { value: 'hex_bar', label: 'Hex Bar' },
+                    ]} />
+
                 {/* Quantity */}
                 <div className="space-y-1">
                     <label className="text-[10px] text-gray-500 uppercase tracking-widest">Quantity</label>
@@ -666,6 +764,201 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                             text-[11px] rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500/50 font-mono"
                     />
                 </div>
+
+                {/* Setup Cost Toggle (Senior Req) */}
+                <div className="flex items-center justify-between py-2 px-1">
+                    <div className="flex items-center gap-2">
+                        <ToggleLeft size={12} className="text-gray-500" />
+                        <span className="text-[10px] text-gray-400 uppercase tracking-widest">Include Setup / Amortization</span>
+                    </div>
+                    <button
+                        onClick={() => setIncludeSetupCost(!includeSetupCost)}
+                        className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
+                            includeSetupCost ? 'bg-cyan-500/60' : 'bg-gray-700'
+                        }`}
+                    >
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                            includeSetupCost ? 'left-[18px]' : 'left-0.5'
+                        }`} />
+                    </button>
+                </div>
+
+                {/* Hole Count Override (Senior Req) */}
+                {geometry && (
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+                            <CircleDot size={10} /> Hole Count
+                            <span className="text-gray-600 normal-case tracking-normal ml-1">
+                                (AI detected: {geometry?.holes?.length || 0})
+                            </span>
+                        </label>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setHoleCountOverride(prev => Math.max(0, (prev < 0 ? (geometry?.holes?.length || 0) : prev) - 1))}
+                                className="w-7 h-7 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 
+                                    hover:border-cyan-500/50 hover:text-cyan-300 flex items-center justify-center transition-colors"
+                            >
+                                <Minus size={12} />
+                            </button>
+                            <input
+                                type="number" min="0" max="200"
+                                value={holeCountOverride < 0 ? (geometry?.holes?.length || 0) : holeCountOverride}
+                                onChange={e => {
+                                    const v = parseInt(e.target.value, 10);
+                                    setHoleCountOverride(isNaN(v) ? -1 : Math.max(0, Math.min(200, v)));
+                                }}
+                                className="flex-1 bg-gray-800/70 border border-gray-700/60 text-gray-200
+                                    text-[11px] rounded-lg px-3 py-1.5 text-center focus:outline-none 
+                                    focus:border-cyan-500/50 font-mono"
+                            />
+                            <button
+                                onClick={() => setHoleCountOverride(prev => (prev < 0 ? (geometry?.holes?.length || 0) : prev) + 1)}
+                                className="w-7 h-7 rounded-lg bg-gray-800 border border-gray-700 text-gray-300
+                                    hover:border-cyan-500/50 hover:text-cyan-300 flex items-center justify-center transition-colors"
+                            >
+                                <Plus size={12} />
+                            </button>
+                            {holeCountOverride >= 0 && (
+                                <button
+                                    onClick={() => setHoleCountOverride(-1)}
+                                    className="text-[9px] text-amber-400/80 hover:text-amber-300 font-mono underline"
+                                >Reset</button>
+                            )}
+                        </div>
+                        {holeCountOverride >= 0 && holeCountOverride !== (geometry?.holes?.length || 0) && (
+                            <p className="text-[9px] text-amber-400/70 font-mono flex items-center gap-1">
+                                <AlertCircle size={9} /> Overridden from {geometry?.holes?.length || 0} → {holeCountOverride}
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {/* ── Material Verification (INSIDE config — above Generate) ── */}
+                {geometry && materialEstimate && (
+                    <div className="rounded-xl bg-gradient-to-br from-emerald-900/15 to-black/40
+                        border border-emerald-500/15 p-3 space-y-2 mt-1">
+                        <div className="flex items-center gap-2 border-b border-emerald-500/10 pb-1.5">
+                            <Eye size={12} className="text-emerald-400" />
+                            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
+                                Material Verification
+                            </span>
+                            <span className="text-[8px] text-emerald-400/70 font-mono ml-auto">
+                                {estimateLoading ? '⟳ ...' : '✓ Ready'}
+                            </span>
+                        </div>
+
+                        <div className="space-y-0.5">
+                            <LineItem label="Stock" value={materialEstimate.stock_type_name || stockType} />
+                            <LineItem label="Material" value={materialEstimate.material_name || '—'} />
+                            <LineItem label="Dims (mm)"
+                                value={`${parseFloat(geometry.boundingBox?.sizeX || 0).toFixed(1)} × ${parseFloat(geometry.boundingBox?.sizeY || 0).toFixed(1)} × ${parseFloat(geometry.boundingBox?.sizeZ || 0).toFixed(1)}`} />
+                        </div>
+
+                        <div className="bg-black/25 rounded-lg p-2 space-y-0.5">
+                            <p className="text-[8px] text-emerald-400/70 uppercase tracking-widest font-bold mb-0.5">Envelope</p>
+                            {materialEstimate.standard_diameter_mm && (
+                                <LineItem label="Std Ø" value={`${materialEstimate.standard_diameter_mm} mm`} highlight />
+                            )}
+                            {materialEstimate.standard_af_mm && (
+                                <LineItem label="Hex AF" value={`${materialEstimate.standard_af_mm} mm`} highlight />
+                            )}
+                            {materialEstimate.standard_thickness_mm && (
+                                <LineItem label="Thick." value={`${materialEstimate.standard_thickness_mm} × ${materialEstimate.standard_width_mm} mm`} highlight />
+                            )}
+                            {materialEstimate.effective_length_mm > 0 && (
+                                <LineItem label="Eff. Len" value={`${materialEstimate.effective_length_mm} mm`} />
+                            )}
+                            <LineItem label="Vol." value={`${fmt(materialEstimate.envelope_volume_mm3)} mm³`} />
+                        </div>
+
+                        <div className="bg-black/25 rounded-lg p-2 space-y-0.5">
+                            <p className="text-[8px] text-emerald-400/70 uppercase tracking-widest font-bold mb-0.5">Weight & Cost</p>
+                            <LineItem label="Wt/Part" value={`${materialEstimate.gross_weight_per_part_kg?.toFixed(3)} kg`} highlight />
+                            <LineItem label="Batch Wt" value={`${materialEstimate.total_batch_weight_kg?.toFixed(3)} kg`} />
+                            <LineItem label="Utilization" value={`${materialEstimate.material_utilization_pct}%`} />
+                            <LineItem label="Mat. Cost" value={`₹${fmt(materialEstimate.estimated_material_cost_inr)}`} highlight />
+                            {materialEstimate.parts_per_bar > 0 && (
+                                <LineItem label="Parts/Bar" value={`${materialEstimate.parts_per_bar} (${materialEstimate.bars_needed} bar${materialEstimate.bars_needed > 1 ? 's' : ''})`} />
+                            )}
+                        </div>
+
+                        <p className="text-[8px] text-gray-600 font-mono leading-tight">
+                            +{materialEstimate.allowances?.surface_allowance_mm}mm surf, +{materialEstimate.allowances?.saw_kerf_mm}mm kerf{materialEstimate.allowances?.end_grip_mm > 0 ? `, +${materialEstimate.allowances?.end_grip_mm}mm grip` : ''}, {materialEstimate.allowances?.scrap_factor_pct}% scrap
+                        </p>
+
+                        {/* Validate with AI button */}
+                        <button
+                            onClick={validateWithAI}
+                            disabled={aiValidating || !materialEstimate}
+                            className="w-full py-2 rounded-lg text-[10px] font-bold tracking-wider
+                                transition-all duration-200 flex items-center justify-center gap-1.5
+                                border border-purple-500/30 bg-purple-500/5 text-purple-300
+                                hover:bg-purple-500/15 hover:border-purple-400/50 active:scale-[0.98]
+                                disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            {aiValidating
+                                ? <><RefreshCw size={11} className="animate-spin" /> Validating...</>
+                                : <><ShieldCheck size={11} /> Validate with AI</>}
+                        </button>
+
+                        {/* AI Validation Result */}
+                        {aiValidation && (
+                            <div className={`rounded-lg p-2.5 space-y-1 border ${
+                                aiValidation.success
+                                    ? aiValidation.match_level === 'excellent' ? 'bg-emerald-500/10 border-emerald-500/25'
+                                    : aiValidation.match_level === 'good' ? 'bg-blue-500/10 border-blue-500/25'
+                                    : aiValidation.match_level === 'fair' ? 'bg-amber-500/10 border-amber-500/25'
+                                    : 'bg-red-500/10 border-red-500/25'
+                                    : 'bg-red-500/10 border-red-500/25'
+                            }`}>
+                                {aiValidation.success ? (
+                                    <>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
+                                                <ShieldCheck size={11} className={
+                                                    aiValidation.match_level === 'excellent' ? 'text-emerald-400' :
+                                                    aiValidation.match_level === 'good' ? 'text-blue-400' :
+                                                    aiValidation.match_level === 'fair' ? 'text-amber-400' : 'text-red-400'
+                                                } />
+                                                AI Confidence
+                                            </span>
+                                            <span className={`text-[13px] font-bold font-mono ${
+                                                aiValidation.confidence_score >= 85 ? 'text-emerald-300' :
+                                                aiValidation.confidence_score >= 60 ? 'text-blue-300' :
+                                                aiValidation.confidence_score >= 40 ? 'text-amber-300' : 'text-red-300'
+                                            }`}>
+                                                {aiValidation.confidence_score}%
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-gray-800 rounded-full h-1.5 mt-0.5">
+                                            <div
+                                                className={`h-1.5 rounded-full transition-all duration-500 ${
+                                                    aiValidation.confidence_score >= 85 ? 'bg-emerald-400' :
+                                                    aiValidation.confidence_score >= 60 ? 'bg-blue-400' :
+                                                    aiValidation.confidence_score >= 40 ? 'bg-amber-400' : 'bg-red-400'
+                                                }`}
+                                                style={{ width: `${aiValidation.confidence_score}%` }}
+                                            />
+                                        </div>
+                                        <p className="text-[9px] text-gray-400 mt-1">
+                                            Match: <span className="font-bold capitalize">{aiValidation.match_level}</span>
+                                            {aiValidation.weight_diff_pct > 0 && ` (${aiValidation.weight_diff_pct}% diff)`}
+                                        </p>
+                                        {aiValidation.discrepancy_notes && aiValidation.discrepancy_notes !== 'Values align' && (
+                                            <p className="text-[9px] text-amber-400/80 mt-0.5">
+                                                ⚠ {aiValidation.discrepancy_notes}
+                                            </p>
+                                        )}
+                                    </>
+                                ) : (
+                                    <p className="text-[9px] text-red-400 flex items-center gap-1">
+                                        <AlertCircle size={10} /> {aiValidation.error}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Generate button */}
                 <button
@@ -817,7 +1110,11 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                         <LineItem label="Machining Cost" value={`₹${fmt(quote.breakdown?.machining_cost)}`} />
                         {(quote.breakdown?.drilling_cost > 0) &&
                             <LineItem label="Drilling Surcharge" value={`₹${fmt(quote.breakdown.drilling_cost)}`} />}
-                        <LineItem label="Setup (amort.)" value={`₹${fmt(quote.breakdown?.setup_cost)}`} />
+                        {quote.include_setup_cost !== false ? (
+                            <LineItem label="Setup (amort.)" value={`₹${fmt(quote.breakdown?.setup_cost)}`} />
+                        ) : (
+                            <LineItem label="Setup (excluded)" value="₹0" />
+                        )}
                         <LineItem label="Overhead (18%)" value={`₹${fmt(quote.breakdown?.overhead)}`} />
                         <LineItem label="Profit Margin" value={`₹${fmt(quote.breakdown?.profit_margin)}`} />
                     </div>
@@ -847,13 +1144,21 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                         />
                     </div>
 
-                    {/* Part info */}
+                    {/* Part info + Material Estimate */}
                     <div className="border-t border-gray-700/40 pt-2 space-y-0.5">
                         <LineItem label="Part Mass" value={`${fmt(quote.mass_kg, 3)} kg`} />
+                        {quote.material_estimate && (
+                            <>
+                                <LineItem label="Stock Size" value={quote.material_estimate.standard_stock_size || '—'} highlight />
+                                <LineItem label="Gross Wt/Part" value={`${quote.material_estimate.gross_weight_per_part_kg?.toFixed(3)} kg`} />
+                                <LineItem label="Batch Weight" value={`${quote.material_estimate.total_batch_weight_kg?.toFixed(3)} kg`} />
+                                <LineItem label="Utilization" value={`${quote.material_estimate.material_utilization_pct}%`} />
+                            </>
+                        )}
                         <LineItem label="Machining Time" value={`${fmt(quote.machining_hours, 2)} hr`} />
                         <LineItem label="Complexity" value={quote.complexity || '—'} />
                         {(quote.holes_count > 0) &&
-                            <LineItem label="Holes Detected" value={String(quote.holes_count)} />}
+                            <LineItem label="Holes (used)" value={String(quote.holes_count)} />}
                         <LineItem label="Metal Price" value={`₹${fmt(quote.metal_price_inr_kg)}/kg`} />
                         <LineItem label="Machine Rate" value={`₹${fmt(quote.machine_rate_inr_hr)}/hr`} />
                         <LineItem label="Exchange Rate" value={`₹${fmt(quote.exchange_rate, 2)}/USD`} />

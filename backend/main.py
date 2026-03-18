@@ -37,6 +37,9 @@ from services.pdf import generate_quote_pdf
 from services.currency import get_usd_to_inr, convert_material_price
 from services.quote_number import generate_quote_number
 from services.pdf_analyzer import analyze_pdf_drawing
+from services.stock_sizes import get_stock_table, get_all_stock_types, find_next_stock_size
+from services.material_calculator import calculate_raw_material
+from services.gemini_validator import validate_with_gemini
 
 app = FastAPI(
     title="AccuDesign Quoting API",
@@ -65,6 +68,10 @@ class QuoteRequest(BaseModel):
     client_company: str  = Field("", example="Aerochamp Aviation (Intl.) Pvt. Ltd.")
     source_filename: str = Field("", example="shaft_drawing.pdf")
     screenshot:     Optional[str] = Field(None, description="Base64 isometric view screenshot")
+    # Senior's Phase 5 additions:
+    include_setup_cost: bool = Field(True, description="Include/exclude setup & amortization cost in quote")
+    hole_count_override: int = Field(-1, ge=-1, description="Override hole count. -1 = use AI/B-Rep detected count")
+    stock_type: str = Field("round_bar", description="Stock type: round_bar, plate, hex_bar")
 
 class ChatRequest(BaseModel):
     message: str
@@ -78,6 +85,26 @@ class BomPdfRequest(BaseModel):
     hsn_code:       str   = Field("84669310")
     source_filename: str  = Field("")
     profit_margin_pct: float = Field(22.0, ge=15.0, le=30.0)
+
+class MaterialEstimateRequest(BaseModel):
+    size_x: float = Field(..., description="Part bounding box X dimension (mm)")
+    size_y: float = Field(..., description="Part bounding box Y dimension (mm)")
+    size_z: float = Field(..., description="Part bounding box Z dimension (mm)")
+    material_id: str = Field("aluminum_6061", description="Material ID for density lookup")
+    quantity: int = Field(1, ge=1, le=10000)
+    stock_type: str = Field("round_bar", description="round_bar, plate, hex_bar")
+    part_volume_mm3: float = Field(0.0, description="Exact part volume for utilization calc")
+
+class AiValidationRequest(BaseModel):
+    # Raw inputs only — the endpoint calculates our_ values itself
+    # so "Match: Unknown" (caused by frontend passing our_gross_weight=0) is impossible
+    size_x: float = Field(...)
+    size_y: float = Field(...)
+    size_z: float = Field(...)
+    material_id: str = Field("aluminum_6061")
+    quantity: int = Field(1, ge=1)
+    stock_type: str = Field("round_bar")
+    part_volume_mm3: float = Field(0.0)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -148,6 +175,123 @@ def get_tolerances():
         tid: {"label": t["label"], "multiplier": t["multiplier"]}
         for tid, t in TOLERANCE_MULTIPLIERS.items()
     }
+
+
+# ── Standard Stock Sizes (Machinery's Handbook) ─────────────────────────────
+@app.get("/api/stock-sizes", tags=["Catalogue"])
+def get_stock_sizes(stock_type: str = "round_bar"):
+    """Return standard stock sizes for a given stock type (Machinery's Handbook 32nd Ed)."""
+    return {
+        "stock_type": stock_type,
+        "sizes": get_stock_table(stock_type),
+        "all_types": get_all_stock_types(),
+    }
+
+
+# ── Material Estimate (pre-quote weight calculation) ────────────────────────
+@app.post("/api/material-estimate", tags=["Quoting"])
+async def material_estimate(req: MaterialEstimateRequest):
+    """
+    Pre-quote endpoint: Calculate raw material weight using envelope-based
+    methodology BEFORE generating the full quote.
+    Lets the user verify critical data points before triggering the quote.
+    """
+    if req.material_id not in MATERIALS:
+        raise HTTPException(400, f"Unknown material: '{req.material_id}'")
+
+    mat = MATERIALS[req.material_id]
+    result = calculate_raw_material(
+        size_x_mm=req.size_x,
+        size_y_mm=req.size_y,
+        size_z_mm=req.size_z,
+        density_g_cm3=mat["density"],
+        quantity=req.quantity,
+        stock_type=req.stock_type,
+        part_volume_mm3=req.part_volume_mm3,
+    )
+
+    # Add material info to response
+    fx = await get_usd_to_inr()
+    rate = fx["rate"]
+    price_data = await get_live_prices()
+    usd_price = price_data["prices"].get(req.material_id, mat["price_usd_kg"])
+    metal_price_inr = convert_material_price(usd_price, rate)
+
+    result["material_name"] = mat["name"]
+    result["density_g_cm3"] = mat["density"]
+    result["metal_price_inr_kg"] = round(metal_price_inr, 2)
+    result["estimated_material_cost_inr"] = round(result["raw_stock_kg"] * metal_price_inr, 2)
+
+    return JSONResponse(content=result)
+
+
+# ── AI Cross-Validation (Gemini — on-demand only) ──────────────────────────
+@app.post("/api/validate-material", tags=["Quoting"])
+async def validate_material_ai(req: AiValidationRequest):
+    """
+    Cross-validate deterministic material calculation with Gemini AI.
+    ONLY called when user explicitly clicks 'Validate with AI'.
+    Uses senior's exact prompt. Returns confidence score + discrepancy analysis.
+    """
+    if req.material_id not in MATERIALS:
+        raise HTTPException(400, f"Unknown material: '{req.material_id}'")
+
+    mat = MATERIALS[req.material_id]
+    fx = await get_usd_to_inr()
+    rate = fx["rate"]
+    price_data = await get_live_prices()
+    usd_price = price_data["prices"].get(req.material_id, mat["price_usd_kg"])
+    metal_price_inr = convert_material_price(usd_price, rate)
+
+    # ── Calculate our values here in the backend — never trust frontend to pass them ──
+    # This is the SAME calculation used in /api/material-estimate and compute_quote()
+    # Doing it here guarantees our_gross_weight is never 0, fixing "Match: Unknown"
+    our_calc = calculate_raw_material(
+        size_x_mm=req.size_x,
+        size_y_mm=req.size_y,
+        size_z_mm=req.size_z,
+        density_g_cm3=mat["density"],
+        quantity=req.quantity,
+        stock_type=req.stock_type,
+        part_volume_mm3=req.part_volume_mm3,
+    )
+    from services.costing import _get_standard_size_label
+    our_stock_size   = _get_standard_size_label(our_calc)
+    our_gross_weight = our_calc["gross_weight_per_part_kg"]   # ← exact value used for pricing
+    our_batch_weight = our_calc["total_batch_weight_kg"]
+    our_utilization  = our_calc["material_utilization_pct"]
+    our_material_cost = round(our_calc["raw_stock_kg"] * metal_price_inr, 2)
+
+    result = await validate_with_gemini(
+        # Raw inputs
+        material_name=mat["name"],
+        density=mat["density"],
+        size_x=req.size_x,
+        size_y=req.size_y,
+        size_z=req.size_z,
+        stock_type=req.stock_type,
+        quantity=req.quantity,
+        metal_price_inr_kg=metal_price_inr,
+        # Our calculated values for comparison
+        our_stock_size=our_stock_size,
+        our_gross_weight=our_gross_weight,
+        our_batch_weight=our_batch_weight,
+        our_utilization=our_utilization,
+        our_material_cost=our_material_cost,
+    )
+
+    # Also include our calculated values in the response for the UI side-by-side display
+    result["our_calculation"] = {
+        "stock_size":         our_stock_size,
+        "gross_weight_kg":    our_gross_weight,
+        "total_batch_weight_kg": our_batch_weight,
+        "material_utilization_pct": our_utilization,
+        "material_cost_inr":  our_material_cost,
+        "parts_per_bar":      our_calc.get("parts_per_bar", 0),
+        "envelope_volume_mm3": our_calc.get("envelope_volume_mm3", 0),
+    }
+
+    return JSONResponse(content=result)
 
 
 # ── Live metal prices (INR) ──────────────────────────────────────────────────
@@ -266,7 +410,8 @@ async def chat_adjust(req: ChatRequest):
         return JSONResponse(content={"response": "I'm offline since GEMINI_API_KEY is not set. Please manually configure.", "metrics": req.metrics})
         
     try:
-        genai.configure(api_key=api_key)
+        from services.gemini_client import call_gemini
+        
         prompt = f"""You are ACCU AI Copilot, a helpful manufacturing quoting assistant. 
 The user wants to adjust their quote parameters based on their message: "{req.message}"
 Current configuration metrics state:
@@ -278,7 +423,7 @@ Try to match their terms loosely. E.g if they say 'commercial aluminium' pick 'c
 
 CRITICAL INSTRUCTIONS FOR 'response':
 1. It MUST be highly conversational, extremely brief, and punchy (1 to 3 sentences maximum).
-2. NEVER output a giant wall of text, massive lists, or excessive markdown formatting. If the user asks what parameters or numbers were found, just give a quick one-sentence high-level summary (e.g. "I found X parts with a total volume of Y mm³"). Focus on clarity, not overwhelming detail.
+2. NEVER output a giant wall of text, massive lists, or excessive markdown formatting. If the user asks what parameters or numbers were found, just give a quick one-sentence high-level summary. Focus on clarity, not overwhelming detail.
 3. ALWAYS ensure numerical values are accurately preserved and stated if relevant.
 
 Return ONLY valid JSON in this exact format, without code blocks or markdown, just the raw braces:
@@ -287,31 +432,12 @@ Return ONLY valid JSON in this exact format, without code blocks or markdown, ju
   "metrics": {{ ... complete updated metrics object ... }}
 }}"""
         
-        models_to_try = [
-            "gemini-2.5-flash",
-            "gemini-2.0-flash",
-            "gemini-2.5-pro"
-        ]
-        
-        text = None
-        last_error = None
-        
-        for model_name in models_to_try:
-            try:
-                model = genai.GenerativeModel(model_name)
-                res = model.generate_content(
-                    prompt, 
-                    generation_config=genai.types.GenerationConfig(temperature=0.0)
-                )
-                text = res.text.strip()
-                break
-            except Exception as e:
-                last_error = e
-                error_str = str(e)
-                if "429" in error_str or "quota" in error_str.lower() or "ResourceExhausted" in error_str:
-                    continue  # try next model on rate limit
-                else:
-                    break  # non rate limit error, break out
+        # Use centralized client for model/key fallback
+        text = await call_gemini(
+            prompt,
+            model_name="gemini-2.0-flash",
+            temperature=0.0
+        )
         
         if text is None:
             if last_error:
@@ -381,6 +507,9 @@ async def gen_quote(req: QuoteRequest):
             exchange_rate=rate,
             surface_treatment_ids=req.surface_treatment_ids,
             profit_margin_pct=req.profit_margin_pct,
+            include_setup_cost=req.include_setup_cost,
+            hole_count_override=req.hole_count_override,
+            stock_type=req.stock_type,
         )
         quote["price_source"]    = price_data["source"]
         quote["price_note"]      = price_data.get("note", "")
@@ -431,6 +560,9 @@ async def gen_quote_pdf(req: QuoteRequest, background_tasks: BackgroundTasks):
             exchange_rate=rate,
             surface_treatment_ids=req.surface_treatment_ids,
             profit_margin_pct=req.profit_margin_pct,
+            include_setup_cost=req.include_setup_cost,
+            hole_count_override=req.hole_count_override,
+            stock_type=req.stock_type,
         )
         quote["price_source"] = price_data["source"]
         quote["quote_number"] = quote_number
@@ -609,4 +741,3 @@ if os.path.isdir(dist_path):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
