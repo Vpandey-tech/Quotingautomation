@@ -14,6 +14,7 @@ Matches the exact layout from the provided Image 3 reference.
 
 import tempfile
 import base64
+import math
 import os
 from fpdf import FPDF
 from datetime import datetime
@@ -273,119 +274,127 @@ def generate_quote_pdf(
 
     hsn_code = quote_data.get("hsn_code", "84669310")
 
+    # ── SINGLE SOURCE OF TRUTH: always read these from quote_data ────────────
+    # order_total  = pre-tax total  (unit_price_discounted × qty)
+    # sgst         = order_total × 9%   (already computed in costing.py)
+    # cgst         = order_total × 9%   (already computed in costing.py)
+    # grand_total  = order_total + sgst + cgst  ← THE ONLY FINAL AMOUNT
+    #
+    # We NEVER recalculate tax here. We NEVER multiply unit_price × qty again.
+    # We read the pre-computed values exactly as returned by compute_quote().
+
     if parts and len(parts) > 0:
         for idx, part in enumerate(parts, 1):
-            rcost = part.get("cost_inr", 0)
-            total_a += rcost
-            mat = part.get("material_short", "-")
-            tol = part.get("tolerance", "Standard")
-            part_no = f"RF{quote_number[-4:]}-{idx:02d}"
-            desc_str = f"Manufacturing of {mat} Parts as per sample provided.\nRaw material: {mat}\nTolerance: {tol}\nPart Number: {part_no}"
-            
+            # cost_inr must be the already-computed order_total for that part
+            # (unit_price_discounted × qty) — NOT unit_price alone
+            rcost = part.get("order_total", part.get("cost_inr", 0))
+            mat   = part.get("material_short", part.get("material", "-"))
+            tol   = part.get("tolerance", "Standard")
+            part_no = f"0{idx}"
+            desc_str = (
+                f"Manufacturing of {mat} Parts as per sample provided.\n"
+                f"Raw material: {mat}\n"
+                f"Tolerance: {tol}\n"
+                f"Part Number: {part_no}"
+            )
             draw_row(
                 idx_str=idx,
                 desc=desc_str,
                 unit="Nos",
                 qty=part.get("quantity", 1),
                 cost_val=_fmt_inr(rcost),
-                img_path=tmp_img_path if idx == 1 else None
+                img_path=tmp_img_path if idx == 1 else None,
             )
             items_count = idx
     else:
-        rcost = quote_data.get("order_total", 0)
-        total_a = rcost
-        mat = quote_data.get("material", "-")
-        tol = quote_data.get("tolerance", "Standard")
+        # Single-part quote — order_total is the pre-tax subtotal
+        rcost   = quote_data.get("order_total", 0)   # ← pre-tax order total
+        mat     = quote_data.get("material", "-")
+        tol     = quote_data.get("tolerance", "Standard")
         part_no = "01"
-        desc_str = f"Manufacturing of {mat} Parts as per sample provided.\nRaw material: {mat}\nTolerance: {tol}\nPart Number: {part_no}"
-        
+        desc_str = (
+            f"Manufacturing of {mat} Parts as per sample provided.\n"
+            f"Raw material: {mat}\n"
+            f"Tolerance: {tol}\n"
+            f"Part Number: {part_no}"
+        )
         draw_row(
             "1",
             desc=desc_str,
             unit="Nos",
             qty=quote_data.get("quantity", 1),
-            cost_val=_fmt_inr(rcost),
-            img_path=tmp_img_path
+            cost_val=_fmt_inr(rcost),          # ← shows order_total in cost column
+            img_path=tmp_img_path,
         )
         items_count = 1
 
-    # ── TOTALS APPENDED ROWS ─────────────────────────────────────────────────
-    # In Image 3, the totals are perfectly aligned below the table,
-    # where the Sr# column increments, the middle columns merge into a label, and Cost is filled.
-    label_w = sum(col_w[1:-1]) # Everything between Sr# and Cost
-    cost_w = col_w[-1]
+    # ── TOTALS BLOCK ─────────────────────────────────────────────────────────
+    # Layout: Sr# | Label (merged middle cols) | Cost
+    # Rows: Order Subtotal | SGST (9%) | CGST (9%) | Grand Total | Amount in Words
+    # NO "Total A", NO "Total B", NO "Taxation C" — removed per requirement.
 
-    def draw_appended_row(desc_label, cost_val, color=None, is_words=False):
+    label_w = sum(col_w[1:-1])
+    cost_w  = col_w[-1]
+
+    def draw_appended_row(desc_label, cost_val, color=None, is_words=False, bold=False):
         nonlocal items_count
         items_count += 1
-        
-        h = 6
-        x = pdf.get_x()
-        y = pdf.get_y()
-
-        fill = False
+        h   = 6
+        x   = pdf.get_x()
+        y   = pdf.get_y()
+        fill = bool(color)
         if color:
             pdf.set_fill_color(*color)
-            fill = True
 
-        # Sr# Col
         pdf.set_xy(x, y)
         pdf.cell(col_w[0], h, str(items_count), border=1, align="C", fill=fill)
-        
-        # Label & Cost
+
         if is_words:
-            # Spans label_w AND cost_w
             pdf.set_xy(x + col_w[0], y)
             pdf._set_font("B", 7)
             pdf.cell(label_w + cost_w, h, desc_label, border=1, align="L", fill=fill)
         else:
             pdf.set_xy(x + col_w[0], y)
+            pdf._set_font("B" if bold else "", 7)
             pdf.cell(label_w, h, desc_label, border=1, align="C", fill=fill)
             pdf.set_xy(x + col_w[0] + label_w, y)
-            pdf._set_font("B" if "TOTAL" in desc_label else "", 7)
+            pdf._set_font("B" if bold else "", 7)
             pdf.cell(cost_w, h, cost_val, border=1, align="C", fill=fill)
 
-        pdf._set_font("", 6.5) # reset
+        pdf._set_font("", 6.5)
         pdf.set_y(y + h)
 
-    # 1. Total A
-    draw_appended_row("TOTAL A", _fmt_inr(total_a))
-    
-    # 2. Additions (Hide if 0)
-    surf_cost = quote_data.get("surface_treatment_cost", 0)
-    log_cost = quote_data.get("logistics_cost", 0)
-    eng_cost = quote_data.get("engineering_cost", 0)
-    
-    if surf_cost > 0:
-        draw_appended_row("SURFACE TREATMENT/COATING", _fmt_inr(surf_cost))
-    if log_cost > 0:
-        draw_appended_row("Internal Logistics, Manufacturing Ops, Rework", _fmt_inr(log_cost))
-    if eng_cost > 0:
-        draw_appended_row("Engineering Charges", _fmt_inr(eng_cost))
+    # Read pre-computed values — NEVER recalculate
+    order_total = quote_data.get("order_total", 0)
+    sgst        = quote_data.get("sgst",        round(order_total * 0.09, 2))
+    cgst        = quote_data.get("cgst",        round(order_total * 0.09, 2))
+    grand_total = quote_data.get("grand_total", round(order_total + sgst + cgst, 2))
 
-    subtotal_b = total_a + surf_cost + log_cost + eng_cost
+    # Row 2: Order Subtotal (pre-tax)
+    draw_appended_row("Order Subtotal (Pre-Tax)", _fmt_inr(order_total))
 
-    # 3. Total B
-    draw_appended_row("TOTAL B", _fmt_inr(subtotal_b))
+    # Row 3: SGST 9%
+    draw_appended_row("SGST @ 9%", _fmt_inr(sgst))
 
-    # 4. Taxation rows (We do SGST then CGST cleanly)
-    sgst = quote_data.get("sgst", subtotal_b * 0.09)
-    cgst = quote_data.get("cgst", subtotal_b * 0.09)
-    
-    # SGST
-    draw_appended_row("Taxation C - SGST @ 9%", _fmt_inr(sgst))
-    # CGST
-    draw_appended_row("Taxation C - CGST @ 9%", _fmt_inr(cgst))
+    # Row 4: CGST 9%
+    draw_appended_row("CGST @ 9%", _fmt_inr(cgst))
 
-    # 5. Grand Total (Lighter Blue Highlight)
-    grand_total = quote_data.get("grand_total", subtotal_b + sgst + cgst)
-    lblue = (210, 235, 255) # Light blue matching Image 2 totals
-    draw_appended_row("GRAND TOTAL = (A+B+C)", _fmt_inr(grand_total), color=lblue)
+    # Row 5: Grand Total — bold + light blue highlight
+    draw_appended_row(
+        "Grand Total (Incl. GST)",
+        _fmt_inr(grand_total),
+        color=(210, 235, 255),
+        bold=True,
+    )
 
-    # 6. Amount in Words (Lighter Blue/Green Highlights)
-    words = amount_in_words(grand_total)
-    lblue_words = (215, 240, 255)
-    draw_appended_row(f" Amount in Words: {words}", "", color=lblue_words, is_words=True)
+    # Row 6: Amount in Words — same light blue
+    words = amount_in_words(int(round(grand_total)))
+    draw_appended_row(
+        f"Amount in Words: {words}",
+        "",
+        color=(215, 240, 255),
+        is_words=True,
+    )
 
     pdf.ln(10)
 
@@ -445,11 +454,10 @@ def generate_quote_pdf(
     pdf._set_font("", 8)
 
     terms = [
-        "GST @18% against supply order.",
-        "Delivery Time within 3 weeks, Inclusive of Transportation.",
+        "Delivery Time within 3-4 weeks, Inclusive of Transportation.",
         "70% Advance and remaining payment successful quality acceptance by client.",
         "Validity of the above quotation for 15 days.",
-        "All disputes are subject to Pune jurisdiction only."
+        "All disputes are subject to Pune jurisdiction only.",
     ]
     for i, t in enumerate(terms, 1):
         pdf.cell(0, 4.5, f"{i}. {t}", ln=True)
@@ -480,17 +488,24 @@ def generate_quote_pdf(
         pdf.cell(0, 5, "For ACCU DESIGN", ln=True)
         pdf.ln(8)
         
+    # ── Save & return ─────────────────────────────────────────────────────────
+    # Returns (tmp_path, suggested_filename).
+    # Caller must use suggested_filename for the download — NOT a random timestamp.
+    # Quote number e.g. "AD/XX/1903/25-26/AbCd" → "AD_XX_1903_25-26_AbCd"
+    safe_qnum = quote_number.replace("/", "_").strip()
+    suggested_filename = f"ACCUDESIGN_QUOTE_{safe_qnum}.pdf"
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         pdf.output(tmp.name)
-        
-        # Cleanup temporary image file if it exists
+
+        # Cleanup temporary screenshot image if it was created
         if tmp_img_path and os.path.exists(tmp_img_path):
             try:
                 os.remove(tmp_img_path)
-            except:
+            except Exception:
                 pass
-                
-        return tmp.name
+
+        return tmp.name, suggested_filename
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -553,11 +568,12 @@ def generate_bom_quote_pdf(
     pdf.ln(6)
 
     # ═══════════════════════ EXACT INVOICE TABLE BOM ═════════════════════════
-    # 10 columns matching EXACTLY the user's latest image layout:
-    # Sr#, DESCRIPTION, DIMENSIONS, CATEGORY, PART NO., MATERIAL, QTY., Weight(kg), MANUFACTURING PROCESS, Cost
-    COL_W = [7, 24, 23, 16, 14, 20, 9, 13, 43, 21]  # sum = 190
+    # Columns: Sr#, DESCRIPTION, DIMENSIONS, CATEGORY, PART NO., MATERIAL, QTY., Weight(kg), MFG PROCESS, Cost
+    # DESCRIPTION and MATERIAL widened; rows use multi_cell so text wraps instead of being cut off
+    COL_W = [7, 30, 20, 14, 12, 22, 9, 13, 42, 21]  # sum = 190
     COL_H = ["Sr#", "DESCRIPTION", "DIMENSIONS", "CATEGORY", "PART\nNO.", "MATERIAL", "QTY.", "Weight\n(kg)", "MANUFACTURING\nPROCESS", "Cost"]
     HDR_H = 8
+    ROW_H = 8   # minimum row height; multi_cell rows auto-expand
     
     def _draw_table_header():
         pdf._set_font("B", 6)
@@ -603,151 +619,190 @@ def generate_bom_quote_pdf(
     pdf._set_font("", 6)
 
     for idx, p in enumerate(parts):
-        if pdf.get_y() + 8 > 260:
+        is_buyout  = bool(p.get('isBuyout', False))
+        qty        = int(p.get('qty', p.get('quantity', 1)))
+
+        # ── CRITICAL: row_amount is the already-computed pre-tax order total ──
+        # It must come from order_total (unit_price_discounted × qty already done
+        # in costing.py).  Do NOT multiply unit_price × qty here — that causes
+        # a 4–5× inflation bug when unit_price is already the per-unit rate.
+        if is_buyout:
+            row_amount = 0.0
+        else:
+            # Prefer order_total (pre-tax total for this part).
+            # Fall back to cost_inr, then unit_price_discounted × qty.
+            row_amount = float(
+                p.get("order_total")
+                or p.get("cost_inr")
+                or (p.get("unit_price_discounted", p.get("unit_price", 0)) * qty)
+                or 0
+            )
+        
+        item_num  = str(p.get('item_number', str(idx + 1).zfill(2)))
+        part_name = p.get('name', 'PART').upper()
+        dims      = str(p.get('dimensions', '-'))
+        material  = str(p.get('material', 'EN-8')).upper()
+        weight    = str(p.get('weight_kg', '-'))
+        process   = p.get('process', 'Machining')
+        cost_str  = "AT ACTUAL" if is_buyout else _fmt_inr(row_amount)
+        cost_bold = is_buyout
+
+        # ── Word-wrap splitter ────────────────────────────────────────────────
+        # Splits text into lines that fit inside col_width mm.
+        # Uses FPDF's real get_string_width — 100% accurate, no estimates.
+        def _split_lines(text, col_width, font_size=6):
+            pdf._set_font("", font_size)
+            usable = col_width - 2.0   # 1 mm padding each side
+            result = []
+            for para in text.split('\n'):
+                if not para.strip():
+                    result.append('')
+                    continue
+                words = para.split(' ')
+                current = ''
+                for word in words:
+                    test = (current + ' ' + word).strip()
+                    if pdf.get_string_width(test) <= usable:
+                        current = test
+                    else:
+                        if current:
+                            result.append(current)
+                        # If single word wider than column, keep it anyway
+                        current = word
+                if current:
+                    result.append(current)
+            return result if result else ['']
+
+        LINE_H = 4.0   # mm per text line
+        PAD_T  = 1.5   # top padding mm
+
+        # Pre-split all wrapping columns to know exact line counts
+        lines_desc = _split_lines(part_name, COL_W[1])
+        lines_mat  = _split_lines(material,  COL_W[5])
+        lines_proc = _split_lines(process,   COL_W[8])
+
+        # Row height = tallest column + padding
+        row_h = max(
+            ROW_H,
+            max(len(lines_desc), len(lines_mat), len(lines_proc)) * LINE_H + PAD_T + 1.5
+        )
+
+        # Page-break check with actual row height
+        if pdf.get_y() + row_h > 260:
             pdf.add_page()
             _draw_table_header()
             pdf._set_font("", 6)
 
-        is_buyout = bool(p.get('isBuyout', False))
-        qty = int(p.get('qty', 1))
-        unit_price = p.get('unit_price', 0) or 0
-        if is_buyout:
-            unit_price = 0
-            
-        row_amount = unit_price * qty
-        
-        item_num = str(p.get('item_number', str(idx+1).zfill(2)))
-        part_name = p.get('name', 'PART').upper()
-        dims = str(p.get('dimensions', '-'))
-        material = str(p.get('material', 'EN-8')).upper()
-        weight = str(p.get('weight_kg', '-'))
-        process = p.get('process', 'Machining')
-
-        cost_str = "-" if is_buyout else _fmt_inr(row_amount)
-
-        # Row Height matching content
         y_start = pdf.get_y()
-        
-        pdf.set_xy(10, y_start)
-        pdf.cell(COL_W[0], 8, str(idx+1), border=1, align="C")
-        
-        pdf.set_xy(10 + sum(COL_W[:1]), y_start)
-        pdf.cell(COL_W[1], 8, part_name[:30], border=1, align="C")
-        
-        pdf.set_xy(10 + sum(COL_W[:2]), y_start)
-        pdf.cell(COL_W[2], 8, dims[:22], border=1, align="C")
-        
-        pdf.set_xy(10 + sum(COL_W[:3]), y_start)
-        pdf.cell(COL_W[3], 8, "Buyout" if is_buyout else "Part", border=1, align="C")
-        
-        pdf.set_xy(10 + sum(COL_W[:4]), y_start)
-        pdf.cell(COL_W[4], 8, item_num[:8], border=1, align="C")
-        
-        pdf.set_xy(10 + sum(COL_W[:5]), y_start)
-        pdf.cell(COL_W[5], 8, material[:18], border=1, align="C")
-        
-        pdf.set_xy(10 + sum(COL_W[:6]), y_start)
-        pdf.cell(COL_W[6], 8, str(qty), border=1, align="C")
-        
-        pdf.set_xy(10 + sum(COL_W[:7]), y_start)
-        pdf.cell(COL_W[7], 8, weight[:8], border=1, align="C")
-        
-        # Multiline for processes potentially
-        x_proc = 10 + sum(COL_W[:8])
-        pdf.set_xy(x_proc, y_start)
-        if len(process) > 28:
-            pdf.multi_cell(COL_W[8], 4, process[:50], border=1, align="C")
-            pdf.set_xy(x_proc + COL_W[8], y_start)
-        else:
-            pdf.cell(COL_W[8], 8, process[:50], border=1, align="C")
-            
-        pdf.set_xy(10 + sum(COL_W[:9]), y_start)
-        pdf.cell(COL_W[9], 8, cost_str, border=1, align="C")
-        
-        pdf.set_y(y_start + 8)
+        x_start = 10
+
+        # ── Draw a simple fixed-height cell (no wrapping needed) ─────────────
+        def _cell(col_idx, text, align="C", bold=False):
+            pdf.set_xy(x_start + sum(COL_W[:col_idx]), y_start)
+            pdf._set_font("B" if bold else "", 6)
+            pdf.cell(COL_W[col_idx], row_h, text, border=1, align=align)
+            # Restore — cell() moves x forward but not y; safe.
+
+        # ── Draw a wrapping cell using only cell() — NO multi_cell ───────────
+        # Draws the border rect, then places each pre-split line individually.
+        # Cursor is ALWAYS restored to (cx+cw, y_start) after drawing.
+        def _wrap_cell(col_idx, lines, bold=False):
+            cx = x_start + sum(COL_W[:col_idx])
+            cw = COL_W[col_idx]
+            # Border rectangle at full row height
+            pdf.set_line_width(0.2)
+            pdf.rect(cx, y_start, cw, row_h)
+            # Draw each line as a plain cell() at precise Y
+            for i, line in enumerate(lines):
+                ly = y_start + PAD_T + i * LINE_H
+                pdf.set_xy(cx + 1, ly)
+                pdf._set_font("B" if bold else "", 6)
+                pdf.cell(cw - 2, LINE_H, line, border=0, align="L")
+            # Always restore cursor — this is the key fix
+            pdf.set_xy(cx + cw, y_start)
+
+        # ── Render all 10 columns ─────────────────────────────────────────────
+        _cell(0, str(idx + 1))
+        _wrap_cell(1, lines_desc)                      # DESCRIPTION
+        _cell(2, dims)
+        _cell(3, "Buyout" if is_buyout else "Part")
+        _cell(4, item_num)
+        _wrap_cell(5, lines_mat)                       # MATERIAL
+        _cell(6, str(qty))
+        _cell(7, weight)
+        _wrap_cell(8, lines_proc)                      # MANUFACTURING PROCESS
+        _cell(9, cost_str, align="C", bold=cost_bold)  # AT ACTUAL (bold) or cost
+
+        # Advance Y by exactly row_h — guaranteed no overlap with next row
+        pdf.set_y(y_start + row_h)
 
         if not is_buyout:
             machined_total += row_amount
 
-    # ═══════════════════════ EXACT TOTALS BLOCK ══════════════════════════════
-    if pdf.get_y() + 65 > 260:
+    # ═══════════════════════ TOTALS BLOCK ════════════════════════════════════
+    # NO "Total A", NO "Total B", NO "Taxation C" — removed per requirement.
+    # All values read from pre-computed costing.py output — never recalculated.
+    if pdf.get_y() + 50 > 260:
         pdf.add_page()
     
     pdf.ln(4)
-    y = pdf.get_y()
     
-    # Calculate the dynamic starting number for the Totals block based on the number of parts
+    # Calculate starting Sr# index (after all part rows)
     start_idx = len(parts) + 1
     
-    w_left = COL_W[0]
-    w_mid = sum(COL_W[1:-1])
+    w_left  = COL_W[0]
+    w_mid   = sum(COL_W[1:-1])
     w_right = COL_W[-1]
-    
-    def total_row(num, text, amount, is_bold=False):
-        pdf._set_font("B" if is_bold else "", 7)
-        pdf.cell(w_left, 6, str(num), border=1, align="C")
-        pdf.cell(w_mid, 6, text, border=1, align="C")
-        pdf.cell(w_right, 6, amount, border=1, align="R")
+
+    def total_row(num, text, amount_str, bold=False, color=None):
+        fill = bool(color)
+        if color:
+            pdf.set_fill_color(*color)
+        pdf._set_font("B" if bold else "", 7)
+        pdf.cell(w_left,  6, str(num),       border=1, align="C",              fill=fill)
+        pdf.cell(w_mid,   6, text,            border=1, align="C",              fill=fill)
+        pdf.cell(w_right, 6, amount_str,      border=1, align="R",              fill=fill)
         pdf.ln(6)
 
-    total_row(start_idx, "TOTAL A", _fmt_inr(machined_total), is_bold=True)
-    
-    surface_treatment = machined_total * 0.05
-    internal_ops = machined_total * 0.05
-    eng_charges = machined_total * 0.05
-    
-    total_row(start_idx + 1, "SURFACE TREATMENT/COATING", _fmt_inr(surface_treatment))
-    total_row(start_idx + 2, "Internal Logistics, Manufacturing Ops, Rework", _fmt_inr(internal_ops))
-    total_row(start_idx + 3, "Engineering Charges", _fmt_inr(eng_charges))
-    
-    total_b = machined_total + surface_treatment + internal_ops + eng_charges
-    total_row(start_idx + 4, "TOTAL B", _fmt_inr(total_b), is_bold=True)
-    
-    # Taxation Row
-    sgst = total_b * 0.09
-    cgst = total_b * 0.09
-    
-    pdf._set_font("", 7)
-    y_tax = pdf.get_y()
-    pdf.cell(w_left, 12, str(start_idx + 5), border=1, align="C")
-    
-    # Mid section split
-    w_mid_left = sum(COL_W[1:7]) # 106 
-    w_mid_mid1 = COL_W[7] # 13
-    w_mid_mid2 = COL_W[8] # 43
-    
-    # "Taxation C" cell spanning vertically
-    pdf.cell(w_mid_left, 12, "Taxation C", border=1, align="C")
-    
-    x_split = pdf.get_x()
-    # Top half (SGST)
-    pdf.cell(w_mid_mid1, 6, "SGST", border=1, align="C")
-    pdf.cell(w_mid_mid2, 6, "9%", border=1, align="C")
-    pdf.cell(w_right, 6, _fmt_inr(sgst), border=1, align="R")
-    pdf.ln(6)
-    
-    # Bottom half (CGST)
-    pdf.set_x(x_split)
-    pdf.cell(w_mid_mid1, 6, "CGST", border=1, align="C")
-    pdf.cell(w_mid_mid2, 6, "9%", border=1, align="C")
-    pdf.cell(w_right, 6, _fmt_inr(cgst), border=1, align="R")
-    pdf.ln(6)
-    
-    grand_total = total_b + sgst + cgst
-    rounded_total = round(grand_total)
-    
-    # Grand Total Row
+    # ── Aggregate pre-tax total across all non-buyout parts ──────────────────
+    # Each part's order_total is already unit_price_discounted × qty from costing.py
+    order_subtotal = sum(
+        float(p.get("order_total") or p.get("cost_inr") or 0)
+        for p in parts
+        if not p.get("isBuyout", False)
+    )
+
+    # ── Read GST from first quoted part (rates are always 9%+9%) ─────────────
+    # If parts carry their own sgst/cgst fields, sum them; otherwise compute.
+    sgst_total = sum(float(p.get("sgst", 0)) for p in parts if not p.get("isBuyout", False))
+    cgst_total = sum(float(p.get("cgst", 0)) for p in parts if not p.get("isBuyout", False))
+
+    # Fallback: if parts don't carry pre-computed GST, compute from subtotal
+    if sgst_total == 0:
+        sgst_total = round(order_subtotal * 0.09, 2)
+    if cgst_total == 0:
+        cgst_total = round(order_subtotal * 0.09, 2)
+
+    grand_total_bom = round(order_subtotal + sgst_total + cgst_total, 2)
+
+    # Row: Order Subtotal (pre-tax)
+    total_row(start_idx,     "Order Subtotal (Pre-Tax)",  _fmt_inr(order_subtotal))
+    # Row: SGST
+    total_row(start_idx + 1, "SGST @ 9%",                _fmt_inr(sgst_total))
+    # Row: CGST
+    total_row(start_idx + 2, "CGST @ 9%",                _fmt_inr(cgst_total))
+    # Row: Grand Total — bold + highlight
+    total_row(start_idx + 3, "Grand Total (Incl. GST)",  _fmt_inr(grand_total_bom),
+              bold=True, color=(210, 235, 255))
+
+    # Row: Amount in Words — amount_in_words() already ends with "Rupees Only"
+    # do NOT append anything extra — that caused "Rupees Only Rupees Only" bug
+    pdf.set_fill_color(215, 240, 255)
     pdf._set_font("B", 7)
-    pdf.cell(w_left, 6, str(start_idx + 6), border=1, align="C")
-    pdf.cell(w_mid, 6, "GRAND TOTAL = (A+B+C)", border=1, align="C")
-    pdf.cell(w_right, 6, _fmt_inr(rounded_total), border=1, align="R")
-    pdf.ln(6)
-    
-    # Amount in Words with Green Background
-    pdf.set_fill_color(200, 240, 180) # Light green
-    pdf.cell(w_left, 7, str(start_idx + 7), border=1, align="C", fill=True)
-    num_txt = "Amount in Words: " + amount_in_words(rounded_total) + " Rupees Only"
-    pdf.cell(w_mid + w_right, 7, num_txt, border=1, align="C", fill=True)
+    rounded_bom = int(round(grand_total_bom))
+    words_str = "Amount in Words: " + amount_in_words(rounded_bom)
+    pdf.cell(w_left,          7, str(start_idx + 4), border=1, align="C", fill=True)
+    pdf.cell(w_mid + w_right, 7, words_str,           border=1, align="L", fill=True)
     pdf.ln(7)
 
     # ═══════════════════════ TERMS & CONDITIONS ══════════════════════════════
@@ -759,12 +814,13 @@ def generate_bom_quote_pdf(
     pdf.cell(0, 5, "Terms & Conditions:", ln=True)
     pdf._set_font("", 8)
 
+    # GST point REMOVED (GST is already shown in the table above).
+    # Delivery updated to "3-4 weeks".
     terms = [
-        f"GST @18% against supply order.",
-        "Delivery Time within 3 weeks, Inclusive of Transportation.",
+        "Delivery Time within 3-4 weeks, Inclusive of Transportation.",
         "70% Advance and remaining payment successful quality acceptance by client.",
         "Validity of the above quotation for 15 days.",
-        f"All disputes are subject to Pune jurisdiction only."
+        "All disputes are subject to Pune jurisdiction only.",
     ]
     for i, t in enumerate(terms, 1):
         pdf.cell(0, 4.5, f"{i}. {t}", ln=True)
@@ -772,14 +828,18 @@ def generate_bom_quote_pdf(
     pdf.ln(8)
     if pdf.get_y() > 240:
         pdf.add_page()
-        
+
     # ── SIGNATURE ────────────────────────────────────────────────────────────
     pdf._set_font("", 9)
     pdf.cell(0, 5, "Yours Faithfully,", ln=True)
     pdf.ln(4)
-    
+
     stamp_placed = False
-    for path in [os.path.join(ASSETS_DIR, "stamp.png"), os.path.join(ASSETS_DIR, "stamp.jpg"), os.path.join(ASSETS_DIR, "stamp.jpeg")]:
+    for path in [
+        os.path.join(ASSETS_DIR, "stamp.png"),
+        os.path.join(ASSETS_DIR, "stamp.jpg"),
+        os.path.join(ASSETS_DIR, "stamp.jpeg"),
+    ]:
         if os.path.isfile(path):
             try:
                 pdf.image(path, x=10, y=pdf.get_y(), w=60)
@@ -788,15 +848,19 @@ def generate_bom_quote_pdf(
                 break
             except Exception:
                 pass
-                
+
     if not stamp_placed:
         pdf._set_font("B", 9)
         pdf.cell(0, 5, "For ACCU DESIGN", ln=True)
         pdf.ln(8)
 
-    # Note: Footer is auto-drawn by FPDF because we use AccuDesignAuthenticPDF
+    # ── Save & return ─────────────────────────────────────────────────────────
+    # Returns (tmp_path, suggested_filename) so the caller can set the download
+    # name as  ACCUDESIGN_BOM_QUOTE_{quote_number}.pdf  — NOT a random timestamp.
+    # Quote number e.g. "AD/BOM/4582" → "AD_BOM_4582"
+    safe_qnum = quote_number.replace("/", "_").strip()
+    suggested_filename = f"ACCUDESIGN_BOM_QUOTE_{safe_qnum}.pdf"
 
-    # ── Save ─────────────────────────────────────────────────────────────────
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         pdf.output(tmp.name)
-        return tmp.name
+        return tmp.name, suggested_filename

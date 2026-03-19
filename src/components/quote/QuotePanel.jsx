@@ -87,13 +87,13 @@ function TextInput({ label, value, onChange, placeholder, icon: Icon, type = "te
 
 /* ─── MultiSelect with Chips ─────────────────────────────────────────────── */
 function MultiSelect({ label, selectedIds = [], onChange, options = [], disabled }) {
-    
+
     const unselectedOptions = options.filter(o => !selectedIds.includes(o.value));
-    
+
     return (
         <div className="space-y-2">
             <label className="text-[10px] text-gray-500 uppercase tracking-widest">{label}</label>
-            
+
             {/* Chips Area */}
             {selectedIds.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -114,7 +114,7 @@ function MultiSelect({ label, selectedIds = [], onChange, options = [], disabled
                     })}
                 </div>
             )}
-            
+
             {/* Add Dropdown */}
             <div className="relative group">
                 <select
@@ -141,7 +141,7 @@ function MultiSelect({ label, selectedIds = [], onChange, options = [], disabled
                 <Plus size={14} className="absolute right-3 top-1/2 -translate-y-1/2
                     text-gray-500 pointer-events-none group-hover:text-cyan-400 transition-colors" />
             </div>
-            
+
             {selectedIds.length >= 5 && label.includes('Process') && (
                 <p className="text-[9px] text-amber-400/80 font-mono mt-1 flex items-center gap-1">
                     <AlertCircle size={9} /> ≥5 processes forces "Very Complex" tier.
@@ -346,8 +346,8 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                     our_stock_size: materialEstimate.standard_diameter_mm
                         ? `Ø${materialEstimate.standard_diameter_mm}mm`
                         : materialEstimate.standard_thickness_mm
-                        ? `${materialEstimate.standard_thickness_mm}×${materialEstimate.standard_width_mm}mm`
-                        : '',
+                            ? `${materialEstimate.standard_thickness_mm}×${materialEstimate.standard_width_mm}mm`
+                            : '',
                     our_envelope_vol: materialEstimate.envelope_volume_mm3 || 0,
                     our_gross_weight: materialEstimate.gross_weight_per_part_kg || 0,
                     our_batch_weight: materialEstimate.total_batch_weight_kg || 0,
@@ -400,9 +400,9 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                         holes: part.holes || [],
                         complexity: { tier: 'Moderate', score: 150 },
                     };
-                    
-                    const pName = part.name || part.description || `Part ${index+1}`;
-                    const pDim = `${part.bounding_box?.sizeX||0}x${part.bounding_box?.sizeY||0}x${part.bounding_box?.sizeZ||0}`;
+
+                    const pName = part.name || part.description || `Part ${index + 1}`;
+                    const pDim = `${part.bounding_box?.sizeX || 0}x${part.bounding_box?.sizeY || 0}x${part.bounding_box?.sizeZ || 0}`;
                     const pQty = part.quantity || 1;
                     const pCons = part.critical_considerations || '-';
 
@@ -444,38 +444,53 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                             screenshot: null,
                             include_setup_cost: includeSetupCost,
                             hole_count_override: holeCountOverride,
-                            stock_type: stockType, 
+                            stock_type: stockType,
                         }),
                     });
 
                     if (!resp.ok) {
-                        return { 
-                            isBuyout: false, error: true, item_number: part.item_number, 
-                            name: pName, material: part.material, dimensions: pDim, qty: pQty 
+                        return {
+                            isBuyout: false, error: true, item_number: part.item_number,
+                            name: pName, material: part.material, dimensions: pDim, qty: pQty
                         };
                     }
                     const qData = await resp.json();
-                    
-                    // Format for table
+
+                    // Format for table — include ALL cost fields so pdf.py never recomputes
                     return {
                         isBuyout: false,
                         item_number: part.item_number || '-',
                         name: pName,
                         material: materials[part.material_id || materialId]?.name || part.material || '-',
+                        material_id: part.material_id || materialId,
+                        process_id: part.process_id || processIds[0] || 'cnc_turning',
+                        tolerance_id: part.tolerance_id || toleranceId,
                         dimensions: pDim,
                         qty: pQty,
+                        quantity: pQty,
                         process: processes[part.process_id || processIds[0]]?.name || 'Machining',
                         machining_cost: qData.breakdown?.machining_cost || 0,
                         material_cost: qData.breakdown?.material_cost || 0,
                         cycle_time: qData.machining_hours || 0,
                         critical_considerations: pCons,
+                        // ── Cost fields — exact values from /api/quote response ──
                         unit_price: qData.unit_price || 0,
-                        total_price: qData.order_total || 0,
+                        unit_price_discounted: qData.unit_price_discounted || 0,
+                        discount_pct: qData.discount_pct || 0,
+                        order_total: qData.order_total || 0,  // pre-tax total
+                        sgst: qData.sgst || 0,
+                        cgst: qData.cgst || 0,
+                        grand_total: qData.grand_total || 0,  // final incl GST
+                        total_price: qData.order_total || 0,  // for UI display
+                        weight_kg: qData.mass_kg || 0,
+                        stock_type: stockType,
+                        geometry: partGeometry,
+                        holes: part.holes || [],
                     };
                 }));
                 setMultiQuote({
                     parts: results,
-                    quote_number: `AD/BOM/${Math.floor(Math.random()*9000)+1000}`
+                    quote_number: `AD/BOM/${Math.floor(Math.random() * 9000) + 1000}`
                 });
             } else {
                 // Single part quote processing
@@ -555,7 +570,8 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `AccuDesign_Quote_${Date.now()}.pdf`;
+            const safeQnum = (quote?.quote_number || '').replace(/\//g, '_');
+            a.download = safeQnum ? `ACCUDESIGN_QUOTE_${safeQnum}.pdf` : `ACCUDESIGN_QUOTE_${Date.now()}.pdf`;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -594,7 +610,8 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `AccuDesign_BOM_Quote_${Date.now()}.pdf`;
+            const safeQnum = (multiQuote.quote_number || '').replace(/\//g, '_');
+            a.download = `ACCUDESIGN_BOM_QUOTE_${safeQnum}.pdf`;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -610,7 +627,7 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
     const matOptions = Object.entries(materials).map(([k, v]) => ({ value: k, label: v.name }));
     const procOptions = Object.entries(processes).map(([k, v]) => ({ value: k, label: v.name }));
     const tolOptions = Object.entries(tolerances).map(([k, v]) => ({ value: k, label: v.label }));
-    
+
     const surfaceOptions = [
         { value: 'anodize_clear', label: 'Anodize (Clear)' },
         { value: 'anodize_black', label: 'Anodize (Black)' },
@@ -733,13 +750,13 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                     options={surfaceOptions} disabled={catLoading} />
                 <Select label="Tolerance" value={toleranceId} onChange={setToleranceId}
                     options={tolOptions} disabled={catLoading} />
-                    
-                <TextInput 
-                    label="Profit Margin" 
-                    type="range" 
+
+                <TextInput
+                    label="Profit Margin"
+                    type="range"
                     min={15} max={30} step={1}
-                    value={profitMarginPct} 
-                    onChange={setProfitMarginPct} 
+                    value={profitMarginPct}
+                    onChange={setProfitMarginPct}
                 />
 
                 {/* Stock Type (Senior Req) */}
@@ -773,13 +790,11 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                     </div>
                     <button
                         onClick={() => setIncludeSetupCost(!includeSetupCost)}
-                        className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
-                            includeSetupCost ? 'bg-cyan-500/60' : 'bg-gray-700'
-                        }`}
+                        className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${includeSetupCost ? 'bg-cyan-500/60' : 'bg-gray-700'
+                            }`}
                     >
-                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
-                            includeSetupCost ? 'left-[18px]' : 'left-0.5'
-                        }`} />
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${includeSetupCost ? 'left-[18px]' : 'left-0.5'
+                            }`} />
                     </button>
                 </div>
 
@@ -903,40 +918,37 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
 
                         {/* AI Validation Result */}
                         {aiValidation && (
-                            <div className={`rounded-lg p-2.5 space-y-1 border ${
-                                aiValidation.success
-                                    ? aiValidation.match_level === 'excellent' ? 'bg-emerald-500/10 border-emerald-500/25'
+                            <div className={`rounded-lg p-2.5 space-y-1 border ${aiValidation.success
+                                ? aiValidation.match_level === 'excellent' ? 'bg-emerald-500/10 border-emerald-500/25'
                                     : aiValidation.match_level === 'good' ? 'bg-blue-500/10 border-blue-500/25'
-                                    : aiValidation.match_level === 'fair' ? 'bg-amber-500/10 border-amber-500/25'
-                                    : 'bg-red-500/10 border-red-500/25'
-                                    : 'bg-red-500/10 border-red-500/25'
-                            }`}>
+                                        : aiValidation.match_level === 'fair' ? 'bg-amber-500/10 border-amber-500/25'
+                                            : 'bg-red-500/10 border-red-500/25'
+                                : 'bg-red-500/10 border-red-500/25'
+                                }`}>
                                 {aiValidation.success ? (
                                     <>
                                         <div className="flex items-center justify-between">
                                             <span className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
                                                 <ShieldCheck size={11} className={
                                                     aiValidation.match_level === 'excellent' ? 'text-emerald-400' :
-                                                    aiValidation.match_level === 'good' ? 'text-blue-400' :
-                                                    aiValidation.match_level === 'fair' ? 'text-amber-400' : 'text-red-400'
+                                                        aiValidation.match_level === 'good' ? 'text-blue-400' :
+                                                            aiValidation.match_level === 'fair' ? 'text-amber-400' : 'text-red-400'
                                                 } />
                                                 AI Confidence
                                             </span>
-                                            <span className={`text-[13px] font-bold font-mono ${
-                                                aiValidation.confidence_score >= 85 ? 'text-emerald-300' :
+                                            <span className={`text-[13px] font-bold font-mono ${aiValidation.confidence_score >= 85 ? 'text-emerald-300' :
                                                 aiValidation.confidence_score >= 60 ? 'text-blue-300' :
-                                                aiValidation.confidence_score >= 40 ? 'text-amber-300' : 'text-red-300'
-                                            }`}>
+                                                    aiValidation.confidence_score >= 40 ? 'text-amber-300' : 'text-red-300'
+                                                }`}>
                                                 {aiValidation.confidence_score}%
                                             </span>
                                         </div>
                                         <div className="w-full bg-gray-800 rounded-full h-1.5 mt-0.5">
                                             <div
-                                                className={`h-1.5 rounded-full transition-all duration-500 ${
-                                                    aiValidation.confidence_score >= 85 ? 'bg-emerald-400' :
+                                                className={`h-1.5 rounded-full transition-all duration-500 ${aiValidation.confidence_score >= 85 ? 'bg-emerald-400' :
                                                     aiValidation.confidence_score >= 60 ? 'bg-blue-400' :
-                                                    aiValidation.confidence_score >= 40 ? 'bg-amber-400' : 'bg-red-400'
-                                                }`}
+                                                        aiValidation.confidence_score >= 40 ? 'bg-amber-400' : 'bg-red-400'
+                                                    }`}
                                                 style={{ width: `${aiValidation.confidence_score}%` }}
                                             />
                                         </div>
@@ -991,7 +1003,7 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                 <div ref={resultRef} className="rounded-2xl bg-gradient-to-b from-purple-900/30 to-black/60
                     border border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.15)]
                     backdrop-blur-xl p-4 space-y-3 relative overflow-hidden">
-                    
+
                     {/* Header */}
                     <div className="flex items-center gap-2 border-b border-purple-500/20 pb-2">
                         <Layers size={15} className="text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
@@ -1052,13 +1064,13 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
 
                     {/* Totals */}
                     <div className="border-t border-purple-500/20 pt-2 space-y-0.5 mt-2">
-                        <LineItem 
+                        <LineItem
                             label="Grand Total (Estimated, Excl. Buyouts)"
                             value={`₹${fmt(multiQuote.parts.reduce((sum, p) => sum + (p.total_price || 0), 0))}`}
                             highlight large
                         />
                         <p className="text-[9px] text-gray-500 text-right italic pt-1">All prices in ₹ INR. Buyout items quoted separately.</p>
-                        
+
                         {/* Download BOM PDF */}
                         <button
                             onClick={downloadBomPdf}
@@ -1090,7 +1102,7 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                             Quote Result (₹ INR)
                         </span>
                         <span className={`ml-auto text-[9px] font-mono font-medium ${quote.price_source === 'metals_dev' ? 'text-green-300' :
-                                quote.price_source === 'world_bank' ? 'text-blue-300' : 'text-amber-300'}`}>
+                            quote.price_source === 'world_bank' ? 'text-blue-300' : 'text-amber-300'}`}>
                             {quote.price_source === 'metals_dev' ? '● LME Live' :
                                 quote.price_source === 'world_bank' ? '● World Bank' : '◐ Estimated'}
                         </span>

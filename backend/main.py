@@ -567,7 +567,7 @@ async def gen_quote_pdf(req: QuoteRequest, background_tasks: BackgroundTasks):
         quote["price_source"] = price_data["source"]
         quote["quote_number"] = quote_number
 
-        pdf_path = generate_quote_pdf(
+        result = generate_quote_pdf(
             quote_data=quote,
             quote_number=quote_number,
             client_name=req.client_name,
@@ -575,11 +575,22 @@ async def gen_quote_pdf(req: QuoteRequest, background_tasks: BackgroundTasks):
             source_filename=req.source_filename,
             screenshot_b64=req.screenshot,
         )
+
+        # Bulletproof unpack — works whether pdf.py returns 1 or 2 values
+        if isinstance(result, tuple):
+            pdf_path = result[0]
+            safe_qnum = quote_number.replace("/", "_").strip()
+            suggested_filename = result[1] if len(result) > 1 else f"ACCUDESIGN_QUOTE_{safe_qnum}.pdf"
+        else:
+            pdf_path = result
+            safe_qnum = quote_number.replace("/", "_").strip()
+            suggested_filename = f"ACCUDESIGN_QUOTE_{safe_qnum}.pdf"
+
         background_tasks.add_task(_safe_delete, pdf_path)
         return FileResponse(
             pdf_path,
             media_type="application/pdf",
-            filename=f"accudesign_quote_{quote_number.replace('/', '_')}.pdf"
+            filename=suggested_filename,
         )
     except Exception as e:
         import traceback
@@ -597,12 +608,57 @@ def _safe_delete(path: str):
 # ── BOM Assembly PDF endpoint ───────────────────────────────────────────────
 @app.post("/api/quote/bom-pdf", tags=["Quoting"])
 async def gen_bom_quote_pdf(req: BomPdfRequest, background_tasks: BackgroundTasks):
-    """Generate a BOM assembly quotation PDF in landscape format."""
+    """
+    Generate BOM PDF using costs already computed by the frontend.
+    Frontend calls /api/quote per part and stores order_total, sgst, cgst,
+    grand_total in each part object. We use those directly — no recomputation.
+    """
     try:
         from services.pdf import generate_bom_quote_pdf
 
-        pdf_path = generate_bom_quote_pdf(
-            parts=req.parts,
+        enriched_parts = []
+        for p in req.parts:
+            part = dict(p)
+
+            # Detect buyout
+            is_buyout = (
+                bool(part.get("isBuyout"))
+                or str(part.get("part_category", "")).lower() == "buyout item"
+            )
+            part["isBuyout"] = is_buyout
+
+            if is_buyout:
+                part["order_total"] = 0.0
+                part["sgst"]        = 0.0
+                part["cgst"]        = 0.0
+                part["grand_total"] = 0.0
+                enriched_parts.append(part)
+                continue
+
+            # ── Use pre-computed costs from the frontend ──────────────────────
+            # Frontend sends: order_total, sgst, cgst, grand_total, unit_price
+            # These come straight from /api/quote responses — they are correct.
+            qty = int(part.get("qty") or part.get("quantity") or 1)
+            part["quantity"] = qty
+
+            # order_total = unit_price_discounted × qty  (pre-tax)
+            order_total = float(part.get("order_total") or 0)
+            if order_total == 0:
+                # fallback: unit_price × qty
+                order_total = round(float(part.get("unit_price") or 0) * qty, 2)
+            part["order_total"] = order_total
+
+            # sgst / cgst — use pre-computed or derive from order_total
+            part["sgst"]        = float(part.get("sgst") or round(order_total * 0.09, 2))
+            part["cgst"]        = float(part.get("cgst") or round(order_total * 0.09, 2))
+            part["grand_total"] = float(part.get("grand_total") or
+                                        round(order_total + part["sgst"] + part["cgst"], 2))
+
+            enriched_parts.append(part)
+
+        # ── Generate PDF ──────────────────────────────────────────────────────
+        result = generate_bom_quote_pdf(
+            parts=enriched_parts,
             quote_number=req.quote_number,
             client_name=req.client_name,
             client_company=req.client_company,
@@ -610,12 +666,21 @@ async def gen_bom_quote_pdf(req: BomPdfRequest, background_tasks: BackgroundTask
             source_filename=req.source_filename,
             profit_margin_pct=req.profit_margin_pct,
         )
+
+        # Bulletproof unpack — works with old pdf.py (1 val) or new (2 vals)
+        if isinstance(result, tuple):
+            pdf_path  = result[0]
+            suggested = result[1] if len(result) > 1 else None
+        else:
+            pdf_path  = result
+            suggested = None
+
+        safe_qnum = req.quote_number.replace("/", "_").strip()
+        filename  = suggested or f"ACCUDESIGN_BOM_QUOTE_{safe_qnum}.pdf"
+
         background_tasks.add_task(_safe_delete, pdf_path)
-        return FileResponse(
-            pdf_path,
-            media_type="application/pdf",
-            filename=f"accudesign_bom_{req.quote_number.replace('/', '_')}.pdf"
-        )
+        return FileResponse(pdf_path, media_type="application/pdf", filename=filename)
+
     except Exception as e:
         import traceback
         print(f"\n{'='*60}\n[BOM PDF ERROR]\n{traceback.format_exc()}\n{'='*60}\n")
