@@ -70,6 +70,7 @@ class QuoteRequest(BaseModel):
     screenshot:     Optional[str] = Field(None, description="Base64 isometric view screenshot")
     # Senior's Phase 5 additions:
     include_setup_cost: bool = Field(True, description="Include/exclude setup & amortization cost in quote")
+    include_drilling_surcharge: bool = Field(True, description="Include/exclude drilling surcharge in quote")
     hole_count_override: int = Field(-1, ge=-1, description="Override hole count. -1 = use AI/B-Rep detected count")
     stock_type: str = Field("round_bar", description="Stock type: round_bar, plate, hex_bar")
 
@@ -415,8 +416,6 @@ async def chat_adjust(req: ChatRequest):
         return JSONResponse(content={"response": "I'm offline since GEMINI_API_KEY is not set. Please manually configure.", "metrics": req.metrics})
         
     try:
-        from services.gemini_client import call_gemini
-        
         prompt = f"""You are ACCU AI Copilot, a helpful manufacturing quoting assistant. 
 The user wants to adjust their quote parameters based on their message: "{req.message}"
 Current configuration metrics state:
@@ -437,19 +436,20 @@ Return ONLY valid JSON in this exact format, without code blocks or markdown, ju
   "metrics": {{ ... complete updated metrics object ... }}
 }}"""
         
-        # Use centralized client for model/key fallback
-        text = await call_gemini(
-            prompt,
-            model_name="gemini-2.0-flash",
-            temperature=0.0
-        )
+        # Use raw Google Generative AI call
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        generation_config = genai.types.GenerationConfig(temperature=0.0)
         
-        if text is None:
-            if last_error:
-                error_str = str(last_error)
-                if "429" in error_str or "quota" in error_str.lower() or "ResourceExhausted" in error_str:
-                    return JSONResponse(content={"response": "I am currently receiving too many requests (API Rate Limit). Please wait a moment and try again.", "metrics": req.metrics})
-            raise Exception("Failed to generate content: " + str(last_error))
+        response = await run_in_threadpool(
+            model.generate_content,
+            prompt,
+            generation_config=generation_config
+        )
+        text = response.text
+        
+        if not text:
+            raise Exception("Empty response from AI")
 
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0]
@@ -513,6 +513,7 @@ async def gen_quote(req: QuoteRequest):
             surface_treatment_ids=req.surface_treatment_ids,
             profit_margin_pct=req.profit_margin_pct,
             include_setup_cost=req.include_setup_cost,
+            include_drilling_surcharge=req.include_drilling_surcharge,
             hole_count_override=req.hole_count_override,
             stock_type=req.stock_type,
         )
@@ -566,6 +567,7 @@ async def gen_quote_pdf(req: QuoteRequest, background_tasks: BackgroundTasks):
             surface_treatment_ids=req.surface_treatment_ids,
             profit_margin_pct=req.profit_margin_pct,
             include_setup_cost=req.include_setup_cost,
+            include_drilling_surcharge=req.include_drilling_surcharge,
             hole_count_override=req.hole_count_override,
             stock_type=req.stock_type,
         )
@@ -743,6 +745,7 @@ def _analyze_with_cadquery(path: str, original_name: str) -> dict:
     vertices = solid.Vertices()
 
     holes = []
+    seen_centers = []
     if BRepAdaptor_Surface and GeomAbs_Cylinder:
         for face in faces:
             try:
@@ -753,8 +756,23 @@ def _analyze_with_cadquery(path: str, original_name: str) -> dict:
                 radius   = cylinder.Radius()
                 if radius <= 0 or radius > 500:
                     continue
-                diameter = round(radius * 2, 4)
+                    
                 fbb   = face.BoundingBox()
+                cx = (fbb.xmax + fbb.xmin) / 2.0
+                cy = (fbb.ymax + fbb.ymin) / 2.0
+                cz = (fbb.zmax + fbb.zmin) / 2.0
+                
+                # Check for duplicates to prevent overcounting split cylinder faces
+                is_dup = False
+                for (sx, sy, sz) in seen_centers:
+                    if abs(cx-sx) < 0.5 and abs(cy-sy) < 0.5 and abs(cz-sz) < 0.5:
+                        is_dup = True
+                        break
+                if is_dup:
+                    continue
+                seen_centers.append((cx, cy, cz))
+                
+                diameter = round(radius * 2, 4)
                 depth = round(max(fbb.xmax - fbb.xmin, fbb.ymax - fbb.ymin, fbb.zmax - fbb.zmin), 4)
                 hole_type = "through" if depth > diameter * 0.5 else "blind"
                 holes.append({"diameter": diameter, "depth": depth, "type": hole_type})

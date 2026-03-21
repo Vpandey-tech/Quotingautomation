@@ -116,6 +116,92 @@ class AccuDesignAuthenticPDF(FPDF):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Material Calculation Breakdown Helper
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _draw_material_calculation_page(pdf, part_data: dict, title: str, source_filename: str = None):
+    me = part_data.get("material_estimate")
+    if not me:
+        return
+
+    pdf.add_page()
+    pdf._set_font("B", 12)
+    pdf.cell(0, 8, "Material Calculation Details (For Record Purposes)", align="C", ln=True)
+    pdf.ln(2)
+
+    pdf._set_font("B", 9)
+    if source_filename:
+        pdf.cell(0, 5, f"Source File: {source_filename}", ln=True)
+    pdf.cell(0, 5, f"{title}", ln=True)
+    pdf.ln(5)
+
+    pdf._set_font("B", 8)
+    pdf.set_line_width(0.2)
+    col_w = [90, 100]
+
+    def _lbl_val(label, val, highlight=False):
+        # Label cell
+        pdf.set_fill_color(255, 255, 255)
+        pdf._set_font("B", 8)
+        pdf.cell(col_w[0], 6, str(label), border=1, fill=True)
+        # Value cell
+        if highlight:
+            pdf.set_fill_color(230, 250, 230)
+        else:
+            pdf.set_fill_color(255, 255, 255)
+        pdf._set_font("", 8)
+        pdf.cell(col_w[1], 6, str(val), border=1, align="R", fill=True)
+        pdf.ln(6)
+
+    def _section_header(title_text):
+        pdf.ln(3)
+        pdf._set_font("B", 8)
+        pdf.set_fill_color(240, 245, 255)
+        pdf.cell(sum(col_w), 7, title_text.upper(), border=1, fill=True, align="L")
+        pdf.ln(7)
+
+    # 1. Stock & Material
+    _section_header("Stock & Material Details")
+    _lbl_val("Stock Type", part_data.get("stock_type_name", "Round Bar"))
+    _lbl_val("Standard Stock Size", me.get("standard_stock_size", "-"))
+    _lbl_val("Material Specification", part_data.get("material", "-"))
+    
+    bb = part_data.get("boundingBox", {})
+    if "boundingBox" not in part_data and "geometry" in part_data:
+        geom = part_data["geometry"]
+        bb = geom if isinstance(geom, dict) and "boundingBox" not in geom else geom.get("boundingBox", {})
+    dims = f"{bb.get('sizeX', 0):.2f} × {bb.get('sizeY', 0):.2f} × {bb.get('sizeZ', 0):.2f} mm" if bb else "N/A"
+    _lbl_val("Part Dimensions", dims)
+
+    # 2. Envelope & Allowances
+    _section_header("Envelope & Machining Allowances")
+    alw = me.get("allowances", {})
+    if alw:
+        for k, v in alw.items():
+            _lbl_val(f"{k.replace('_', ' ').title()} Allowance", f"{v} mm")
+    _lbl_val("Calculated Envelope Volume", f"{me.get('envelope_volume_mm3', 0):,.0f} mm³")
+
+    # 3. Weight & Cost
+    mat_cost = part_data.get("breakdown", {}).get("material_cost", 0)
+    if mat_cost == 0 and "material_cost" in part_data:
+        mat_cost = part_data["material_cost"]
+
+    _section_header("Weight & Cost Estimates")
+    _lbl_val("Gross Weight Per Part (Raw Stock)", f"{me.get('gross_weight_per_part_kg', 0):.3f} kg", highlight=True)
+    _lbl_val("Net Part Weight (Finished)", f"{part_data.get('mass_kg', part_data.get('weight_kg', 0)):.3f} kg")
+    scrap = part_data.get("scrap_weight_kg", 0)
+    _lbl_val("Scrap Weight Per Part", f"{scrap:.3f} kg")
+    _lbl_val("Total Batch Weight (For Full Qty)", f"{me.get('total_batch_weight_kg', 0):.3f} kg")
+    _lbl_val("Material Utilization Rate", f"{me.get('material_utilization_pct', 0)} %")
+    
+    if me.get("parts_per_bar", 0) > 0:
+        _lbl_val("Parts Yield per Bar", f"{me.get('parts_per_bar')} (Requires {me.get('bars_needed')} full length bars)")
+        
+    _lbl_val("Estimated Material Cost", _fmt_inr(mat_cost), highlight=True)
+    pdf.ln(5)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Authentic Generator Function
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -487,6 +573,9 @@ def generate_quote_pdf(
         pdf._set_font("B", 9)
         pdf.cell(0, 5, "For ACCU DESIGN", ln=True)
         pdf.ln(8)
+        
+    # Append the material calculation details page
+    _draw_material_calculation_page(pdf, quote_data, "Calculation Details", source_filename)
         
     # ── Save & return ─────────────────────────────────────────────────────────
     # Returns (tmp_path, suggested_filename).
@@ -862,6 +951,15 @@ def generate_bom_quote_pdf(
         pdf._set_font("B", 9)
         pdf.cell(0, 5, "For ACCU DESIGN", ln=True)
         pdf.ln(8)
+
+    # Append the material calculation details pages for all parts in the BOM
+    for idx, part_data in enumerate(parts, 1):
+        _draw_material_calculation_page(
+            pdf, 
+            part_data, 
+            f"Component {idx}: {part_data.get('name', 'Part')} {part_data.get('item_number', '')}".strip(), 
+            part_data.get('source_filename', '')
+        )
 
     # ── Save & return ─────────────────────────────────────────────────────────
     # Returns (tmp_path, suggested_filename) so the caller can set the download

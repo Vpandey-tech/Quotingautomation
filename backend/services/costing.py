@@ -149,6 +149,7 @@ def compute_quote(
     surface_treatment_ids: list = None,
     profit_margin_pct: float = 22.0, # e.g. 22.0 = 22%
     include_setup_cost: bool = True,  # Senior Req: toggle setup cost
+    include_drilling_surcharge: bool = True, # Senior Req: toggle drilling cost
     hole_count_override: int = -1,    # Senior Req: -1 = use detected, >=0 = override
     stock_type: str = "round_bar",    # Senior Req: stock type for material calc
 ) -> dict:
@@ -287,7 +288,7 @@ def compute_quote(
         total_mach_cost_unit += adj_mach_hr * proc_rate_inr
 
         # ── Hole drilling surcharge (INR) ONLY IF first subtractive process ──
-        if proc["axes"] > 0 and effective_holes and total_drill_cost == 0.0:
+        if include_drilling_surcharge and proc["axes"] > 0 and effective_holes and total_drill_cost == 0.0:
             for hole in effective_holes:
                 d = safe_float(hole.get("diameter"), 1.0)
                 depth = safe_float(hole.get("depth"), d)
@@ -379,6 +380,7 @@ def compute_quote(
 
         # ── Part / job info ────────────────────────────────────────────────────
         "mass_kg":                 round(part_mass_kg,       4),
+        "scrap_weight_kg":         max(0.0, round(raw_stock_kg - part_mass_kg, 4)),
         "machining_hours":         round(total_machining_hr, 3),
         "holes_count":             effective_hole_count,
         "manufacturing_processes": mfg_processes,

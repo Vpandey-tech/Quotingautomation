@@ -3,7 +3,7 @@ import Viewer from './components/viewer/Viewer';
 import QuotePanel from './components/quote/QuotePanel';
 import {
   Box, FileText, Activity, Ruler, FlaskConical,
-  DollarSign, Layers, ChevronRight, MessageSquare, Send, X
+  DollarSign, Layers, ChevronRight, MessageSquare, Send, X, Eye
 } from 'lucide-react';
 
 /* ─── Metric row ─────────────────────────────────────────────────────────── */
@@ -90,7 +90,11 @@ export default function App() {
   // Each "part" stores its own metrics, geometry, and file reference
   const [parts, setParts] = useState([]);
   const [activePartId, setActivePartId] = useState(null);
-  // Note: "parts" is an array of { id, metrics, geometry, file, fileName, occtResult, brepStatus }
+  
+  // Update a part's config/quote data
+  const handleUpdatePartData = useCallback((id, data) => {
+    setParts(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+  }, []);
 
   // Track sidebar hover to block pointer events on 3D canvas
   const [sidebarHovered, setSidebarHovered] = useState(false);
@@ -208,6 +212,10 @@ export default function App() {
       fileName: m.fileName || 'Part 1',
       occtResult: result,
       brepStatus: m.source === 'pdf' ? 'pdf' : 'loading',
+      config: null,
+      quote: null,
+      materialEstimate: null,
+      aiValidation: null,
     };
     setParts([newPart]);
     setActivePartId(newId);
@@ -268,7 +276,14 @@ export default function App() {
     if (!m) return;
 
     const geom = buildGeometry(m);
-    const partNumber = parts.length + 1;
+    const activePart = parts.find(p => p.id === activePartId);
+    
+    // Deep clone the active config to avoid unintended reference sharing, but reset quantity to 1 for the new part
+    const newConfig = activePart?.config ? JSON.parse(JSON.stringify(activePart.config)) : null;
+    if (newConfig) {
+        newConfig.quantity = 1;
+    }
+
     const newId = Date.now();
 
     const newPart = {
@@ -276,9 +291,13 @@ export default function App() {
       metrics: m,
       geometry: geom,
       file: file,
-      fileName: m.fileName || `Part ${partNumber}`,
+      fileName: m.fileName || `Part ${parts.length + 1}`,
       occtResult: result,
       brepStatus: m.source === 'pdf' ? 'pdf' : 'loading',
+      config: newConfig,
+      quote: null,
+      materialEstimate: null,
+      aiValidation: null,
     };
 
     setParts(prev => [...prev, newPart]);
@@ -610,6 +629,47 @@ export default function App() {
                   )}
                 </SectionCard>
 
+                {/* Material Verification Summary */}
+                {(() => {
+                  const activePart = parts.find(p => p.id === activePartId);
+                  const materialEstimate = activePart?.materialEstimate;
+                  const pcfg = activePart?.config;
+
+                  if (materialEstimate && pcfg) {
+                    return (
+                      <SectionCard icon={Eye} title="Material Verification" accent="rgba(16,185,129,0.1)">
+                        <div className="space-y-0.5 mt-1">
+                          <MetricRow label="Stock" value={materialEstimate.stock_type_name || pcfg.stockType} />
+                          <MetricRow label="Material" value={materialEstimate.material_name || '-'} />
+                          <MetricRow label="Dims (mm)"
+                            value={`${parseFloat(geometry?.boundingBox?.sizeX || 0).toFixed(1)} × ${parseFloat(geometry?.boundingBox?.sizeY || 0).toFixed(1)} × ${parseFloat(geometry?.boundingBox?.sizeZ || 0).toFixed(1)}`} />
+                          
+                          <div className="mt-3 mb-1 border-t border-white/5 pt-2">
+                             <p className="text-[9px] text-emerald-400/70 uppercase tracking-[0.15em] font-bold mb-1 px-1">Envelope</p>
+                             {materialEstimate.standard_diameter_mm && <MetricRow label="Std Ø" value={`${materialEstimate.standard_diameter_mm} mm`} highlight />}
+                             {materialEstimate.standard_af_mm && <MetricRow label="Hex AF" value={`${materialEstimate.standard_af_mm} mm`} highlight />}
+                             {materialEstimate.standard_thickness_mm && <MetricRow label="Thick." value={`${materialEstimate.standard_thickness_mm} × ${materialEstimate.standard_width_mm} mm`} highlight />}
+                             {materialEstimate.effective_length_mm > 0 && <MetricRow label="Eff. Len" value={`${materialEstimate.effective_length_mm} mm`} />}
+                             <MetricRow label="Vol." value={`${Number(materialEstimate.envelope_volume_mm3).toLocaleString()} mm³`} />
+                          </div>
+                          
+                          <div className="mt-3 border-t border-white/5 pt-2">
+                             <p className="text-[9px] text-emerald-400/70 uppercase tracking-[0.15em] font-bold mb-1 px-1">Weight & Cost</p>
+                             <MetricRow label="Wt/Part" value={`${materialEstimate.gross_weight_per_part_kg?.toFixed(3)} kg`} highlight />
+                             <MetricRow label="Batch Wt" value={`${materialEstimate.total_batch_weight_kg?.toFixed(3)} kg`} />
+                             <MetricRow label="Utilization" value={`${materialEstimate.material_utilization_pct}%`} />
+                             <MetricRow label="Mat. Cost" value={`₹${Number(materialEstimate.estimated_material_cost_inr).toLocaleString()}`} highlight />
+                             {materialEstimate.parts_per_bar > 0 && (
+                                <MetricRow label="Parts/Bar" value={`${materialEstimate.parts_per_bar} (${materialEstimate.bars_needed} bar${materialEstimate.bars_needed > 1 ? 's' : ''})`} />
+                             )}
+                          </div>
+                        </div>
+                      </SectionCard>
+                    );
+                  }
+                  return null;
+                })()}
+
                 {/* B-Rep status */}
                 {brepStatus !== 'idle' && (
                 <div className="rounded-lg px-3 py-2 text-[10px] font-mono"
@@ -698,6 +758,9 @@ export default function App() {
 
             {tab === 'quote' && (
               <QuotePanel
+                key={activePartId} // Key ensures full remount on part change to read isolated part state
+                activePart={parts.find(p => p.id === activePartId)}
+                onUpdatePartData={handleUpdatePartData}
                 geometry={geometry}
                 fileMetrics={metrics}
                 captureScreenshot={captureScreenshot}

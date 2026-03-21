@@ -152,7 +152,9 @@ function MultiSelect({ label, selectedIds = [], onChange, options = [], disabled
 }
 
 /* ─── Main component ─────────────────────────────────────────────────────── */
-export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, parts: accumulatedParts = [], onRemovePart }) {
+export default function QuotePanel({ activePart, onUpdatePartData, geometry, fileMetrics, captureScreenshot, parts: accumulatedParts = [], onRemovePart }) {
+    const pcfg = activePart?.config || {};
+    
     // ── Catalogue state
     const [materials, setMaterials] = useState({});
     const [processes, setProcesses] = useState({});
@@ -165,21 +167,23 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, p
     const [exchangeRate, setExchangeRate] = useState(null);
     const [priceLoading, setPriceLoading] = useState(false);
 
-    // ── Selection state
-    const [materialId, setMaterialId] = useState('aluminum_6061');
-    const [processIds, setProcessIds] = useState(['cnc_milling_3ax']);
-    const [surfaceTreatmentIds, setSurfaceTreatmentIds] = useState([]);
-    const [toleranceId, setToleranceId] = useState('standard');
-    const [quantity, setQuantity] = useState(1);
-    const [profitMarginPct, setProfitMarginPct] = useState(22);
+    // ── Selection state (Initialized from activePart)
+    const [materialId, setMaterialId] = useState(pcfg.materialId || 'aluminum_6061');
+    const [processIds, setProcessIds] = useState(pcfg.processIds || ['cnc_milling_3ax']);
+    const [surfaceTreatmentIds, setSurfaceTreatmentIds] = useState(pcfg.surfaceTreatmentIds || []);
+    const [toleranceId, setToleranceId] = useState(pcfg.toleranceId || 'standard');
+    const [quantity, setQuantity] = useState(pcfg.quantity || 1);
+    const [profitMarginPct, setProfitMarginPct] = useState(pcfg.profitMarginPct || 22);
 
     // ── Senior Phase 5: New controls
-    const [includeSetupCost, setIncludeSetupCost] = useState(true);
-    const [holeCountOverride, setHoleCountOverride] = useState(-1); // -1 = auto
-    const [stockType, setStockType] = useState('round_bar');
-    const [materialEstimate, setMaterialEstimate] = useState(null);
+    const [includeSetupCost, setIncludeSetupCost] = useState(pcfg.includeSetupCost ?? true);
+    const [includeDrillingSurcharge, setIncludeDrillingSurcharge] = useState(pcfg.includeDrillingSurcharge ?? true);
+    const [holeCountOverride, setHoleCountOverride] = useState(pcfg.holeCountOverride ?? -1); // -1 = auto
+    const [stockType, setStockType] = useState(pcfg.stockType || 'round_bar');
+    
+    const [materialEstimate, setMaterialEstimate] = useState(activePart?.materialEstimate || null);
     const [estimateLoading, setEstimateLoading] = useState(false);
-    const [aiValidation, setAiValidation] = useState(null);
+    const [aiValidation, setAiValidation] = useState(activePart?.aiValidation || null);
     const [aiValidating, setAiValidating] = useState(false);
 
     // ── Client info
@@ -188,20 +192,36 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, p
     const [hsnCode, setHsnCode] = useState('84669310'); // Default HSN code
 
     // ── Output state
-    const [quote, setQuote] = useState(null);
+    const [quote, setQuote] = useState(activePart?.quote || null);
     const [multiQuote, setMultiQuote] = useState(null);
     const [loading, setLoading] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // Sync state changes to global layout for persistence
+    useEffect(() => {
+        if (!activePart || !onUpdatePartData) return;
+        onUpdatePartData(activePart.id, {
+            config: {
+                materialId, processIds, surfaceTreatmentIds, toleranceId,
+                quantity, profitMarginPct, includeSetupCost, includeDrillingSurcharge,
+                holeCountOverride, stockType
+            },
+            quote,
+            materialEstimate,
+            aiValidation
+        });
+    }, [activePart?.id, materialId, processIds, surfaceTreatmentIds, toleranceId, quantity, profitMarginPct, includeSetupCost, includeDrillingSurcharge, holeCountOverride, stockType, quote, materialEstimate, aiValidation, onUpdatePartData]);
 
     const resultRef = React.useRef(null);
 
     // ── Auto-fill selections from PDF analysis if available
     useEffect(() => {
         if (fileMetrics?.source === 'pdf') {
-            if (fileMetrics.materialId) setMaterialId(fileMetrics.materialId);
-            if (fileMetrics.processId) setProcessIds([fileMetrics.processId]);
-            if (fileMetrics.toleranceId) setToleranceId(fileMetrics.toleranceId);
+            const pcfg = activePart?.config || {};
+            if (fileMetrics.materialId && !pcfg.materialId) setMaterialId(fileMetrics.materialId);
+            if (fileMetrics.processId && (!pcfg.processIds || pcfg.processIds.length === 0)) setProcessIds([fileMetrics.processId]);
+            if (fileMetrics.toleranceId && !pcfg.toleranceId) setToleranceId(fileMetrics.toleranceId);
             
             // Auto-fill client info ONLY if currently empty (prevents overwriting when switching parts)
             if (fileMetrics.clientName) {
@@ -406,9 +426,11 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, p
                     const bb = partGeom?.boundingBox || {};
                     const pDim = `${parseFloat(bb.sizeX || 0).toFixed(0)}x${parseFloat(bb.sizeY || 0).toFixed(0)}x${parseFloat(bb.sizeZ || 0).toFixed(0)}`;
 
-                    const partMatId = pm?.materialId || materialId;
-                    const partProcIds = pm?.processId ? [pm.processId] : processIds;
-                    const partTolId = pm?.toleranceId || toleranceId;
+                    const partConfig = accPart.config || {};
+                    const partMatId = partConfig.materialId || 'aluminum_6061';
+                    const partProcIds = (partConfig.processIds && partConfig.processIds.length) ? partConfig.processIds : ['cnc_milling_3ax'];
+                    const partTolId = partConfig.toleranceId || 'standard';
+                    const partQty = partConfig.quantity || 1;
 
                     const resp = await fetch(`${API}/quote`, {
                         method: 'POST',
@@ -417,18 +439,19 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, p
                             geometry: partGeom,
                             material_id: partMatId,
                             process_ids: partProcIds,
-                            surface_treatment_ids: surfaceTreatmentIds,
-                            profit_margin_pct: profitMarginPct,
+                            surface_treatment_ids: partConfig.surfaceTreatmentIds || [],
+                            profit_margin_pct: partConfig.profitMarginPct || 22,
                             tolerance_id: partTolId,
-                            quantity: qty,
+                            quantity: partQty,
                             client_name: clientName,
                             client_company: clientCompany,
                             hsn_code: hsnCode,
                             source_filename: pm?.fileName || '',
                             screenshot: null,
-                            include_setup_cost: includeSetupCost,
-                            hole_count_override: holeCountOverride,
-                            stock_type: stockType,
+                            include_setup_cost: partConfig.includeSetupCost ?? true,
+                            include_drilling_surcharge: partConfig.includeDrillingSurcharge ?? true,
+                            hole_count_override: partConfig.holeCountOverride ?? -1,
+                            stock_type: partConfig.stockType || 'round_bar',
                         }),
                     });
 
@@ -450,8 +473,8 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, p
                         process_id: partProcIds[0],
                         tolerance_id: partTolId,
                         dimensions: pDim,
-                        qty: qty,
-                        quantity: qty,
+                        qty: partQty,
+                        quantity: partQty,
                         process: qData.process || 'Machining',
                         machining_cost: qData.breakdown?.machining_cost || 0,
                         material_cost: qData.breakdown?.material_cost || 0,
@@ -471,6 +494,8 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, p
                         holes: partGeom?.holes || [],
                         tolerance: qData.tolerance || 'Standard',
                         source_filename: pm?.fileName || '',
+                        material_estimate: qData.material_estimate || null,
+                        scrap_weight_kg: qData.scrap_weight_kg || 0,
                     };
                 }));
 
@@ -569,6 +594,8 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, p
                         geometry: partGeometry, holes: part.holes || [],
                         tolerance: qData.tolerance || 'Standard',
                         source_filename: fileMetrics?.fileName || '',
+                        material_estimate: qData.material_estimate || null,
+                        scrap_weight_kg: qData.scrap_weight_kg || 0,
                     };
                 }));
                 const combinedOrderTotal = results.reduce((s, p) => s + (p.order_total || 0), 0);
@@ -602,6 +629,7 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, p
                         source_filename: fileMetrics?.fileName || '',
                         screenshot,
                         include_setup_cost: includeSetupCost,
+                        include_drilling_surcharge: includeDrillingSurcharge,
                         hole_count_override: holeCountOverride,
                         stock_type: stockType,
                     }),
@@ -646,6 +674,10 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, p
                 hsn_code: hsnCode,
                 source_filename: fileMetrics?.fileName || '',
                 screenshot,
+                include_setup_cost: includeSetupCost,
+                include_drilling_surcharge: includeDrillingSurcharge,
+                hole_count_override: holeCountOverride,
+                stock_type: stockType,
             };
 
             const resp = await fetch(`${API}/quote/pdf`, {
@@ -879,7 +911,7 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, p
                 </div>
 
                 {/* Setup Cost Toggle (Senior Req) */}
-                <div className="flex items-center justify-between py-2 px-1">
+                <div className="flex items-center justify-between py-2 px-1 border-gray-700/50">
                     <div className="flex items-center gap-2">
                         <ToggleLeft size={12} className="text-gray-500" />
                         <span className="text-[10px] text-gray-400 uppercase tracking-widest">Include Setup / Amortization</span>
@@ -890,6 +922,22 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, p
                             }`}
                     >
                         <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${includeSetupCost ? 'left-[18px]' : 'left-0.5'
+                            }`} />
+                    </button>
+                </div>
+                
+                {/* Drilling Surcharge Toggle */}
+                <div className="flex items-center justify-between pb-2 pt-0 px-1">
+                    <div className="flex items-center gap-2">
+                        <ToggleLeft size={12} className="text-gray-500" />
+                        <span className="text-[10px] text-gray-400 uppercase tracking-widest">Include Drilling Surcharge</span>
+                    </div>
+                    <button
+                        onClick={() => setIncludeDrillingSurcharge(!includeDrillingSurcharge)}
+                        className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${includeDrillingSurcharge ? 'bg-cyan-500/60' : 'bg-gray-700'
+                            }`}
+                    >
+                        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${includeDrillingSurcharge ? 'left-[18px]' : 'left-0.5'
                             }`} />
                     </button>
                 </div>
@@ -1269,6 +1317,9 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, p
                     {/* Part info + Material Estimate */}
                     <div className="border-t border-gray-700/40 pt-2 space-y-0.5">
                         <LineItem label="Part Mass" value={`${fmt(quote.mass_kg, 3)} kg`} />
+                        {quote.scrap_weight_kg != null && (
+                            <LineItem label="Scrap Value" value={`${fmt(quote.scrap_weight_kg, 3)} kg`} />
+                        )}
                         {quote.material_estimate && (
                             <>
                                 <LineItem label="Stock Size" value={quote.material_estimate.standard_stock_size || '—'} highlight />
