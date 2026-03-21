@@ -342,43 +342,52 @@ def compute_quote(
         "tolerance":    tol["label"],
         "complexity":   comp_tier,
         "quantity":     quantity,
-        "metal_price_inr_kg": round(metal_price_inr, 2),
-        "exchange_rate":      round(exchange_rate, 2),
+        "metal_price_inr_kg":  round(metal_price_inr, 2),
+        "exchange_rate":       round(exchange_rate, 2),
         "machine_rate_inr_hr": round(proc_rate_inr, 2) if 'proc_rate_inr' in locals() else 0.0,
 
-        # Per-unit breakdown (INR)
+        # ── Per-unit cost breakdown (INR) — for itemised display on UI ─────────
         "breakdown": {
-            "material_cost":    round(mat_cost_unit,    2),
-            "machining_cost":   round(total_mach_cost_unit,   2),
-            "drilling_cost":    round(total_drill_cost,       2),
-            "setup_cost":       round(setup_per_unit,   2),
-            "overhead":         round(overhead_unit,    2),
-            "profit_margin":    round(profit_unit,      2),
+            "material_cost":  round(mat_cost_unit,        2),
+            "machining_cost": round(total_mach_cost_unit, 2),
+            "drilling_cost":  round(total_drill_cost,     2),
+            "setup_cost":     round(setup_per_unit,       2),
+            "overhead":       round(overhead_unit,        2),
+            "profit_margin":  round(profit_unit,          2),
         },
 
-        "unit_price":            round(total_unit,       2),
+        # ── Order-level totals (INR) ────────────────────────────────────────────
+        # unit_price            = total per unit before any discount
+        # unit_price_discounted = total per unit after quantity discount
+        # order_total           = unit_price_discounted × quantity  (pre-tax)
+        "unit_price":            round(total_unit,            2),
         "unit_price_discounted": round(total_unit_discounted, 2),
-        "discount_pct":          round(discount_pct * 100, 1),
-        "order_total":           round(total_order,      2),
+        "discount_pct":          round(discount_pct * 100,    1),
+        "order_total":           round(total_order,           2),  # pre-tax
 
-        # GST (INR)
+        # ── GST — SGST + CGST only (no other tax labels) ───────────────────────
+        # sgst        = order_total × 9%
+        # cgst        = order_total × 9%
+        # grand_total = order_total + sgst + cgst  ← FINAL PAYABLE AMOUNT
+        # Both UI and PDF must read grand_total for the final amount.
+        # Do NOT recalculate tax in pdf.py — always read these pre-computed keys.
         "sgst_rate":   9.0,
         "cgst_rate":   9.0,
-        "sgst":        round(sgst, 2),
-        "cgst":        round(cgst, 2),
-        "grand_total": round(grand_total, 2),
+        "sgst":        round(sgst,        2),
+        "cgst":        round(cgst,        2),
+        "grand_total": round(grand_total, 2),   # ← UI and PDF both read this
 
-        # Derived — part info
-        "mass_kg":              round(part_mass_kg,     4),
-        "machining_hours":      round(total_machining_hr,      3),
-        "holes_count":          effective_hole_count,
+        # ── Part / job info ────────────────────────────────────────────────────
+        "mass_kg":                 round(part_mass_kg,       4),
+        "machining_hours":         round(total_machining_hr, 3),
+        "holes_count":             effective_hole_count,
         "manufacturing_processes": mfg_processes,
-        "currency":             "INR",
+        "currency":                "INR",
 
-        # ── NEW: Senior's envelope-based material estimation outputs ─────────
-        "include_setup_cost":   include_setup_cost,
-        "stock_type":           material_estimate.get("stock_type", stock_type),
-        "stock_type_name":      material_estimate.get("stock_type_name", "Round Bar"),
+        # ── Envelope-based material estimation (Senior's requirement) ──────────
+        "include_setup_cost": include_setup_cost,
+        "stock_type":         material_estimate.get("stock_type",      stock_type),
+        "stock_type_name":    material_estimate.get("stock_type_name", "Round Bar"),
         "material_estimate": {
             "gross_weight_per_part_kg": material_estimate["gross_weight_per_part_kg"],
             "total_batch_weight_kg":    material_estimate["total_batch_weight_kg"],

@@ -152,7 +152,7 @@ function MultiSelect({ label, selectedIds = [], onChange, options = [], disabled
 }
 
 /* ─── Main component ─────────────────────────────────────────────────────── */
-export default function QuotePanel({ geometry, fileMetrics, captureScreenshot }) {
+export default function QuotePanel({ geometry, fileMetrics, captureScreenshot, parts: accumulatedParts = [], onRemovePart }) {
     // ── Catalogue state
     const [materials, setMaterials] = useState({});
     const [processes, setProcesses] = useState({});
@@ -202,10 +202,17 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
             if (fileMetrics.materialId) setMaterialId(fileMetrics.materialId);
             if (fileMetrics.processId) setProcessIds([fileMetrics.processId]);
             if (fileMetrics.toleranceId) setToleranceId(fileMetrics.toleranceId);
-            // Auto-fill client info extracted from PDF (admin can still edit)
-            if (fileMetrics.clientName) setClientName(fileMetrics.clientName);
-            if (fileMetrics.clientCompany) setClientCompany(fileMetrics.clientCompany);
-            if (fileMetrics.hsnCode) setHsnCode(fileMetrics.hsnCode);
+            
+            // Auto-fill client info ONLY if currently empty (prevents overwriting when switching parts)
+            if (fileMetrics.clientName) {
+                setClientName(prev => prev ? prev : fileMetrics.clientName);
+            }
+            if (fileMetrics.clientCompany) {
+                setClientCompany(prev => prev ? prev : fileMetrics.clientCompany);
+            }
+            if (fileMetrics.hsnCode) {
+                setHsnCode(prev => prev === '84669310' ? fileMetrics.hsnCode : prev);
+            }
         }
     }, [fileMetrics]);
 
@@ -369,7 +376,12 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
 
     // ── Generate quote
     const generateQuote = async () => {
-        if (!geometry && !fileMetrics?.allParts) {
+        // Multi-part from accumulated files (Add Part feature)
+        const hasMultiParts = accumulatedParts.length > 1;
+        // Multi-part from PDF BOM analysis
+        const hasPdfBom = fileMetrics?.source === 'pdf' && fileMetrics?.allParts?.length > 1;
+
+        if (!geometry && !hasPdfBom && !hasMultiParts) {
             setError('Please upload a STEP file or PDF drawing first.');
             return;
         }
@@ -385,8 +397,100 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                 try { screenshot = captureScreenshot(); } catch { }
             }
 
-            // If it's a PDF with multiple parts (BOM), generate tabular quote
-            if (fileMetrics?.source === 'pdf' && fileMetrics?.allParts?.length > 1) {
+            // ── MULTI-PART: from accumulated files (Add Part button) ─────────
+            if (hasMultiParts) {
+                const results = await Promise.all(accumulatedParts.map(async (accPart, index) => {
+                    const partGeom = accPart.geometry;
+                    const pm = accPart.metrics;
+                    const pName = pm?.fileName || pm?.partName || `Part ${index + 1}`;
+                    const bb = partGeom?.boundingBox || {};
+                    const pDim = `${parseFloat(bb.sizeX || 0).toFixed(0)}x${parseFloat(bb.sizeY || 0).toFixed(0)}x${parseFloat(bb.sizeZ || 0).toFixed(0)}`;
+
+                    const partMatId = pm?.materialId || materialId;
+                    const partProcIds = pm?.processId ? [pm.processId] : processIds;
+                    const partTolId = pm?.toleranceId || toleranceId;
+
+                    const resp = await fetch(`${API}/quote`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            geometry: partGeom,
+                            material_id: partMatId,
+                            process_ids: partProcIds,
+                            surface_treatment_ids: surfaceTreatmentIds,
+                            profit_margin_pct: profitMarginPct,
+                            tolerance_id: partTolId,
+                            quantity: qty,
+                            client_name: clientName,
+                            client_company: clientCompany,
+                            hsn_code: hsnCode,
+                            source_filename: pm?.fileName || '',
+                            screenshot: null,
+                            include_setup_cost: includeSetupCost,
+                            hole_count_override: holeCountOverride,
+                            stock_type: stockType,
+                        }),
+                    });
+
+                    if (!resp.ok) {
+                        return {
+                            isBuyout: false, error: true,
+                            item_number: String(index + 1).padStart(2, '0'),
+                            name: pName, material: '-', dimensions: pDim, qty: qty
+                        };
+                    }
+                    const qData = await resp.json();
+
+                    return {
+                        isBuyout: false,
+                        item_number: String(index + 1).padStart(2, '0'),
+                        name: pName,
+                        material: qData.material || materials[partMatId]?.name || '-',
+                        material_id: partMatId,
+                        process_id: partProcIds[0],
+                        tolerance_id: partTolId,
+                        dimensions: pDim,
+                        qty: qty,
+                        quantity: qty,
+                        process: qData.process || 'Machining',
+                        machining_cost: qData.breakdown?.machining_cost || 0,
+                        material_cost: qData.breakdown?.material_cost || 0,
+                        cycle_time: qData.machining_hours || 0,
+                        critical_considerations: '-',
+                        unit_price: qData.unit_price || 0,
+                        unit_price_discounted: qData.unit_price_discounted || 0,
+                        discount_pct: qData.discount_pct || 0,
+                        order_total: qData.order_total || 0,
+                        sgst: qData.sgst || 0,
+                        cgst: qData.cgst || 0,
+                        grand_total: qData.grand_total || 0,
+                        total_price: qData.order_total || 0,
+                        weight_kg: qData.mass_kg || 0,
+                        stock_type: stockType,
+                        geometry: partGeom,
+                        holes: partGeom?.holes || [],
+                        tolerance: qData.tolerance || 'Standard',
+                        source_filename: pm?.fileName || '',
+                    };
+                }));
+
+                // Compute combined totals — GST on total, not per-part
+                const combinedOrderTotal = results.reduce((s, p) => s + (p.order_total || 0), 0);
+                const combinedSgst = Math.round(combinedOrderTotal * 0.09 * 100) / 100;
+                const combinedCgst = Math.round(combinedOrderTotal * 0.09 * 100) / 100;
+                const combinedGrandTotal = Math.round((combinedOrderTotal + combinedSgst + combinedCgst) * 100) / 100;
+
+                setMultiQuote({
+                    parts: results,
+                    quote_number: `AD/MP/${Math.floor(Math.random() * 9000) + 1000}`,
+                    combined_order_total: combinedOrderTotal,
+                    combined_sgst: combinedSgst,
+                    combined_cgst: combinedCgst,
+                    combined_grand_total: combinedGrandTotal,
+                });
+            }
+            // ── MULTI-PART: PDF with BOM ────────────────────────────────────
+            else if (hasPdfBom) {
                 const results = await Promise.all(fileMetrics.allParts.map(async (part, index) => {
                     const isBuyout = (part.part_category || '').toLowerCase().includes('buyout');
                     const partGeometry = {
@@ -400,7 +504,6 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                         holes: part.holes || [],
                         complexity: { tier: 'Moderate', score: 150 },
                     };
-
                     const pName = part.name || part.description || `Part ${index + 1}`;
                     const pDim = `${part.bounding_box?.sizeX || 0}x${part.bounding_box?.sizeY || 0}x${part.bounding_box?.sizeZ || 0}`;
                     const pQty = part.quantity || 1;
@@ -408,24 +511,15 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
 
                     if (isBuyout) {
                         return {
-                            isBuyout: true,
-                            item_number: part.item_number || '-',
-                            name: pName,
-                            material: part.material || '-',
-                            dimensions: pDim,
-                            qty: pQty,
-                            process: 'Buyout Item',
-                            machining_cost: 0,
-                            material_cost: 0,
-                            cycle_time: 0,
-                            critical_considerations: pCons,
-                            unit_price: 0,
+                            isBuyout: true, item_number: part.item_number || '-',
+                            name: pName, material: part.material || '-', dimensions: pDim,
+                            qty: pQty, process: 'Buyout Item', machining_cost: 0,
+                            material_cost: 0, cycle_time: 0, critical_considerations: pCons,
+                            unit_price: 0, order_total: 0, sgst: 0, cgst: 0, grand_total: 0, total_price: 0,
                         };
                     }
-
                     const fallbackMatId = Object.keys(materials).length > 0 ? Object.keys(materials)[0] : 'aluminum_6061';
                     const fallbackProcId = Object.keys(processes).length > 0 ? Object.keys(processes)[0] : 'cnc_milling_3ax';
-
                     const resp = await fetch(`${API}/quote`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -437,60 +531,57 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                             profit_margin_pct: profitMarginPct,
                             tolerance_id: part.tolerance_id || toleranceId,
                             quantity: pQty,
-                            client_name: clientName,
-                            client_company: clientCompany,
-                            hsn_code: hsnCode,
-                            source_filename: fileMetrics?.fileName || '',
-                            screenshot: null,
-                            include_setup_cost: includeSetupCost,
-                            hole_count_override: holeCountOverride,
-                            stock_type: stockType,
+                            client_name: clientName, client_company: clientCompany,
+                            hsn_code: hsnCode, source_filename: fileMetrics?.fileName || '',
+                            screenshot: null, include_setup_cost: includeSetupCost,
+                            hole_count_override: holeCountOverride, stock_type: stockType,
                         }),
                     });
-
                     if (!resp.ok) {
                         return {
                             isBuyout: false, error: true, item_number: part.item_number,
-                            name: pName, material: part.material, dimensions: pDim, qty: pQty
+                            name: pName, material: part.material, dimensions: pDim, qty: pQty,
+                            order_total: 0, sgst: 0, cgst: 0, grand_total: 0, total_price: 0,
                         };
                     }
                     const qData = await resp.json();
-
-                    // Format for table — include ALL cost fields so pdf.py never recomputes
                     return {
-                        isBuyout: false,
-                        item_number: part.item_number || '-',
+                        isBuyout: false, item_number: part.item_number || '-',
                         name: pName,
                         material: materials[part.material_id || materialId]?.name || part.material || '-',
                         material_id: part.material_id || materialId,
                         process_id: part.process_id || processIds[0] || 'cnc_turning',
                         tolerance_id: part.tolerance_id || toleranceId,
-                        dimensions: pDim,
-                        qty: pQty,
-                        quantity: pQty,
+                        dimensions: pDim, qty: pQty, quantity: pQty,
                         process: processes[part.process_id || processIds[0]]?.name || 'Machining',
                         machining_cost: qData.breakdown?.machining_cost || 0,
                         material_cost: qData.breakdown?.material_cost || 0,
                         cycle_time: qData.machining_hours || 0,
                         critical_considerations: pCons,
-                        // ── Cost fields — exact values from /api/quote response ──
                         unit_price: qData.unit_price || 0,
                         unit_price_discounted: qData.unit_price_discounted || 0,
                         discount_pct: qData.discount_pct || 0,
-                        order_total: qData.order_total || 0,  // pre-tax total
-                        sgst: qData.sgst || 0,
-                        cgst: qData.cgst || 0,
-                        grand_total: qData.grand_total || 0,  // final incl GST
-                        total_price: qData.order_total || 0,  // for UI display
-                        weight_kg: qData.mass_kg || 0,
-                        stock_type: stockType,
-                        geometry: partGeometry,
-                        holes: part.holes || [],
+                        order_total: qData.order_total || 0,
+                        sgst: qData.sgst || 0, cgst: qData.cgst || 0,
+                        grand_total: qData.grand_total || 0,
+                        total_price: qData.order_total || 0,
+                        weight_kg: qData.mass_kg || 0, stock_type: stockType,
+                        geometry: partGeometry, holes: part.holes || [],
+                        tolerance: qData.tolerance || 'Standard',
+                        source_filename: fileMetrics?.fileName || '',
                     };
                 }));
+                const combinedOrderTotal = results.reduce((s, p) => s + (p.order_total || 0), 0);
+                const combinedSgst = Math.round(combinedOrderTotal * 0.09 * 100) / 100;
+                const combinedCgst = Math.round(combinedOrderTotal * 0.09 * 100) / 100;
+                const combinedGrandTotal = Math.round((combinedOrderTotal + combinedSgst + combinedCgst) * 100) / 100;
                 setMultiQuote({
                     parts: results,
-                    quote_number: `AD/BOM/${Math.floor(Math.random() * 9000) + 1000}`
+                    quote_number: `AD/BOM/${Math.floor(Math.random() * 9000) + 1000}`,
+                    combined_order_total: combinedOrderTotal,
+                    combined_sgst: combinedSgst,
+                    combined_cgst: combinedCgst,
+                    combined_grand_total: combinedGrandTotal,
                 });
             } else {
                 // Single part quote processing
@@ -600,6 +691,11 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                     hsn_code: hsnCode,
                     source_filename: fileMetrics?.fileName || '',
                     profit_margin_pct: profitMarginPct,
+                    // Pass pre-computed combined totals so PDF matches UI exactly
+                    combined_order_total: multiQuote.combined_order_total,
+                    combined_sgst: multiQuote.combined_sgst,
+                    combined_cgst: multiQuote.combined_cgst,
+                    combined_grand_total: multiQuote.combined_grand_total,
                 }),
             });
             if (!resp.ok) {
@@ -975,17 +1071,19 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                 {/* Generate button */}
                 <button
                     onClick={generateQuote}
-                    disabled={loading || (!geometry && !(fileMetrics?.allParts?.length > 1))}
+                    disabled={loading || (!geometry && !(fileMetrics?.allParts?.length > 1) && !(accumulatedParts.length > 1))}
                     className={`w-full py-3 mt-1 rounded-xl text-[12px] font-bold tracking-wider
                         transition-all duration-300 flex items-center justify-center gap-2
-                        ${(geometry || fileMetrics?.allParts?.length > 1)
+                        ${(geometry || fileMetrics?.allParts?.length > 1 || accumulatedParts.length > 1)
                             ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 shadow-[0_0_20px_rgba(34,211,238,0.3)] hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] hover:scale-[1.02] active:scale-[0.98]'
                             : 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/10'}`}
                 >
                     {loading
                         ? <><RefreshCw size={14} className="animate-spin" /> Computing…</>
                         : <><Zap size={14} className="drop-shadow-md" />
-                            {(geometry || fileMetrics?.allParts?.length > 1) ? 'Generate Quote (₹)' : 'Upload STEP/PDF First'}</>
+                            {accumulatedParts.length > 1
+                                ? `Generate Combined Quote (${accumulatedParts.length} parts)`
+                                : (geometry || fileMetrics?.allParts?.length > 1) ? 'Generate Quote (₹)' : 'Upload STEP/PDF First'}</>
                     }
                 </button>
 
@@ -1062,11 +1160,23 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                         </table>
                     </div>
 
-                    {/* Totals */}
+                    {/* Totals — uses pre-computed combined values */}
                     <div className="border-t border-purple-500/20 pt-2 space-y-0.5 mt-2">
                         <LineItem
-                            label="Grand Total (Estimated, Excl. Buyouts)"
-                            value={`₹${fmt(multiQuote.parts.reduce((sum, p) => sum + (p.total_price || 0), 0))}`}
+                            label="Order Subtotal (Pre-Tax)"
+                            value={`₹${fmt(multiQuote.combined_order_total || multiQuote.parts.reduce((sum, p) => sum + (p.order_total || 0), 0))}`}
+                        />
+                        <LineItem
+                            label="SGST (9%)"
+                            value={`₹${fmt(multiQuote.combined_sgst || 0)}`}
+                        />
+                        <LineItem
+                            label="CGST (9%)"
+                            value={`₹${fmt(multiQuote.combined_cgst || 0)}`}
+                        />
+                        <LineItem
+                            label="Grand Total (Incl. GST)"
+                            value={`₹${fmt(multiQuote.combined_grand_total || 0)}`}
                             highlight large
                         />
                         <p className="text-[9px] text-gray-500 text-right italic pt-1">All prices in ₹ INR. Buyout items quoted separately.</p>
@@ -1083,7 +1193,7 @@ export default function QuotePanel({ geometry, fileMetrics, captureScreenshot })
                         >
                             {pdfLoading
                                 ? <><RefreshCw size={14} className="animate-spin" /> Generating PDF…</>
-                                : <><FileText size={14} /> Download BOM Quote (PDF)</>}
+                                : <><FileText size={14} /> Download Quote (PDF)</>}
                         </button>
                     </div>
                 </div>

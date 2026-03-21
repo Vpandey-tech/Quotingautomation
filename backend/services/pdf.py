@@ -520,6 +520,11 @@ def generate_bom_quote_pdf(
     hsn_code: str = "84669310",
     source_filename: str = "",
     profit_margin_pct: float = 22.0,
+    # Pre-computed combined totals from frontend — ensures PDF matches UI
+    combined_order_total: float = None,
+    combined_sgst: float = None,
+    combined_cgst: float = None,
+    combined_grand_total: float = None,
 ) -> str:
     """Generate a clean, professional BOM assembly quotation PDF in Portrait A4."""
 
@@ -550,20 +555,25 @@ def generate_bom_quote_pdf(
     if client_company:
         pdf.cell(0, 5, client_company, ln=True)
     
-    if source_filename:
-        pdf._set_font("I", 8)
-        pdf.cell(0, 5, f"Subject: {source_filename}", ln=True)
+    # Get all unique filenames from the uploaded parts to list them
+    file_names = set(p.get("source_filename", "").strip() for p in parts if p.get("source_filename", "").strip())
+    if source_filename and source_filename.strip() not in file_names:
+        file_names.add(source_filename.strip())
+        
+    all_files_str = ", ".join(sorted(file_names)) if file_names else "enclosed parts/drawings"
+
+    pdf._set_font("B", 10)
+    pdf.cell(0, 5, "Subject: Quotation for Machined Parts", ln=True)
 
     pdf.ln(2)
     pdf._set_font("B", 9)
-    name_display = f"Mr. {client_name}" if client_name else "Purchasing Manager"
+    name_display = f"{client_name}" if client_name else "Purchasing Manager"
     pdf.cell(0, 5, f"Kindly Attention: {name_display}", ln=True)
     pdf.ln(3)
 
-    # ── Subject Line ─────────────────────────────────────────────────────────
+    # ── Description ──────────────────────────────────────────────────────────
     pdf._set_font("", 9)
-    part_label = source_filename.replace('.pdf', '').replace('.step', '') if source_filename else "parts"
-    subj_text = f"We are hereby pleased to share with you the best Techno - commercial offer for the\n{part_label} for your perusal."
+    subj_text = f"We are hereby pleased to share with you the best Techno-commercial offer for the following:\n{all_files_str}\nfor your perusal."
     pdf.multi_cell(0, 5, subj_text)
     pdf.ln(6)
 
@@ -599,12 +609,11 @@ def generate_bom_quote_pdf(
     machined_total = 0.0
 
     pdf._set_font("B", 6)
-    
     # Yellow highlighted "Assembly" row just like the image
-    part_label = source_filename.replace('.pdf', '').replace('.step', '') if source_filename else "ASSEMBLY"
+    part_label = "PROJECT BATCH" if len(parts) > 1 else "MAIN COMPONENT"
     y = pdf.get_y()
     pdf.cell(COL_W[0], 6, "A", border=1, align="C")
-    pdf.cell(COL_W[1], 6, str(part_label)[:25].upper(), border=1, align="C")
+    pdf.cell(COL_W[1], 6, str(part_label).upper(), border=1, align="C")
     pdf.cell(COL_W[2], 6, "", border=1, align="C")
     pdf.set_fill_color(255, 255, 150)
     pdf.cell(COL_W[3], 6, "Assembly", border=1, align="C", fill=True)
@@ -764,26 +773,26 @@ def generate_bom_quote_pdf(
         pdf.cell(w_right, 6, amount_str,      border=1, align="R",              fill=fill)
         pdf.ln(6)
 
-    # ── Aggregate pre-tax total across all non-buyout parts ──────────────────
-    # Each part's order_total is already unit_price_discounted × qty from costing.py
-    order_subtotal = sum(
-        float(p.get("order_total") or p.get("cost_inr") or 0)
-        for p in parts
-        if not p.get("isBuyout", False)
-    )
-
-    # ── Read GST from first quoted part (rates are always 9%+9%) ─────────────
-    # If parts carry their own sgst/cgst fields, sum them; otherwise compute.
-    sgst_total = sum(float(p.get("sgst", 0)) for p in parts if not p.get("isBuyout", False))
-    cgst_total = sum(float(p.get("cgst", 0)) for p in parts if not p.get("isBuyout", False))
-
-    # Fallback: if parts don't carry pre-computed GST, compute from subtotal
-    if sgst_total == 0:
-        sgst_total = round(order_subtotal * 0.09, 2)
-    if cgst_total == 0:
-        cgst_total = round(order_subtotal * 0.09, 2)
-
-    grand_total_bom = round(order_subtotal + sgst_total + cgst_total, 2)
+    # ── Use pre-computed combined totals if provided (fixes UI vs PDF mismatch) ──
+    if combined_order_total is not None:
+        order_subtotal = combined_order_total
+        sgst_total = combined_sgst if combined_sgst is not None else round(order_subtotal * 0.09, 2)
+        cgst_total = combined_cgst if combined_cgst is not None else round(order_subtotal * 0.09, 2)
+        grand_total_bom = combined_grand_total if combined_grand_total is not None else round(order_subtotal + sgst_total + cgst_total, 2)
+    else:
+        # Fallback: aggregate from per-part values
+        order_subtotal = sum(
+            float(p.get("order_total") or p.get("cost_inr") or 0)
+            for p in parts
+            if not p.get("isBuyout", False)
+        )
+        sgst_total = sum(float(p.get("sgst", 0)) for p in parts if not p.get("isBuyout", False))
+        cgst_total = sum(float(p.get("cgst", 0)) for p in parts if not p.get("isBuyout", False))
+        if sgst_total == 0:
+            sgst_total = round(order_subtotal * 0.09, 2)
+        if cgst_total == 0:
+            cgst_total = round(order_subtotal * 0.09, 2)
+        grand_total_bom = round(order_subtotal + sgst_total + cgst_total, 2)
 
     # Row: Order Subtotal (pre-tax)
     total_row(start_idx,     "Order Subtotal (Pre-Tax)",  _fmt_inr(order_subtotal))

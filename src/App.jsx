@@ -3,7 +3,7 @@ import Viewer from './components/viewer/Viewer';
 import QuotePanel from './components/quote/QuotePanel';
 import {
   Box, FileText, Activity, Ruler, FlaskConical,
-  DollarSign, Layers, ChevronRight, MessageSquare, Send
+  DollarSign, Layers, ChevronRight, MessageSquare, Send, X
 } from 'lucide-react';
 
 /* ─── Metric row ─────────────────────────────────────────────────────────── */
@@ -49,7 +49,7 @@ function SectionCard({ icon: Icon, title, children, accent }) {
 }
 
 /* ─── Tab button ─────────────────────────────────────────────────────────── */
-function Tab({ active, onClick, icon: Icon, label }) {
+function Tab({ active, onClick, icon: Icon, label, badge }) {
   return (
     <button
       onClick={onClick}
@@ -62,6 +62,12 @@ function Tab({ active, onClick, icon: Icon, label }) {
     >
       <Icon size={12} className={active ? 'drop-shadow-[0_0_4px_rgba(34,211,238,0.6)]' : ''} />
       {label}
+      {badge > 0 && (
+        <span className="ml-1 w-4 h-4 rounded-full bg-emerald-500/80 text-white text-[8px] font-bold
+          flex items-center justify-center leading-none shadow-[0_0_6px_rgba(16,185,129,0.5)]">
+          {badge}
+        </span>
+      )}
       {active && (
         <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[2px] rounded-full"
           style={{ background: 'linear-gradient(90deg, transparent, #22d3ee, transparent)' }} />
@@ -79,6 +85,12 @@ export default function App() {
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState([]);
   const [isAiTyping, setIsAiTyping] = useState(false);
+
+  // ── Multi-part state ──────────────────────────────────────────────────────
+  // Each "part" stores its own metrics, geometry, and file reference
+  const [parts, setParts] = useState([]);
+  const [activePartId, setActivePartId] = useState(null);
+  // Note: "parts" is an array of { id, metrics, geometry, file, fileName, occtResult, brepStatus }
 
   // Track sidebar hover to block pointer events on 3D canvas
   const [sidebarHovered, setSidebarHovered] = useState(false);
@@ -154,20 +166,10 @@ export default function App() {
     document.addEventListener('mouseup', onUp);
   }, [sidebarWidth]);
 
-  // Called by Viewer with mesh metrics + original File object
-  // For STEP files: file is passed, triggers B-Rep analysis
-  // For PDF files: file is null, geometry comes from Gemini AI
-  const handleMetrics = async (m, file) => {
-    if (!m) {
-      setMetrics(null);
-      setGeometry(null);
-      setBrepStatus('idle');
-      return;
-    }
-    setMetrics(m);
-
-    // Build geometry object from metrics
-    const geom = {
+  // ── Build geometry from metrics helper ──
+  const buildGeometry = (m) => {
+    if (!m) return null;
+    return {
       volume: parseFloat(m.volume) || 0,
       surfaceArea: parseFloat(m.surfaceArea) || 0,
       boundingBox: {
@@ -178,6 +180,37 @@ export default function App() {
       complexity: { tier: 'Moderate', score: 150, faces: 0, edges: 0, holes: 0 },
       holes: m.holes || [],
     };
+  };
+
+  // Called by Viewer with mesh metrics + original File object
+  // This is the PRIMARY file handler — resets parts and starts fresh
+  const handleMetrics = async (m, file, result) => {
+    if (!m) {
+      setMetrics(null);
+      setGeometry(null);
+      setBrepStatus('idle');
+      setParts([]); // Clear all parts on reset
+      setActivePartId(null);
+      return;
+    }
+    setMetrics(m);
+
+    // Build geometry object from metrics
+    const geom = buildGeometry(m);
+
+    // When a new file is loaded (not Add Part), reset parts and add this as part 1
+    const newId = Date.now();
+    const newPart = {
+      id: newId,
+      metrics: m,
+      geometry: geom,
+      file: file,
+      fileName: m.fileName || 'Part 1',
+      occtResult: result,
+      brepStatus: m.source === 'pdf' ? 'pdf' : 'loading',
+    };
+    setParts([newPart]);
+    setActivePartId(newId);
 
     // For PDF files — geometry is already extracted by Gemini, no B-Rep needed
     if (m.source === 'pdf') {
@@ -205,24 +238,124 @@ export default function App() {
     
     // Auto-clear loading state after 3.5 seconds
     const loadingTimeout = setTimeout(() => {
-      setBrepStatus(prev => prev === 'loading' ? 'ready' : prev); // Optimistic UI assumption for rapid user experience
+      setBrepStatus(prev => prev === 'loading' ? 'ready' : prev);
     }, 3500);
 
     try {
       const fd = new FormData();
       fd.append('file', file);
       const resp = await fetch('/api/analyze', { method: 'POST', body: fd });
-      clearTimeout(loadingTimeout); // clear if it comes back faster
+      clearTimeout(loadingTimeout);
       if (resp.ok) {
-        setGeometry(await resp.json());
+        const brepGeom = await resp.json();
+        setGeometry(brepGeom);
         setBrepStatus('ready');
+        // Update the part's geometry with B-Rep data
+        setParts(prev => prev.map(p => p.id === newId ? { ...p, geometry: brepGeom, brepStatus: 'ready' } : p));
       } else {
         setBrepStatus('offline');
+        setParts(prev => prev.map(p => p.id === newId ? { ...p, brepStatus: 'offline' } : p));
       }
     } catch {
       clearTimeout(loadingTimeout);
       setBrepStatus('offline');
+      setParts(prev => prev.map(p => p.id === newId ? { ...p, brepStatus: 'offline' } : p));
     }
+  };
+
+  // ── "Add Part" handler — appends a new part without resetting existing ones ──
+  const handleAddPart = async (m, file, result) => {
+    if (!m) return;
+
+    const geom = buildGeometry(m);
+    const partNumber = parts.length + 1;
+    const newId = Date.now();
+
+    const newPart = {
+      id: newId,
+      metrics: m,
+      geometry: geom,
+      file: file,
+      fileName: m.fileName || `Part ${partNumber}`,
+      occtResult: result,
+      brepStatus: m.source === 'pdf' ? 'pdf' : 'loading',
+    };
+
+    setParts(prev => [...prev, newPart]);
+    setActivePartId(newId);
+
+    // Update current display metrics/geometry to the latest added part
+    setMetrics(m);
+    setGeometry(geom);
+
+    if (m.source === 'pdf') {
+      setBrepStatus('pdf');
+    } else if (file) {
+      setBrepStatus('loading');
+      const loadingTimeout = setTimeout(() => {
+        setBrepStatus(prev => prev === 'loading' ? 'ready' : prev);
+      }, 3500);
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const resp = await fetch('/api/analyze', { method: 'POST', body: fd });
+        clearTimeout(loadingTimeout);
+        if (resp.ok) {
+          const brepGeom = await resp.json();
+          setGeometry(brepGeom);
+          setBrepStatus('ready');
+          setParts(prev => prev.map(p => p.id === newId ? { ...p, geometry: brepGeom, brepStatus: 'ready' } : p));
+        } else {
+          setBrepStatus('offline');
+          setParts(prev => prev.map(p => p.id === newId ? { ...p, brepStatus: 'offline' } : p));
+        }
+      } catch {
+        clearTimeout(loadingTimeout);
+        setBrepStatus('offline');
+        setParts(prev => prev.map(p => p.id === newId ? { ...p, brepStatus: 'offline' } : p));
+      }
+    }
+
+    // Auto-switch to Quote tab when adding parts
+    if (parts.length >= 1) {
+      setTab('quote');
+    }
+  };
+
+  // ── Context Switching: Selecting an existing part
+  const handleSelectPart = (id) => {
+    if (activePartId === id) return;
+    const part = parts.find(p => p.id === id);
+    if (!part) return;
+    setActivePartId(id);
+    setMetrics(part.metrics);
+    setGeometry(part.geometry);
+    setBrepStatus(part.brepStatus || 'idle');
+  };
+
+  // ── Remove a specific part ──
+  const handleRemovePart = (partId) => {
+    setParts(prev => {
+      const updated = prev.filter(p => p.id !== partId);
+      // If no parts left, reset everything
+      if (updated.length === 0) {
+        setMetrics(null);
+        setGeometry(null);
+        setBrepStatus('idle');
+        setActivePartId(null);
+        return [];
+      }
+      
+      // If we removed the currently active part, fallback to the last part
+      if (partId === activePartId) {
+        const last = updated[updated.length - 1];
+        setActivePartId(last.id);
+        setMetrics(last.metrics);
+        setGeometry(last.geometry);
+        setBrepStatus(last.brepStatus || 'idle');
+      }
+      return updated;
+    });
   };
 
   const handleSendChat = async (e) => {
@@ -296,6 +429,18 @@ export default function App() {
 
         {/* Status badges */}
         <div className="flex items-center gap-2">
+          {/* Parts count badge */}
+          {parts.length > 1 && (
+            <span className="text-[10px] font-mono font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5"
+              style={{
+                background: 'rgba(16,185,129,0.08)',
+                border: '1px solid rgba(16,185,129,0.25)',
+                color: '#6ee7b7',
+              }}>
+              <Layers size={10} />
+              {parts.length} Parts
+            </span>
+          )}
           {metrics && (
             <span className="text-[10px] font-mono font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5"
               style={{
@@ -353,7 +498,7 @@ export default function App() {
           )}
           <span className="text-[10px] text-gray-600 font-mono px-2.5 py-1 rounded-full"
             style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
-            v0.4.0
+            v0.5.0
           </span>
         </div>
       </header>
@@ -374,7 +519,7 @@ export default function App() {
             <Tab active={tab === 'details'} onClick={() => setTab('details')}
               icon={Layers} label="Details" />
             <Tab active={tab === 'quote'} onClick={() => setTab('quote')}
-              icon={DollarSign} label="Quote" />
+              icon={DollarSign} label="Quote" badge={parts.length > 1 ? parts.length : 0} />
           </div>
 
           {/* ── Scrollable content — completely isolated scroll context ── */}
@@ -391,6 +536,11 @@ export default function App() {
                       <p className="text-[10px] text-gray-600 mt-0.5 font-mono">
                         {(metrics.fileSize / 1024).toFixed(1)} KB · STEP / ISO 10303
                       </p>
+                      {parts.length > 1 && (
+                        <p className="text-[9px] text-emerald-400/80 font-mono mt-1 flex items-center gap-1">
+                          <Layers size={9} /> {parts.length} parts in this quotation
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className="py-3 flex flex-col items-center gap-1.5">
@@ -402,6 +552,44 @@ export default function App() {
                   )}
                 </SectionCard>
 
+                {/* Parts list (when multiple) */}
+                {parts.length > 1 && (
+                  <SectionCard icon={Layers} title={`Parts (${parts.length})`} accent="rgba(16,185,129,0.1)">
+                    <div className="space-y-1.5">
+                      {parts.map((part, idx) => {
+                        const isActive = part.id === activePartId;
+                        return (
+                          <div key={part.id}
+                            onClick={() => handleSelectPart(part.id)}
+                            className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg
+                              border cursor-pointer transition-all duration-200
+                              ${isActive 
+                                ? 'bg-emerald-900/40 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.1)]' 
+                                : 'bg-white/[0.03] border-white/[0.05] hover:border-emerald-500/30 hover:bg-white/[0.06]'}`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`w-5 h-5 rounded-md text-[9px] font-bold flex items-center justify-center flex-shrink-0
+                                ${isActive ? 'bg-emerald-500/90 text-white shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                                {idx + 1}
+                              </span>
+                              <span className={`text-[10px] font-mono truncate transition-colors
+                                ${isActive ? 'text-emerald-100 font-bold' : 'text-gray-300'}`}>
+                                {part.fileName}
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleRemovePart(part.id); }}
+                              className="text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded-sm transition-all flex-shrink-0 p-1"
+                              title="Remove this part"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </SectionCard>
+                )}
 
                 {/* Properties */}
                 <SectionCard icon={FlaskConical} title="Properties">
@@ -509,7 +697,13 @@ export default function App() {
             )}
 
             {tab === 'quote' && (
-              <QuotePanel geometry={geometry} fileMetrics={metrics} captureScreenshot={captureScreenshot} />
+              <QuotePanel
+                geometry={geometry}
+                fileMetrics={metrics}
+                captureScreenshot={captureScreenshot}
+                parts={parts}
+                onRemovePart={handleRemovePart}
+              />
             )}
           </div>
         </aside>
@@ -527,7 +721,12 @@ export default function App() {
           className="flex-1 relative overflow-hidden"
           style={{ background: '#080c14' }}
         >
-          <Viewer onMetrics={handleMetrics} />
+          <Viewer
+            onMetrics={handleMetrics}
+            onAddPart={handleAddPart}
+            hasExistingParts={parts.length > 0}
+            activePart={parts.find(p => p.id === activePartId)}
+          />
         </section>
       </div>
     </div>

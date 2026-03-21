@@ -85,6 +85,11 @@ class BomPdfRequest(BaseModel):
     hsn_code:       str   = Field("84669310")
     source_filename: str  = Field("")
     profit_margin_pct: float = Field(22.0, ge=15.0, le=30.0)
+    # Pre-computed combined totals from frontend — ensures PDF matches UI exactly
+    combined_order_total: Optional[float] = Field(None, description="Pre-computed combined order total")
+    combined_sgst: Optional[float] = Field(None, description="Pre-computed combined SGST")
+    combined_cgst: Optional[float] = Field(None, description="Pre-computed combined CGST")
+    combined_grand_total: Optional[float] = Field(None, description="Pre-computed combined grand total")
 
 class MaterialEstimateRequest(BaseModel):
     size_x: float = Field(..., description="Part bounding box X dimension (mm)")
@@ -665,6 +670,11 @@ async def gen_bom_quote_pdf(req: BomPdfRequest, background_tasks: BackgroundTask
             hsn_code=req.hsn_code,
             source_filename=req.source_filename,
             profit_margin_pct=req.profit_margin_pct,
+            # Pre-computed combined totals — ensures PDF matches UI exactly
+            combined_order_total=req.combined_order_total,
+            combined_sgst=req.combined_sgst,
+            combined_cgst=req.combined_cgst,
+            combined_grand_total=req.combined_grand_total,
         )
 
         # Bulletproof unpack — works with old pdf.py (1 val) or new (2 vals)
@@ -778,8 +788,10 @@ import posixpath
 dist_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dist")
 
 if os.path.isdir(dist_path):
-    # Serve assets like JS/CSS
-    app.mount("/assets", StaticFiles(directory=os.path.join(dist_path, "assets")), name="assets")
+    # Serve assets like JS/CSS (only if the assets subfolder exists)
+    assets_path = os.path.join(dist_path, "assets")
+    if os.path.isdir(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
 
     # Serve files at root like vite.svg or favicon.ico if they exist
     for root_file in os.listdir(dist_path):

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useDropzone } from 'react-dropzone';
-import { Upload, RotateCcw, AlertCircle, Loader2, Box, FileText } from 'lucide-react';
+import { Upload, RotateCcw, AlertCircle, Loader2, Box, FileText, PlusCircle } from 'lucide-react';
 import Scene from './Scene';
 import { parseStepFile } from '../../lib/occt';
 import { computeMetrics } from '../../lib/metrics';
@@ -9,13 +9,17 @@ import { computeMetrics } from '../../lib/metrics';
 const API = '/api';
 
 /**
- * AccuDesign Viewer — Phase 4
+ * AccuDesign Viewer — Phase 5
  *
  * Accepts BOTH STEP files (.step/.stp) and PDF engineering drawings (.pdf).
  * - STEP files → parsed via occt-import-js WASM → 3D render + metrics
  * - PDF files  → displayed inline as embedded PDF + sent to backend Gemini AI for analysis
+ *
+ * Now supports multi-part accumulation:
+ * - "New File" resets everything (starts fresh quotation)
+ * - "Add Part" appends a new part to the current quotation
  */
-export default function Viewer({ onMetrics }) {
+export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false, activePart = null }) {
     const [file, setFile] = useState(null);
     const [fileType, setFileType] = useState(null);    // 'step' | 'pdf'
     const [status, setStatus] = useState('idle');       // idle|loading|loaded|error|pdf_loaded
@@ -24,6 +28,7 @@ export default function Viewer({ onMetrics }) {
     const [pdfUrl, setPdfUrl] = useState(null);         // Object URL for PDF preview
     const [showPdfToast, setShowPdfToast] = useState(false);
     const [extractedMetrics, setExtractedMetrics] = useState(null);
+    const [isAddingPart, setIsAddingPart] = useState(false); // tracks if current upload is "add part"
 
     // Cleanup PDF URL on component unmount or reset
     useEffect(() => {
@@ -33,12 +38,13 @@ export default function Viewer({ onMetrics }) {
     }, [pdfUrl]);
 
     // ── Process STEP file via OCCT ──────────────────────────────────────────
-    const processStepFile = useCallback(async (f) => {
+    const processStepFile = useCallback(async (f, addingPart = false) => {
         setFile(f);
         setFileType('step');
         setStatus('loading');
         setOcctResult(null);
         setErrorMsg('');
+        setIsAddingPart(addingPart);
         if (pdfUrl) { URL.revokeObjectURL(pdfUrl); setPdfUrl(null); }
 
         try {
@@ -51,23 +57,29 @@ export default function Viewer({ onMetrics }) {
             setOcctResult(result);
             setStatus('loaded');
 
-            if (onMetrics) {
-                onMetrics(computeMetrics(result, f), f);
+            const metrics = computeMetrics(result, f);
+
+            if (addingPart && onAddPart) {
+                // Adding as a new part to existing quotation
+                onAddPart(metrics, f, result);
+            } else if (onMetrics) {
+                onMetrics(metrics, f, result);
             }
         } catch (err) {
             console.error('[Viewer] OCCT parse error:', err);
             setStatus('error');
             setErrorMsg(err.message || 'Failed to parse file. Ensure it is a valid STEP/STP file.');
         }
-    }, [onMetrics, pdfUrl]);
+    }, [onMetrics, onAddPart, pdfUrl]);
 
     // ── Process PDF file — show preview + analyze via Gemini ────────────────
-    const processPdfFile = useCallback(async (f) => {
+    const processPdfFile = useCallback(async (f, addingPart = false) => {
         setFile(f);
         setFileType('pdf');
         setStatus('loading');
         setOcctResult(null);
         setErrorMsg('');
+        setIsAddingPart(addingPart);
 
         // Create object URL for PDF preview immediately
         if (pdfUrl) URL.revokeObjectURL(pdfUrl);
@@ -138,29 +150,32 @@ export default function Viewer({ onMetrics }) {
                 setShowPdfToast(false);
             }, 5000); // give the user 5 seconds to read it
 
-            if (onMetrics) {
-                onMetrics(pdfMetrics, null);
+            if (addingPart && onAddPart) {
+                // Adding as a new part to existing quotation
+                onAddPart(pdfMetrics, f, null);
+            } else if (onMetrics) {
+                onMetrics(pdfMetrics, f, null);
             }
         } catch (err) {
             console.error('[Viewer] PDF analysis error:', err);
             setStatus('error');
             setErrorMsg(err.message || 'Failed to analyze PDF. Is the backend running with GEMINI_API_KEY?');
         }
-    }, [onMetrics, pdfUrl]);
+    }, [onMetrics, onAddPart, pdfUrl]);
 
     // ── Universal file handler ──────────────────────────────────────────────
-    const processFile = useCallback(async (f) => {
+    const processFile = useCallback(async (f, addingPart = false) => {
         const fname = (f.name || '').toLowerCase();
         if (fname.endsWith('.pdf')) {
-            await processPdfFile(f);
+            await processPdfFile(f, addingPart);
         } else {
-            await processStepFile(f);
+            await processStepFile(f, addingPart);
         }
     }, [processStepFile, processPdfFile]);
 
     // ── Dropzone — accepts STEP and PDF ─────────────────────────────────────
     const onDrop = useCallback((acceptedFiles) => {
-        if (acceptedFiles.length > 0) processFile(acceptedFiles[0]);
+        if (acceptedFiles.length > 0) processFile(acceptedFiles[0], false);
     }, [processFile]);
 
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -185,8 +200,57 @@ export default function Viewer({ onMetrics }) {
         setOcctResult(null);
         setErrorMsg('');
         setExtractedMetrics(null);
+        setIsAddingPart(false);
         if (onMetrics) onMetrics(null);
     }, [onMetrics, pdfUrl]);
+
+    // ── "Add Part" handler — opens file picker for additional part ──────────
+    const handleAddPart = useCallback(() => {
+        // Create a hidden input to pick file
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.step,.stp,.pdf';
+        input.onchange = (e) => {
+            const f = e.target.files?.[0];
+            if (f) processFile(f, true);
+        };
+        input.click();
+    }, [processFile]);
+
+    // ── Restore state when activePart changes (Switching Context) ─────────
+    useEffect(() => {
+        if (activePart && activePart.file) {
+            const f = activePart.file;
+            const fname = (f.name || '').toLowerCase();
+            
+            // If the Viewer is already showing this EXACT file, do nothing.
+            // We use file name as a heuristic to avoid unnecessary re-renders.
+            if (file && file.name === f.name) return;
+
+            setFile(f);
+            setIsAddingPart(false);
+            
+            if (fname.endsWith('.pdf')) {
+                setFileType('pdf');
+                if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+                setPdfUrl(URL.createObjectURL(f));
+                setStatus('pdf_loaded');
+                setOcctResult(null);
+                setExtractedMetrics(activePart.metrics);
+                setErrorMsg('');
+            } else {
+                setFileType('step');
+                if (pdfUrl) { URL.revokeObjectURL(pdfUrl); setPdfUrl(null); }
+                if (activePart.occtResult) {
+                    setOcctResult(activePart.occtResult);
+                    setStatus('loaded');
+                } else {
+                    // Fallback to reparsing if occtResult wasn't provided
+                    processStepFile(f, false);
+                }
+            }
+        }
+    }, [activePart]);
 
     return (
         <div className="w-full h-full relative bg-[#080c14]" {...getRootProps()}>
@@ -232,7 +296,7 @@ export default function Viewer({ onMetrics }) {
                                 <Loader2 size={16} className="text-cyan-400 animate-spin flex-shrink-0" />
                                 <div className="flex-1">
                                     <p className="text-[11px] text-cyan-300 font-bold">
-                                        Analyzing with ACCU AI…
+                                        {isAddingPart ? 'Adding Part with ACCU AI…' : 'Analyzing with ACCU AI…'}
                                     </p>
                                     <p className="text-[9px] text-gray-500 font-mono">
                                         Extracting dimensions, materials, tolerances & client info
@@ -258,7 +322,9 @@ export default function Viewer({ onMetrics }) {
                                 <span className="w-2.5 h-2.5 rounded-full bg-green-400 flex-shrink-0"
                                     style={{ boxShadow: '0 0 8px rgba(74,222,128,0.8)' }} />
                                 <p className="text-[10px] text-green-300 font-mono font-bold">
-                                    ✓ PDF analyzed — Dimensions extracted — Check Details & Quote tabs
+                                    {isAddingPart
+                                        ? '✓ Part added — Check Quote tab for combined costing'
+                                        : '✓ PDF analyzed — Dimensions extracted — Check Details & Quote tabs'}
                                 </p>
                             </div>
                         </div>
@@ -318,7 +384,9 @@ export default function Viewer({ onMetrics }) {
                         <Loader2 size={48} className="text-cyan-400 animate-spin" />
                         <div className="absolute inset-0 rounded-full bg-cyan-400/10 animate-pulse" />
                     </div>
-                    <p className="text-gray-100 font-semibold text-lg mb-1">Parsing geometry</p>
+                    <p className="text-gray-100 font-semibold text-lg mb-1">
+                        {isAddingPart ? 'Adding part geometry' : 'Parsing geometry'}
+                    </p>
                     <p className="text-gray-400 text-sm mb-1">{file?.name}</p>
                     <p className="text-gray-600 text-xs">Running OCCT WebAssembly engine…</p>
                 </div>
@@ -350,12 +418,12 @@ export default function Viewer({ onMetrics }) {
                 </div>
             )}
 
-            {/* ── Top bar: file info + reset ─────────────────────────────── */}
+            {/* ── Top bar: file info + New File + Add Part ─────────────────── */}
             {(status === 'loaded' || status === 'loading' || status === 'pdf_loaded') && file && (
                 <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between
                     px-4 py-3 pointer-events-none">
                     <div className="bg-gray-900/80 backdrop-blur-md px-3 py-2 rounded-xl border border-gray-700/60
-                        text-gray-300 text-sm font-mono truncate max-w-[65%] flex items-center gap-2 pointer-events-auto
+                        text-gray-300 text-sm font-mono truncate max-w-[50%] flex items-center gap-2 pointer-events-auto
                         shadow-lg">
                         <span className="text-cyan-400 flex-shrink-0">
                             {fileType === 'pdf' ? '📄' : '📐'}
@@ -365,15 +433,32 @@ export default function Viewer({ onMetrics }) {
                             ({(file.size / 1024).toFixed(0)} KB)
                         </span>
                     </div>
-                    <button
-                        onClick={handleReset}
-                        className="flex items-center gap-1.5 bg-gray-900/80 backdrop-blur-md px-3 py-2 rounded-xl
-                            border border-gray-700/60 text-gray-400 hover:text-white hover:bg-gray-800/90
-                            transition-all text-sm pointer-events-auto shadow-lg"
-                    >
-                        <RotateCcw size={13} />
-                        New file
-                    </button>
+                    <div className="flex items-center gap-2 pointer-events-auto">
+                        {/* Add Part button — green accent, clearly distinct from New File */}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleAddPart(); }}
+                            className="flex items-center gap-1.5 bg-emerald-900/80 backdrop-blur-md px-3 py-2 rounded-xl
+                                border border-emerald-500/40 text-emerald-300 hover:text-white hover:bg-emerald-800/90
+                                hover:border-emerald-400/60 transition-all text-sm shadow-lg
+                                hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                            title="Add another part to this quotation (same quote PDF)"
+                        >
+                            <PlusCircle size={14} />
+                            <span className="font-semibold">Add Part</span>
+                        </button>
+
+                        {/* New File button — resets everything */}
+                        <button
+                            onClick={handleReset}
+                            className="flex items-center gap-1.5 bg-gray-900/80 backdrop-blur-md px-3 py-2 rounded-xl
+                                border border-gray-700/60 text-gray-400 hover:text-white hover:bg-gray-800/90
+                                transition-all text-sm pointer-events-auto shadow-lg"
+                            title="Start a fresh quotation (clears all parts)"
+                        >
+                            <RotateCcw size={13} />
+                            New File
+                        </button>
+                    </div>
                 </div>
             )}
 
