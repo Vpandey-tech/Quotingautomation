@@ -29,6 +29,7 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
     const [showPdfToast, setShowPdfToast] = useState(false);
     const [extractedMetrics, setExtractedMetrics] = useState(null);
     const [isAddingPart, setIsAddingPart] = useState(false); // tracks if current upload is "add part"
+    const [viewerMetrics, setViewerMetrics] = useState(null); // metrics shown on 3D viewer HUD
 
     // Cleanup PDF URL on component unmount or reset
     useEffect(() => {
@@ -58,6 +59,7 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
             setStatus('loaded');
 
             const metrics = computeMetrics(result, f);
+            setViewerMetrics(metrics);
 
             if (addingPart && onAddPart) {
                 // Adding as a new part to existing quotation
@@ -201,6 +203,7 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
         setErrorMsg('');
         setExtractedMetrics(null);
         setIsAddingPart(false);
+        setViewerMetrics(null);
         if (onMetrics) onMetrics(null);
     }, [onMetrics, pdfUrl]);
 
@@ -229,6 +232,7 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
 
             setFile(f);
             setIsAddingPart(false);
+            setViewerMetrics(activePart.metrics || null);
             
             if (fname.endsWith('.pdf')) {
                 setFileType('pdf');
@@ -269,6 +273,47 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
                         <Scene occtResult={occtResult} />
                     </Suspense>
                 </Canvas>
+            )}
+
+            {/* ── On-Screen Metrics HUD ──────────────────────────────── */}
+            {status === 'loaded' && viewerMetrics && (
+                <div className="absolute bottom-4 right-4 z-20 pointer-events-none">
+                    <div className="bg-gray-900/85 backdrop-blur-md rounded-xl border border-gray-700/50
+                        px-3 py-2.5 shadow-xl" style={{ minWidth: 175 }}>
+                        <p className="text-[9px] text-gray-500 uppercase tracking-widest font-bold mb-1.5
+                            flex items-center gap-1">
+                            <span>📐</span> Model Dimensions
+                        </p>
+                        <div className="space-y-0.5 text-[11px] font-mono">
+                            <div className="flex justify-between gap-6">
+                                <span className="text-red-400 font-bold">X</span>
+                                <span className="text-gray-100">{viewerMetrics.sizeX} <span className="text-gray-500 text-[9px]">mm</span></span>
+                            </div>
+                            <div className="flex justify-between gap-6">
+                                <span className="text-green-400 font-bold">Y</span>
+                                <span className="text-gray-100">{viewerMetrics.sizeY} <span className="text-gray-500 text-[9px]">mm</span></span>
+                            </div>
+                            <div className="flex justify-between gap-6">
+                                <span className="text-blue-400 font-bold">Z</span>
+                                <span className="text-gray-100">{viewerMetrics.sizeZ} <span className="text-gray-500 text-[9px]">mm</span></span>
+                            </div>
+                        </div>
+                        <div className="border-t border-gray-700/40 mt-1.5 pt-1.5 space-y-0.5 text-[10px]">
+                            <div className="flex justify-between gap-4">
+                                <span className="text-gray-500">Volume</span>
+                                <span className="text-cyan-300 font-semibold">
+                                    {Number(viewerMetrics.volume).toLocaleString()} <span className="text-gray-500 text-[8px]">mm³</span>
+                                </span>
+                            </div>
+                            <div className="flex justify-between gap-4">
+                                <span className="text-gray-500">Surface</span>
+                                <span className="text-cyan-300 font-semibold">
+                                    {Number(viewerMetrics.surfaceArea).toLocaleString()} <span className="text-gray-500 text-[8px]">mm²</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* ── PDF PREVIEW — shows the actual PDF inline ──────────────── */}
