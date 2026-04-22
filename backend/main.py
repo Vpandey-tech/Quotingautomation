@@ -41,6 +41,9 @@ from services.stock_sizes import get_stock_table, get_all_stock_types, find_next
 from services.material_calculator import calculate_raw_material
 from services.gemini_validator import validate_with_gemini
 
+# ── Engineering Design Module (AIAE) ─────────────────────────────────────────
+from engineering_routes import router as design_router
+
 app = FastAPI(
     title="AccuDesign Quoting API",
     description="Phase 4: INR pricing + ACCU DESIGN PDF + PDF drawing analysis",
@@ -54,6 +57,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include the engineering design module routes
+app.include_router(design_router)
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 class QuoteRequest(BaseModel):

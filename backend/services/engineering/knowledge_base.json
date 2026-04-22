@@ -1,0 +1,2712 @@
+[
+  {
+    "domain": "Shaft Design",
+    "topic": "Torque Calculation",
+    "type": "formula",
+    "formula_string": "T = (9550 * P) / N",
+    "inputs": [
+      {"symbol": "P", "description": "Power", "unit": "kW"},
+      {"symbol": "N", "description": "Speed", "unit": "RPM"}
+    ],
+    "output": {"symbol": "T", "description": "Torque", "unit": "Nm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design",
+    "topic": "Equivalent Torque (ASME)",
+    "type": "formula",
+    "formula_string": "Te = ((Kb * M)**2 + (Kt * T)**2)**0.5",
+    "inputs": [
+      {"symbol": "M", "description": "Bending moment", "unit": "Nm"},
+      {"symbol": "T", "description": "Torque", "unit": "Nm"},
+      {"symbol": "Kb", "description": "Bending shock factor", "unit": ""},
+      {"symbol": "Kt", "description": "Torsion shock factor", "unit": ""}
+    ],
+    "output": {"symbol": "Te", "description": "Equivalent torque", "unit": "Nm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design",
+    "topic": "Maximum Shear Stress Theory (Tresca)",
+    "type": "formula",
+    "formula_string": "tau_max = (16 * Te) / (3.14159 * d**3)",
+    "inputs": [
+      {"symbol": "Te", "description": "Equivalent torque", "unit": "Nm"},
+      {"symbol": "d", "description": "Shaft diameter", "unit": "m"}
+    ],
+    "output": {"symbol": "tau_max", "description": "Maximum Shear Stress", "unit": "Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design",
+    "topic": "Von Mises Stress",
+    "type": "formula",
+    "formula_string": "sigma_e = (sigma**2 + 3 * tau**2)**0.5",
+    "inputs": [
+      {"symbol": "sigma", "description": "Bending stress", "unit": "Pa"},
+      {"symbol": "tau", "description": "Torsional stress", "unit": "Pa"}
+    ],
+    "output": {"symbol": "sigma_e", "description": "Von Mises Stress", "unit": "Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design",
+    "topic": "Shaft Diameter (ASME)",
+    "type": "formula",
+    "formula_string": "d = ((16 / (3.14159 * tau_allow)) * ((Kb*M)**2 + (Kt*T)**2)**0.5)**(1/3)",
+    "inputs": [
+      {"symbol": "tau_allow", "description": "Allowable shear stress", "unit": "Pa"},
+      {"symbol": "Kb", "description": "Bending shock factor", "unit": ""},
+      {"symbol": "M", "description": "Bending moment", "unit": "Nm"},
+      {"symbol": "Kt", "description": "Torsion shock factor", "unit": ""},
+      {"symbol": "T", "description": "Torque", "unit": "Nm"}
+    ],
+    "output": {"symbol": "d", "description": "Shaft Diameter", "unit": "m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design",
+    "topic": "Deflection (Simply Supported)",
+    "type": "formula",
+    "formula_string": "delta = (W * L**3) / (48 * E * I)",
+    "inputs": [
+      {"symbol": "W", "description": "Load", "unit": "N"},
+      {"symbol": "L", "description": "Length", "unit": "m"},
+      {"symbol": "E", "description": "Youngs Modulus", "unit": "Pa"},
+      {"symbol": "I", "description": "Area Moment of Inertia", "unit": "m^4"}
+    ],
+    "output": {"symbol": "delta", "description": "Deflection", "unit": "m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design",
+    "topic": "Critical Speed (Whirling)",
+    "type": "formula",
+    "formula_string": "Nc = (30 / 3.14159) * (9.81 / delta)**0.5",
+    "inputs": [
+      {"symbol": "delta", "description": "Deflection", "unit": "m"}
+    ],
+    "output": {"symbol": "Nc", "description": "Critical speed", "unit": "RPM"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Design",
+    "topic": "Lewis Bending Equation",
+    "type": "formula",
+    "formula_string": "Ft = (sigma * b * m * Y)",
+    "inputs": [
+      {"symbol": "sigma", "description": "Allowable stress", "unit": "Pa"},
+      {"symbol": "b", "description": "Face width", "unit": "m"},
+      {"symbol": "m", "description": "Module", "unit": "m"},
+      {"symbol": "Y", "description": "Lewis form factor", "unit": ""}
+    ],
+    "output": {"symbol": "Ft", "description": "Tangential force", "unit": "N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Design",
+    "topic": "Tangential Load",
+    "type": "formula",
+    "formula_string": "Ft = (1000 * P) / v",
+    "inputs": [
+      {"symbol": "P", "description": "Power", "unit": "kW"},
+      {"symbol": "v", "description": "Pitch line velocity", "unit": "m/s"}
+    ],
+    "output": {"symbol": "Ft", "description": "Tangential force", "unit": "N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Design",
+    "topic": "Velocity Factor (Kv)",
+    "type": "formula",
+    "formula_string": "Kv = 3 / (3 + v)",
+    "inputs": [
+      {"symbol": "v", "description": "Pitch line velocity", "unit": "m/s"}
+    ],
+    "output": {"symbol": "Kv", "description": "Velocity Factor", "unit": ""},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Design",
+    "topic": "AGMA Bending Stress",
+    "type": "formula",
+    "formula_string": "sigma = (Wt * Ko * Kv * Ks * Km) / (b * m * J)",
+    "inputs": [
+      {"symbol": "Wt", "description": "Transmitted tangential load", "unit": "N"},
+      {"symbol": "Ko", "description": "Overload factor", "unit": ""},
+      {"symbol": "Kv", "description": "Dynamic factor", "unit": ""},
+      {"symbol": "Ks", "description": "Size factor", "unit": ""},
+      {"symbol": "Km", "description": "Load distribution factor", "unit": ""},
+      {"symbol": "b", "description": "Face width", "unit": "m"},
+      {"symbol": "m", "description": "Module", "unit": "m"},
+      {"symbol": "J", "description": "Geometry factor", "unit": ""}
+    ],
+    "output": {"symbol": "sigma", "description": "Bending stress", "unit": "Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Bearing Selection",
+    "topic": "Equivalent Dynamic Load",
+    "type": "formula",
+    "formula_string": "P = X * Fr + Y * Fa",
+    "inputs": [
+      {"symbol": "Fr", "description": "Radial load", "unit": "N"},
+      {"symbol": "Fa", "description": "Axial load", "unit": "N"},
+      {"symbol": "X", "description": "Radial factor", "unit": ""},
+      {"symbol": "Y", "description": "Axial factor", "unit": ""}
+    ],
+    "output": {"symbol": "P", "description": "Equivalent Load", "unit": "N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Bearing Selection",
+    "topic": "Bearing Life (L10)",
+    "type": "formula",
+    "formula_string": "L10 = (C / P)**p",
+    "inputs": [
+      {"symbol": "C", "description": "Dynamic load rating", "unit": "N"},
+      {"symbol": "P", "description": "Equivalent dynamic load", "unit": "N"},
+      {"symbol": "p", "description": "Exponent", "unit": ""}
+    ],
+    "output": {"symbol": "L10", "description": "Life in millions of revs", "unit": "revs"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Bearing Selection",
+    "topic": "Life in Hours",
+    "type": "formula",
+    "formula_string": "L10h = (L10 * 10**6) / (60 * N)",
+    "inputs": [
+      {"symbol": "L10", "description": "Life in millions of revs", "unit": "revs"},
+      {"symbol": "N", "description": "Speed", "unit": "RPM"}
+    ],
+    "output": {"symbol": "L10h", "description": "Life in hours", "unit": "hours"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Fasteners",
+    "topic": "Torque-Tension Relationship",
+    "type": "formula",
+    "formula_string": "T = K * F * d",
+    "inputs": [
+      {"symbol": "K", "description": "Nut factor", "unit": ""},
+      {"symbol": "F", "description": "Preload force", "unit": "N"},
+      {"symbol": "d", "description": "Nominal diameter", "unit": "m"}
+    ],
+    "output": {"symbol": "T", "description": "Torque", "unit": "Nm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spring Design",
+    "topic": "Helical Spring Stiffness",
+    "type": "formula",
+    "formula_string": "k = (G * d**4) / (8 * D**3 * n)",
+    "inputs": [
+      {"symbol": "G", "description": "Shear modulus", "unit": "Pa"},
+      {"symbol": "d", "description": "Wire diameter", "unit": "m"},
+      {"symbol": "D", "description": "Mean coil diameter", "unit": "m"},
+      {"symbol": "n", "description": "Active coils", "unit": ""}
+    ],
+    "output": {"symbol": "k", "description": "Stiffness", "unit": "N/m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Pressure Vessel",
+    "topic": "Thin Cylinder Hoop Stress",
+    "type": "formula",
+    "formula_string": "sigma_h = (P * D) / (2 * t)",
+    "inputs": [
+      {"symbol": "P", "description": "Pressure", "unit": "Pa"},
+      {"symbol": "D", "description": "Diameter", "unit": "m"},
+      {"symbol": "t", "description": "Thickness", "unit": "m"}
+    ],
+    "output": {"symbol": "sigma_h", "description": "Hoop Stress", "unit": "Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welded Joints",
+    "topic": "Fillet Weld Strength",
+    "type": "formula",
+    "formula_string": "tau = F / (0.707 * h * L)",
+    "inputs": [
+      {"symbol": "F", "description": "Force", "unit": "N"},
+      {"symbol": "h", "description": "Weld size", "unit": "m"},
+      {"symbol": "L", "description": "Weld length", "unit": "m"}
+    ],
+    "output": {"symbol": "tau", "description": "Shear Stress", "unit": "Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Fits and Tolerances",
+    "topic": "Tolerance Unit (i)",
+    "type": "formula",
+    "formula_string": "i = 0.45 * (D)**(1/3) + 0.001 * D",
+    "inputs": [
+      {"symbol": "D", "description": "Geometric mean diameter", "unit": "mm"}
+    ],
+    "output": {"symbol": "i", "description": "Tolerance Unit", "unit": "microns"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Belt Drives",
+    "topic": "Belt Tension Ratio",
+    "type": "formula",
+    "formula_string": "ratio = 2.71828**(mu * theta)",
+    "inputs": [
+      {"symbol": "mu", "description": "Coefficient of friction", "unit": ""},
+      {"symbol": "theta", "description": "Wrap angle", "unit": "rad"}
+    ],
+    "output": {"symbol": "ratio", "description": "T1/T2 Ratio", "unit": ""},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Fatigue Design",
+    "topic": "Goodman Criterion",
+    "type": "formula",
+    "formula_string": "n = 1 / ((sigma_a / Se) + (sigma_m / Sut))",
+    "inputs": [
+      {"symbol": "sigma_a", "description": "Alternating stress", "unit": "Pa"},
+      {"symbol": "Se", "description": "Endurance limit", "unit": "Pa"},
+      {"symbol": "sigma_m", "description": "Mean stress", "unit": "Pa"},
+      {"symbol": "Sut", "description": "Ultimate tensile strength", "unit": "Pa"}
+    ],
+    "output": {"symbol": "n", "description": "Factor of safety", "unit": ""},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design",
+    "topic": "Shock and Fatigue Factors (ASME)",
+    "type": "table",
+    "formula_string": null,
+    "inputs": [],
+    "output": null,
+    "rule_logic": null,
+    "table_data": {
+      "steady_load": {"Kb": 1.0, "Kt": 1.0},
+      "minor_shock": {"Kb": 1.5, "Kt": 1.2},
+      "moderate_shock": {"Kb": 2.0, "Kt": 1.5},
+      "heavy_shock": {"Kb": 3.0, "Kt": 2.0}
+    }
+  },
+  {
+    "domain": "Gear Design",
+    "topic": "Lewis Form Factor (Spur, 20 degrees)",
+    "type": "table",
+    "formula_string": null,
+    "inputs": [],
+    "output": null,
+    "rule_logic": null,
+    "table_data": {
+      "12": 0.245,
+      "16": 0.289,
+      "20": 0.322,
+      "24": 0.340,
+      "30": 0.360,
+      "40": 0.380,
+      "60": 0.400,
+      "100": 0.420
+    }
+  },
+  {
+    "domain": "Material Properties",
+    "topic": "Standard Material Table",
+    "type": "table",
+    "formula_string": null,
+    "inputs": [],
+    "output": null,
+    "rule_logic": null,
+    "table_data": {
+      "1018_Steel": {"Sy": 370, "Sut": 440, "E": 200, "Density": 7850},
+      "1045_Steel": {"Sy": 530, "Sut": 630, "E": 200, "Density": 7850},
+      "4140_Alloy_Steel": {"Sy": 655, "Sut": 850, "E": 205, "Density": 7850},
+      "6061_T6_Aluminum": {"Sy": 276, "Sut": 310, "E": 69, "Density": 2700},
+      "7075_T6_Aluminum": {"Sy": 503, "Sut": 572, "E": 71, "Density": 2810},
+      "304_Stainless_Steel": {"Sy": 215, "Sut": 505, "E": 193, "Density": 8000},
+      "Cast_Iron_Gray": {"Sy": 130, "Sut": 240, "E": 110, "Density": 7200}
+    }
+  },
+  {
+    "domain": "Gear Design",
+    "topic": "Standard Module Series (ISO)",
+    "type": "table",
+    "formula_string": null,
+    "inputs": [],
+    "output": null,
+    "rule_logic": null,
+    "table_data": {
+      "series": [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10, 12, 16, 20]
+    }
+  },
+  {
+    "domain": "Bearing Selection",
+    "topic": "Bearing Factors (Ball Bearings)",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "Fa", "description": "Axial Load", "unit": "N"},
+      {"symbol": "Fr", "description": "Radial Load", "unit": "N"}
+    ],
+    "output": {"symbol": "X_Y", "description": "Radial and Axial Factors", "unit": ""},
+    "rule_logic": "if (Fa/Fr <= 0.3) { X = 1; Y = 0 } else if (Fa/Fr > 0.3 && Fa/Fr <= 0.6) { X = 0.56; Y = 1.6 } else { X = 0.44; Y = 2.3 }",
+    "table_data": null
+  },
+  {
+    "domain": "Fatigue Design",
+    "topic": "Surface Finish Factor (ka)",
+    "type": "table",
+    "formula_string": null,
+    "inputs": [],
+    "output": null,
+    "rule_logic": null,
+    "table_data": {
+      "Ground": 0.9,
+      "Machined": 0.8,
+      "Hot_Rolled": 0.7,
+      "As_Forged": 0.6
+    }
+  },
+  {
+    "domain": "Fatigue Design",
+    "topic": "Size Factor (kb)",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [{"symbol": "d", "description": "Diameter", "unit": "mm"}],
+    "output": {"symbol": "kb", "description": "Size Factor", "unit": ""},
+    "rule_logic": "if (d < 7.5) { kb = 1.0 } else if (d >= 7.5 && d <= 50) { kb = 0.85 } else { kb = 0.75 }",
+    "table_data": null
+  },
+  {
+    "domain": "Fatigue Design",
+    "topic": "Reliability Factor (ke)",
+    "type": "table",
+    "formula_string": null,
+    "inputs": [],
+    "output": null,
+    "rule_logic": null,
+    "table_data": {
+      "50": 1.0,
+      "90": 0.897,
+      "95": 0.868,
+      "99": 0.814
+    }
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Alternating Bending Stress",
+    "type": "formula",
+    "formula_string": "sigma_a = K_f * 32 * M_a / (pi * d**3)",
+    "inputs": [
+      {"symbol": "K_f", "description": "Fatigue stress-concentration factor for bending", "unit": "dimensionless"},
+      {"symbol": "M_a", "description": "Alternating bending moment", "unit": "Nm"},
+      {"symbol": "d", "description": "Diameter of the solid circular shaft", "unit": "m"}
+    ],
+    "output": {"symbol": "sigma_a", "description": "Alternating bending stress", "unit": "Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Midrange Bending Stress",
+    "type": "formula",
+    "formula_string": "sigma_m = K_f * 32 * M_m / (pi * d**3)",
+    "inputs": [
+      {"symbol": "K_f", "description": "Fatigue stress-concentration factor for bending", "unit": "dimensionless"},
+      {"symbol": "M_m", "description": "Midrange (steady) bending moment", "unit": "Nm"},
+      {"symbol": "d", "description": "Diameter of the solid circular shaft", "unit": "m"}
+    ],
+    "output": {"symbol": "sigma_m", "description": "Midrange bending stress", "unit": "Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Alternating Torsional Stress",
+    "type": "formula",
+    "formula_string": "tau_a = K_fs * 16 * T_a / (pi * d**3)",
+    "inputs": [
+      {"symbol": "K_fs", "description": "Fatigue stress-concentration factor for torsion", "unit": "dimensionless"},
+      {"symbol": "T_a", "description": "Alternating torsional moment", "unit": "Nm"},
+      {"symbol": "d", "description": "Diameter of the solid circular shaft", "unit": "m"}
+    ],
+    "output": {"symbol": "tau_a", "description": "Alternating torsional stress", "unit": "Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Midrange Torsional Stress",
+    "type": "formula",
+    "formula_string": "tau_m = K_fs * 16 * T_m / (pi * d**3)",
+    "inputs": [
+      {"symbol": "K_fs", "description": "Fatigue stress-concentration factor for torsion", "unit": "dimensionless"},
+      {"symbol": "T_m", "description": "Midrange (steady) torsional moment", "unit": "Nm"},
+      {"symbol": "d", "description": "Diameter of the solid circular shaft", "unit": "m"}
+    ],
+    "output": {"symbol": "tau_m", "description": "Midrange torsional stress", "unit": "Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Alternating von Mises Equivalent Stress",
+    "type": "formula",
+    "formula_string": "sigma_a_prime = ( (32 * K_f * M_a / (pi * d**3))**2 + 3 * (16 * K_fs * T_a / (pi * d**3))**2 )**(1/2)",
+    "inputs": [
+      {"symbol": "K_f", "description": "Fatigue stress-concentration factor for bending", "unit": "dimensionless"},
+      {"symbol": "M_a", "description": "Alternating bending moment", "unit": "Nm"},
+      {"symbol": "d", "description": "Diameter of the solid circular shaft", "unit": "m"},
+      {"symbol": "K_fs", "description": "Fatigue stress-concentration factor for torsion", "unit": "dimensionless"},
+      {"symbol": "T_a", "description": "Alternating torsional moment", "unit": "Nm"}
+    ],
+    "output": {"symbol": "sigma_a_prime", "description": "Alternating von Mises stress", "unit": "Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Midrange von Mises Equivalent Stress",
+    "type": "formula",
+    "formula_string": "sigma_m_prime = ( (32 * K_f * M_m / (pi * d**3))**2 + 3 * (16 * K_fs * T_m / (pi * d**3))**2 )**(1/2)",
+    "inputs": [
+      {"symbol": "K_f", "description": "Fatigue stress-concentration factor for bending", "unit": "dimensionless"},
+      {"symbol": "M_m", "description": "Midrange (steady) bending moment", "unit": "Nm"},
+      {"symbol": "d", "description": "Diameter of the solid circular shaft", "unit": "m"},
+      {"symbol": "K_fs", "description": "Fatigue stress-concentration factor for torsion", "unit": "dimensionless"},
+      {"symbol": "T_m", "description": "Midrange (steady) torsional moment", "unit": "Nm"}
+    ],
+    "output": {"symbol": "sigma_m_prime", "description": "Midrange von Mises stress", "unit": "Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Required Shaft Diameter (DE-Goodman)",
+    "type": "formula",
+    "formula_string": "d = ( (16 * n / pi) * ( (1 / S_e) * (4 * (K_f * M_a)**2 + 3 * (K_fs * T_a)**2)**(1/2) + (1 / S_ut) * (4 * (K_f * M_m)**2 + 3 * (K_fs * T_m)**2)**(1/2) ) )**(1/3)",
+    "inputs": [
+      {"symbol": "n", "description": "Factor of safety (design margin)", "unit": "dimensionless"},
+      {"symbol": "S_e", "description": "Fully corrected endurance limit", "unit": "Pa"},
+      {"symbol": "K_f", "description": "Fatigue stress-concentration factor for bending", "unit": "dimensionless"},
+      {"symbol": "M_a", "description": "Alternating bending moment", "unit": "Nm"},
+      {"symbol": "K_fs", "description": "Fatigue stress-concentration factor for torsion", "unit": "dimensionless"},
+      {"symbol": "T_a", "description": "Alternating torsional moment", "unit": "Nm"},
+      {"symbol": "S_ut", "description": "Ultimate tensile strength", "unit": "Pa"},
+      {"symbol": "M_m", "description": "Midrange (steady) bending moment", "unit": "Nm"},
+      {"symbol": "T_m", "description": "Midrange (steady) torsional moment", "unit": "Nm"}
+    ],
+    "output": {"symbol": "d", "description": "Required minimum diameter", "unit": "m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Intermediate Variable A (DE-Gerber)",
+    "type": "formula",
+    "formula_string": "A = (4 * (K_f * M_a)**2 + 3 * (K_fs * T_a)**2)**(1/2)",
+    "inputs": [
+      {"symbol": "K_f", "description": "Fatigue stress-concentration factor for bending", "unit": "dimensionless"},
+      {"symbol": "M_a", "description": "Alternating bending moment", "unit": "Nm"},
+      {"symbol": "K_fs", "description": "Fatigue stress-concentration factor for torsion", "unit": "dimensionless"},
+      {"symbol": "T_a", "description": "Alternating torsional moment", "unit": "Nm"}
+    ],
+    "output": {"symbol": "A", "description": "Intermediate alternating stress parameter", "unit": "Nm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Intermediate Variable B (DE-Gerber)",
+    "type": "formula",
+    "formula_string": "B = (4 * (K_f * M_m)**2 + 3 * (K_fs * T_m)**2)**(1/2)",
+    "inputs": [
+      {"symbol": "K_f", "description": "Fatigue stress-concentration factor for bending", "unit": "dimensionless"},
+      {"symbol": "M_m", "description": "Midrange (steady) bending moment", "unit": "Nm"},
+      {"symbol": "K_fs", "description": "Fatigue stress-concentration factor for torsion", "unit": "dimensionless"},
+      {"symbol": "T_m", "description": "Midrange (steady) torsional moment", "unit": "Nm"}
+    ],
+    "output": {"symbol": "B", "description": "Intermediate midrange stress parameter", "unit": "Nm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Required Shaft Diameter (DE-Gerber)",
+    "type": "formula",
+    "formula_string": "d = ( (8 * n * A) / (pi * S_e) * ( 1 + (1 + (2 * B * S_e / (A * S_ut))**2)**(1/2) ) )**(1/3)",
+    "inputs": [
+      {"symbol": "n", "description": "Factor of safety (design margin)", "unit": "dimensionless"},
+      {"symbol": "A", "description": "Intermediate alternating stress parameter", "unit": "Nm"},
+      {"symbol": "S_e", "description": "Fully corrected endurance limit", "unit": "Pa"},
+      {"symbol": "B", "description": "Intermediate midrange stress parameter", "unit": "Nm"},
+      {"symbol": "S_ut", "description": "Ultimate tensile strength", "unit": "Pa"}
+    ],
+    "output": {"symbol": "d", "description": "Required minimum diameter", "unit": "m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Required Shaft Diameter (DE-Soderberg)",
+    "type": "formula",
+    "formula_string": "d = ( (16 * n / pi) * ( (1 / S_e) * (4 * (K_f * M_a)**2 + 3 * (K_fs * T_a)**2)**(1/2) + (1 / S_y) * (4 * (K_f * M_m)**2 + 3 * (K_fs * T_m)**2)**(1/2) ) )**(1/3)",
+    "inputs": [
+      {"symbol": "n", "description": "Factor of safety (design margin)", "unit": "dimensionless"},
+      {"symbol": "S_e", "description": "Fully corrected endurance limit", "unit": "Pa"},
+      {"symbol": "K_f", "description": "Fatigue stress-concentration factor for bending", "unit": "dimensionless"},
+      {"symbol": "M_a", "description": "Alternating bending moment", "unit": "Nm"},
+      {"symbol": "K_fs", "description": "Fatigue stress-concentration factor for torsion", "unit": "dimensionless"},
+      {"symbol": "T_a", "description": "Alternating torsional moment", "unit": "Nm"},
+      {"symbol": "S_y", "description": "Yield strength of the material", "unit": "Pa"},
+      {"symbol": "M_m", "description": "Midrange (steady) bending moment", "unit": "Nm"},
+      {"symbol": "T_m", "description": "Midrange (steady) torsional moment", "unit": "Nm"}
+    ],
+    "output": {"symbol": "d", "description": "Required minimum diameter", "unit": "m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Maximum von Mises Stress (First Load Cycle)",
+    "type": "formula",
+    "formula_string": "sigma_max_prime = ( (32 * K_f * (M_m + M_a) / (pi * d**3))**2 + 3 * (16 * K_fs * (T_m + T_a) / (pi * d**3))**2 )**(1/2)",
+    "inputs": [
+      {"symbol": "K_f", "description": "Fatigue stress-concentration factor for bending", "unit": "dimensionless"},
+      {"symbol": "M_m", "description": "Midrange (steady) bending moment", "unit": "Nm"},
+      {"symbol": "M_a", "description": "Alternating bending moment", "unit": "Nm"},
+      {"symbol": "d", "description": "Diameter of the solid circular shaft", "unit": "m"},
+      {"symbol": "K_fs", "description": "Fatigue stress-concentration factor for torsion", "unit": "dimensionless"},
+      {"symbol": "T_m", "description": "Midrange (steady) torsional moment", "unit": "Nm"},
+      {"symbol": "T_a", "description": "Alternating torsional moment", "unit": "Nm"}
+    ],
+    "output": {"symbol": "sigma_max_prime", "description": "Maximum peak von Mises stress", "unit": "Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Yield Factor of Safety",
+    "type": "formula",
+    "formula_string": "n_y = S_y / sigma_max_prime",
+    "inputs": [
+      {"symbol": "S_y", "description": "Yield strength of the material", "unit": "Pa"},
+      {"symbol": "sigma_max_prime", "description": "Maximum peak von Mises stress", "unit": "Pa"}
+    ],
+    "output": {"symbol": "n_y", "description": "Static yielding safety factor", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Static Yielding Guard Rule",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "n_y", "description": "Static yielding safety factor", "unit": "dimensionless"}
+    ],
+    "output": null,
+    "rule_logic": "IF n_y > 1 THEN design prevents yielding ELSE design will yield.",
+    "table_data": null
+  },
+  {
+    "domain": "Shaft Design for Stress",
+    "topic": "Stress-Concentration Factors (First Iteration Estimates)",
+    "type": "table",
+    "formula_string": null,
+    "inputs": null,
+    "output": null,
+    "rule_logic": null,
+    "table_data": {
+      "Shoulder fillet sharp (r/d = 0.02)": {"K_t_bending": 2.7, "K_ts_torsion": 2.2, "K_t_axial": 3.0},
+      "Shoulder fillet well rounded (r/d = 0.1)": {"K_t_bending": 1.7, "K_ts_torsion": 1.5, "K_t_axial": 1.9},
+      "End-mill keyseat (r/d = 0.02)": {"K_t_bending": 2.14, "K_ts_torsion": 3.0, "K_t_axial": null},
+      "Sled runner keyseat": {"K_t_bending": 1.7, "K_ts_torsion": null, "K_t_axial": null},
+      "Retaining ring groove": {"K_t_bending": 5.0, "K_ts_torsion": 3.0, "K_t_axial": 5.0}
+    }
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "Pitch-Line Velocity (U.S. Customary)",
+    "type": "formula",
+    "formula_string": "V = (3.14159 * d_P * n_P) / 12",
+    "inputs": [
+      {"symbol": "d_P", "description": "Pitch diameter of the pinion", "unit": "in"},
+      {"symbol": "n_P", "description": "Pinion speed", "unit": "rev/min"}
+    ],
+    "output": {"symbol": "V", "description": "Pitch-line velocity", "unit": "ft/min"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "Transmitted Tangential Load (U.S. Customary)",
+    "type": "formula",
+    "formula_string": "W_t = (33000 * H) / V",
+    "inputs": [
+      {"symbol": "H", "description": "Power transmitted", "unit": "hp"},
+      {"symbol": "V", "description": "Pitch-line velocity", "unit": "ft/min"}
+    ],
+    "output": {"symbol": "W_t", "description": "Transmitted tangential load", "unit": "lbf"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "Pitch-Line Velocity (SI Units)",
+    "type": "formula",
+    "formula_string": "V = (3.14159 * d_P * n_P) / 60000",
+    "inputs": [
+      {"symbol": "d_P", "description": "Pitch diameter of the pinion", "unit": "mm"},
+      {"symbol": "n_P", "description": "Pinion speed", "unit": "rev/min"}
+    ],
+    "output": {"symbol": "V", "description": "Pitch-line velocity", "unit": "m/s"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "Transmitted Tangential Load (SI Units)",
+    "type": "formula",
+    "formula_string": "W_t = (60000000 * H) / (3.14159 * d_P * n_P)",
+    "inputs": [
+      {"symbol": "H", "description": "Power transmitted", "unit": "kW"},
+      {"symbol": "d_P", "description": "Pitch diameter of the pinion", "unit": "mm"},
+      {"symbol": "n_P", "description": "Pinion speed", "unit": "rev/min"}
+    ],
+    "output": {"symbol": "W_t", "description": "Transmitted tangential load", "unit": "N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "AGMA Bending Stress (U.S. Customary)",
+    "type": "formula",
+    "formula_string": "sigma = W_t * K_o * K_v * K_s * (P_d / F) * (K_m * K_B / J)",
+    "inputs": [
+      {"symbol": "W_t", "description": "Transmitted tangential load", "unit": "lbf"},
+      {"symbol": "K_o", "description": "Overload factor", "unit": "dimensionless"},
+      {"symbol": "K_v", "description": "Dynamic factor", "unit": "dimensionless"},
+      {"symbol": "K_s", "description": "Size factor", "unit": "dimensionless"},
+      {"symbol": "P_d", "description": "Transverse diametral pitch", "unit": "teeth/in"},
+      {"symbol": "F", "description": "Net face width of the narrowest member", "unit": "in"},
+      {"symbol": "K_m", "description": "Load-distribution factor", "unit": "dimensionless"},
+      {"symbol": "K_B", "description": "Rim-thickness factor", "unit": "dimensionless"},
+      {"symbol": "J", "description": "AGMA Geometry factor for bending strength", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "sigma", "description": "AGMA Bending Stress", "unit": "psi"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "AGMA Bending Stress (SI Units)",
+    "type": "formula",
+    "formula_string": "sigma = W_t * K_o * K_v * K_s * (1 / (b * m_t)) * (K_m * K_B / J)",
+    "inputs": [
+      {"symbol": "W_t", "description": "Transmitted tangential load", "unit": "N"},
+      {"symbol": "K_o", "description": "Overload factor", "unit": "dimensionless"},
+      {"symbol": "K_v", "description": "Dynamic factor", "unit": "dimensionless"},
+      {"symbol": "K_s", "description": "Size factor", "unit": "dimensionless"},
+      {"symbol": "b", "description": "Face width", "unit": "mm"},
+      {"symbol": "m_t", "description": "Transverse module", "unit": "mm/tooth"},
+      {"symbol": "K_m", "description": "Load-distribution factor", "unit": "dimensionless"},
+      {"symbol": "K_B", "description": "Rim-thickness factor", "unit": "dimensionless"},
+      {"symbol": "J", "description": "AGMA Geometry factor for bending strength", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "sigma", "description": "AGMA Bending Stress", "unit": "MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "AGMA Contact Stress",
+    "type": "formula",
+    "formula_string": "sigma_c = C_p * ( W_t * K_o * K_v * K_s * (K_m / (d_P * F * I)) * C_f )**(1/2)",
+    "inputs": [
+      {"symbol": "C_p", "description": "Elastic coefficient", "unit": "sqrt(psi) or sqrt(MPa)"},
+      {"symbol": "W_t", "description": "Transmitted tangential load", "unit": "lbf or N"},
+      {"symbol": "K_o", "description": "Overload factor", "unit": "dimensionless"},
+      {"symbol": "K_v", "description": "Dynamic factor", "unit": "dimensionless"},
+      {"symbol": "K_s", "description": "Size factor", "unit": "dimensionless"},
+      {"symbol": "K_m", "description": "Load-distribution factor", "unit": "dimensionless"},
+      {"symbol": "d_P", "description": "Pitch diameter of the pinion", "unit": "in or mm"},
+      {"symbol": "F", "description": "Net face width", "unit": "in or mm"},
+      {"symbol": "I", "description": "AGMA Geometry factor for pitting resistance", "unit": "dimensionless"},
+      {"symbol": "C_f", "description": "Surface condition factor", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "sigma_c", "description": "Maximum Hertzian contact stress", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "AGMA Allowable Bending Stress",
+    "type": "formula",
+    "formula_string": "sigma_all = (S_t * Y_N) / (K_T * K_R)",
+    "inputs": [
+      {"symbol": "S_t", "description": "AGMA Bending strength of the material", "unit": "psi or MPa"},
+      {"symbol": "Y_N", "description": "Stress-cycle factor for bending strength", "unit": "dimensionless"},
+      {"symbol": "K_T", "description": "Temperature factor", "unit": "dimensionless"},
+      {"symbol": "K_R", "description": "Reliability factor", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "sigma_all", "description": "Allowable bending stress", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "AGMA Allowable Contact Stress",
+    "type": "formula",
+    "formula_string": "sigma_c_all = (S_c * Z_N * C_H) / (K_T * K_R)",
+    "inputs": [
+      {"symbol": "S_c", "description": "AGMA Surface endurance strength of the material", "unit": "psi or MPa"},
+      {"symbol": "Z_N", "description": "Stress-cycle factor for pitting resistance", "unit": "dimensionless"},
+      {"symbol": "C_H", "description": "Hardness-ratio factor", "unit": "dimensionless"},
+      {"symbol": "K_T", "description": "Temperature factor", "unit": "dimensionless"},
+      {"symbol": "K_R", "description": "Reliability factor", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "sigma_c_all", "description": "Allowable contact stress", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "Bending Safety Factor",
+    "type": "formula",
+    "formula_string": "S_F = sigma_all / sigma",
+    "inputs": [
+      {"symbol": "sigma_all", "description": "Allowable bending stress", "unit": "psi or MPa"},
+      {"symbol": "sigma", "description": "AGMA Bending Stress", "unit": "psi or MPa"}
+    ],
+    "output": {"symbol": "S_F", "description": "Bending Safety Factor", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "Pitting (Wear) Safety Factor",
+    "type": "formula",
+    "formula_string": "S_H = sigma_c_all / sigma_c",
+    "inputs": [
+      {"symbol": "sigma_c_all", "description": "Allowable contact stress", "unit": "psi or MPa"},
+      {"symbol": "sigma_c", "description": "Maximum Hertzian contact stress", "unit": "psi or MPa"}
+    ],
+    "output": {"symbol": "S_H", "description": "Pitting (Wear) Safety Factor", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "Dynamic Factor (Cut or Milled Profile)",
+    "type": "formula",
+    "formula_string": "K_v = (1200 + V) / 1200",
+    "inputs": [
+      {"symbol": "V", "description": "Pitch-line velocity", "unit": "ft/min"}
+    ],
+    "output": {"symbol": "K_v", "description": "Dynamic factor", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "Dynamic Factor (Hobbed or Shaped Profile)",
+    "type": "formula",
+    "formula_string": "K_v = (50 + V**(1/2)) / 50",
+    "inputs": [
+      {"symbol": "V", "description": "Pitch-line velocity", "unit": "ft/min"}
+    ],
+    "output": {"symbol": "K_v", "description": "Dynamic factor", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Spur and Helical Gears (AGMA Standards)",
+    "topic": "Dynamic Factor (Shaved or Ground Profile)",
+    "type": "formula",
+    "formula_string": "K_v = (78 + V**(1/2)) / 78",
+    "inputs": [
+      {"symbol": "V", "description": "Pitch-line velocity", "unit": "ft/min"}
+    ],
+    "output": {"symbol": "K_v", "description": "Dynamic factor", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Rolling-Contact Bearings",
+    "topic": "Equivalent Dynamic Radial Load",
+    "type": "formula",
+    "formula_string": "F_e = X * V * F_r + Y * F_a",
+    "inputs": [
+      {"symbol": "X", "description": "Radial load factor", "unit": "dimensionless"},
+      {"symbol": "V", "description": "Rotation factor", "unit": "dimensionless"},
+      {"symbol": "F_r", "description": "Applied radial load", "unit": "lbf or N"},
+      {"symbol": "Y", "description": "Axial load factor", "unit": "dimensionless"},
+      {"symbol": "F_a", "description": "Applied axial (thrust) load", "unit": "lbf or N"}
+    ],
+    "output": {"symbol": "F_e", "description": "Equivalent dynamic radial load", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Rolling-Contact Bearings",
+    "topic": "Axial Load Negligibility Check",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "F_a", "description": "Applied axial load", "unit": "lbf or N"},
+      {"symbol": "V", "description": "Rotation factor", "unit": "dimensionless"},
+      {"symbol": "F_r", "description": "Applied radial load", "unit": "lbf or N"},
+      {"symbol": "e", "description": "Catalog specific threshold", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "F_e", "description": "Simplified equivalent load", "unit": "lbf or N"},
+    "rule_logic": "IF F_a / (V * F_r) <= e THEN axial load is negligible, set X = 1, Y = 0, AND F_e = V * F_r.",
+    "table_data": null
+  },
+  {
+    "domain": "Rolling-Contact Bearings",
+    "topic": "Required Basic Rating Life",
+    "type": "formula",
+    "formula_string": "L_D = (60 * h_D * n_D) / 10**6",
+    "inputs": [
+      {"symbol": "h_D", "description": "Desired design hours", "unit": "hours"},
+      {"symbol": "n_D", "description": "Design speed", "unit": "rev/min"}
+    ],
+    "output": {"symbol": "L_D", "description": "Required basic rating life", "unit": "millions of revolutions"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Rolling-Contact Bearings",
+    "topic": "Dimensionless Design Life",
+    "type": "formula",
+    "formula_string": "x_D = L_D / L_R",
+    "inputs": [
+      {"symbol": "L_D", "description": "Desired design life", "unit": "millions of revolutions"},
+      {"symbol": "L_R", "description": "Manufacturer's rating life threshold", "unit": "millions of revolutions"}
+    ],
+    "output": {"symbol": "x_D", "description": "Dimensionless multiple of rating life", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Rolling-Contact Bearings",
+    "topic": "Catalog Rating for 90% Reliability (Standard Equation)",
+    "type": "formula",
+    "formula_string": "C_10 = a_f * F_D * (L_D / L_R)**(1/a)",
+    "inputs": [
+      {"symbol": "a_f", "description": "Application factor (shock/impact modifier)", "unit": "dimensionless"},
+      {"symbol": "F_D", "description": "Desired design load (Equivalent Radial Load F_e)", "unit": "lbf or N"},
+      {"symbol": "L_D", "description": "Desired design life", "unit": "millions of revolutions"},
+      {"symbol": "L_R", "description": "Manufacturer's rating life threshold", "unit": "millions of revolutions"},
+      {"symbol": "a", "description": "Load-life exponent", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "C_10", "description": "Required basic dynamic load rating", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Rolling-Contact Bearings",
+    "topic": "Catalog Rating for Higher Reliability (Weibull Equation)",
+    "type": "formula",
+    "formula_string": "C_10 = a_f * F_D * ( x_D / ( x_0 + (theta - x_0) * (1 - R_D)**(1/b) ) )**(1/a)",
+    "inputs": [
+      {"symbol": "a_f", "description": "Application factor", "unit": "dimensionless"},
+      {"symbol": "F_D", "description": "Desired design load", "unit": "lbf or N"},
+      {"symbol": "x_D", "description": "Dimensionless design life", "unit": "dimensionless"},
+      {"symbol": "x_0", "description": "Weibull guaranteed dimensionless life parameter", "unit": "dimensionless"},
+      {"symbol": "theta", "description": "Weibull characteristic dimensionless life parameter", "unit": "dimensionless"},
+      {"symbol": "R_D", "description": "Desired reliability", "unit": "dimensionless"},
+      {"symbol": "b", "description": "Weibull shape parameter", "unit": "dimensionless"},
+      {"symbol": "a", "description": "Load-life exponent", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "C_10", "description": "Required basic dynamic load rating for specified reliability", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Rolling-Contact Bearings",
+    "topic": "Equivalent Static Load",
+    "type": "formula",
+    "formula_string": "F_0e = X_0 * F_r + Y_0 * F_a",
+    "inputs": [
+      {"symbol": "X_0", "description": "Static radial load factor", "unit": "dimensionless"},
+      {"symbol": "F_r", "description": "Applied radial load", "unit": "lbf or N"},
+      {"symbol": "Y_0", "description": "Static axial load factor", "unit": "dimensionless"},
+      {"symbol": "F_a", "description": "Applied axial load", "unit": "lbf or N"}
+    ],
+    "output": {"symbol": "F_0e", "description": "Equivalent static load", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Rolling-Contact Bearings",
+    "topic": "Static Loading Verification",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "C_0", "description": "Basic static load rating", "unit": "lbf or N"},
+      {"symbol": "n_s", "description": "Static factor of safety", "unit": "dimensionless"},
+      {"symbol": "F_0e", "description": "Equivalent static load", "unit": "lbf or N"}
+    ],
+    "output": null,
+    "rule_logic": "IF C_0 >= n_s * F_0e THEN bearing prevents permanent plastic deformation (brinelling) ELSE bearing fails static check.",
+    "table_data": null
+  },
+  {
+    "domain": "Rolling-Contact Bearings",
+    "topic": "Typical Weibull Parameters (Manufacturer 2)",
+    "type": "table",
+    "formula_string": null,
+    "inputs": null,
+    "output": null,
+    "rule_logic": null,
+    "table_data": {
+      "Guaranteed dimensionless life (x_0)": 0.02,
+      "Characteristic life (theta)": 4.439,
+      "Shape parameter (b)": 1.483,
+      "Rating life (L_R)": 1000000.0
+    }
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Spring Index",
+    "type": "formula",
+    "formula_string": "C = D / d",
+    "inputs": [
+      {"symbol": "D", "description": "Mean coil diameter", "unit": "in or mm"},
+      {"symbol": "d", "description": "Wire diameter", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "C", "description": "Spring index", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Bergsträsser Factor",
+    "type": "formula",
+    "formula_string": "K_B = (4 * C + 2) / (4 * C - 3)",
+    "inputs": [
+      {"symbol": "C", "description": "Spring index", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "K_B", "description": "Bergsträsser factor", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Wahl Factor (Alternative)",
+    "type": "formula",
+    "formula_string": "K_W = (4 * C - 1) / (4 * C - 4) + 0.615 / C",
+    "inputs": [
+      {"symbol": "C", "description": "Spring index", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "K_W", "description": "Wahl factor", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Maximum Shear Stress (Compression)",
+    "type": "formula",
+    "formula_string": "tau = K_B * (8 * F * D) / (pi * d**3)",
+    "inputs": [
+      {"symbol": "K_B", "description": "Bergsträsser factor", "unit": "dimensionless"},
+      {"symbol": "F", "description": "Applied axial force", "unit": "lbf or N"},
+      {"symbol": "D", "description": "Mean coil diameter", "unit": "in or mm"},
+      {"symbol": "d", "description": "Wire diameter", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "tau", "description": "Maximum shear stress", "unit": "psi or Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Spring Deflection (Compression)",
+    "type": "formula",
+    "formula_string": "y = (8 * F * D**3 * N_a) / (d**4 * G)",
+    "inputs": [
+      {"symbol": "F", "description": "Applied axial force", "unit": "lbf or N"},
+      {"symbol": "D", "description": "Mean coil diameter", "unit": "in or mm"},
+      {"symbol": "N_a", "description": "Number of active coils/turns", "unit": "dimensionless"},
+      {"symbol": "d", "description": "Wire diameter", "unit": "in or mm"},
+      {"symbol": "G", "description": "Shear modulus / Modulus of rigidity", "unit": "psi or Pa"}
+    ],
+    "output": {"symbol": "y", "description": "Axial deflection", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Spring Rate / Stiffness (Compression)",
+    "type": "formula",
+    "formula_string": "k = (d**4 * G) / (8 * D**3 * N_a)",
+    "inputs": [
+      {"symbol": "d", "description": "Wire diameter", "unit": "in or mm"},
+      {"symbol": "G", "description": "Shear modulus / Modulus of rigidity", "unit": "psi or Pa"},
+      {"symbol": "D", "description": "Mean coil diameter", "unit": "in or mm"},
+      {"symbol": "N_a", "description": "Number of active coils/turns", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "k", "description": "Spring rate / stiffness", "unit": "lbf/in or N/mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Solid Shear Stress",
+    "type": "formula",
+    "formula_string": "tau_s = K_B * (8 * F_s * D) / (pi * d**3)",
+    "inputs": [
+      {"symbol": "K_B", "description": "Bergsträsser factor", "unit": "dimensionless"},
+      {"symbol": "F_s", "description": "Force at solid height", "unit": "lbf or N"},
+      {"symbol": "D", "description": "Mean coil diameter", "unit": "in or mm"},
+      {"symbol": "d", "description": "Wire diameter", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "tau_s", "description": "Shear stress at solid height", "unit": "psi or Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Factor of Safety at Solid Height",
+    "type": "formula",
+    "formula_string": "n_s = S_sy / tau_s",
+    "inputs": [
+      {"symbol": "S_sy", "description": "Torsional yield strength", "unit": "psi or Pa"},
+      {"symbol": "tau_s", "description": "Shear stress at solid height", "unit": "psi or Pa"}
+    ],
+    "output": {"symbol": "n_s", "description": "Static factor of safety at solid height", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Solid Height Yield Check",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "n_s", "description": "Static factor of safety at solid height", "unit": "dimensionless"}
+    ],
+    "output": null,
+    "rule_logic": "IF n_s >= 1.2 THEN spring will not permanently yield when fully compressed ELSE risk of yielding.",
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Critical Buckling Free Length",
+    "type": "formula",
+    "formula_string": "L_0_cr = 2.63 * (D / alpha)",
+    "inputs": [
+      {"symbol": "D", "description": "Mean coil diameter", "unit": "in or mm"},
+      {"symbol": "alpha", "description": "End condition constant (0.5 for squared and ground)", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "L_0_cr", "description": "Critical buckling free length", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Buckling Stability Check",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "L_0", "description": "Actual free length of spring", "unit": "in or mm"},
+      {"symbol": "L_0_cr", "description": "Critical buckling free length", "unit": "in or mm"}
+    ],
+    "output": null,
+    "rule_logic": "IF L_0 > L_0_cr THEN spring is likely to buckle and requires central rod/tube ELSE spring is elastically stable.",
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Bending Stress-Correction Factor (Torsion)",
+    "type": "formula",
+    "formula_string": "K_i = (4 * C**2 - C - 1) / (4 * C * (C - 1))",
+    "inputs": [
+      {"symbol": "C", "description": "Spring index", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "K_i", "description": "Bending stress-correction factor for inner fiber", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Maximum Bending Stress (Torsion)",
+    "type": "formula",
+    "formula_string": "sigma = K_i * (32 * M) / (pi * d**3)",
+    "inputs": [
+      {"symbol": "K_i", "description": "Bending stress-correction factor", "unit": "dimensionless"},
+      {"symbol": "M", "description": "Applied torsional moment/torque", "unit": "lbf-in or N-m"},
+      {"symbol": "d", "description": "Wire diameter", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "sigma", "description": "Maximum bending stress", "unit": "psi or Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Torsional Spring Rate",
+    "type": "formula",
+    "formula_string": "k_prime = (d**4 * E) / (10.8 * D * N_a)",
+    "inputs": [
+      {"symbol": "d", "description": "Wire diameter", "unit": "in or mm"},
+      {"symbol": "E", "description": "Modulus of elasticity", "unit": "psi or Pa"},
+      {"symbol": "D", "description": "Mean coil diameter", "unit": "in or mm"},
+      {"symbol": "N_a", "description": "Number of active coils/turns", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "k_prime", "description": "Torsional spring rate", "unit": "lbf-in/turn or N-m/turn"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Angular Deflection (Torsion)",
+    "type": "formula",
+    "formula_string": "theta_p = (10.8 * M * D * N_a) / (d**4 * E)",
+    "inputs": [
+      {"symbol": "M", "description": "Applied torsional moment/torque", "unit": "lbf-in or N-m"},
+      {"symbol": "D", "description": "Mean coil diameter", "unit": "in or mm"},
+      {"symbol": "N_a", "description": "Number of active coils/turns", "unit": "dimensionless"},
+      {"symbol": "d", "description": "Wire diameter", "unit": "in or mm"},
+      {"symbol": "E", "description": "Modulus of elasticity", "unit": "psi or Pa"}
+    ],
+    "output": {"symbol": "theta_p", "description": "Angular deflection", "unit": "number of turns"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "New Mean Diameter Under Load (Torsion)",
+    "type": "formula",
+    "formula_string": "D_prime = (N_b * D) / (N_b + theta_p_c)",
+    "inputs": [
+      {"symbol": "N_b", "description": "Number of body turns", "unit": "dimensionless"},
+      {"symbol": "D", "description": "Original mean coil diameter", "unit": "in or mm"},
+      {"symbol": "theta_p_c", "description": "Angular deflection in turns", "unit": "number of turns"}
+    ],
+    "output": {"symbol": "D_prime", "description": "New mean diameter", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Dynamic Arbor/Pin Diametral Clearance",
+    "type": "formula",
+    "formula_string": "Delta = D_prime - d - D_p",
+    "inputs": [
+      {"symbol": "D_prime", "description": "New mean diameter", "unit": "in or mm"},
+      {"symbol": "d", "description": "Wire diameter", "unit": "in or mm"},
+      {"symbol": "D_p", "description": "Arbor/Pin diameter", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "Delta", "description": "Diametral clearance", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Mechanical Springs",
+    "topic": "Dynamic Arbor/Pin Clearance Check",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "Delta", "description": "Diametral clearance", "unit": "in or mm"}
+    ],
+    "output": null,
+    "rule_logic": "IF Delta > 0 THEN spring will not bind on arbor/pin ELSE binding will occur.",
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Tensile-Stress Area (Unified National Standard / U.S. Customary)",
+    "type": "formula",
+    "formula_string": "A_t = (pi / 4) * (d - (0.9743 / N))**2",
+    "inputs": [
+      {"symbol": "d", "description": "Nominal diameter of the bolt", "unit": "in"},
+      {"symbol": "N", "description": "Threads per inch", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "A_t", "description": "Tensile-stress area of the threaded section", "unit": "in^2"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Tensile-Stress Area (ISO Metric)",
+    "type": "formula",
+    "formula_string": "A_t = (pi / 4) * (d - 0.938194 * p)**2",
+    "inputs": [
+      {"symbol": "d", "description": "Nominal diameter of the bolt", "unit": "mm"},
+      {"symbol": "p", "description": "Thread pitch", "unit": "mm"}
+    ],
+    "output": {"symbol": "A_t", "description": "Tensile-stress area of the threaded section", "unit": "mm^2"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Major-Diameter Area",
+    "type": "formula",
+    "formula_string": "A_d = (pi * d**2) / 4",
+    "inputs": [
+      {"symbol": "d", "description": "Nominal diameter of the bolt", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "A_d", "description": "Major-diameter area of the bolt", "unit": "in^2 or mm^2"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Bolt Stiffness",
+    "type": "formula",
+    "formula_string": "k_b = (A_d * A_t * E_b) / (A_d * l_t + A_t * l_d)",
+    "inputs": [
+      {"symbol": "A_d", "description": "Major-diameter area of the bolt", "unit": "in^2 or mm^2"},
+      {"symbol": "A_t", "description": "Tensile-stress area of the threaded section", "unit": "in^2 or mm^2"},
+      {"symbol": "E_b", "description": "Modulus of elasticity of the bolt", "unit": "psi or MPa"},
+      {"symbol": "l_t", "description": "Length of the threaded portion within the grip", "unit": "in or mm"},
+      {"symbol": "l_d", "description": "Length of the unthreaded portion within the grip", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "k_b", "description": "Stiffness of the bolt", "unit": "lbf/in or N/mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Washer Face Outer Diameter",
+    "type": "formula",
+    "formula_string": "d_w = 1.5 * d",
+    "inputs": [
+      {"symbol": "d", "description": "Nominal diameter of the bolt", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "d_w", "description": "Outer diameter of the washer face", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Member Stiffness (Frustum Method)",
+    "type": "formula",
+    "formula_string": "k_m = (pi * E_m * d * tan(alpha)) / log(((l * tan(alpha) + d_w - d) * (d_w + d)) / ((l * tan(alpha) + d_w + d) * (d_w - d)))",
+    "inputs": [
+      {"symbol": "E_m", "description": "Modulus of elasticity of the clamped members", "unit": "psi or MPa"},
+      {"symbol": "d", "description": "Nominal diameter of the bolt", "unit": "in or mm"},
+      {"symbol": "alpha", "description": "Frustum expansion half-angle (typically 30 deg)", "unit": "degrees"},
+      {"symbol": "l", "description": "Grip length (total thickness of clamped members)", "unit": "in or mm"},
+      {"symbol": "d_w", "description": "Outer diameter of the washer face", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "k_m", "description": "Stiffness of the clamped members", "unit": "lbf/in or N/mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Joint Stiffness Constant",
+    "type": "formula",
+    "formula_string": "C = k_b / (k_b + k_m)",
+    "inputs": [
+      {"symbol": "k_b", "description": "Stiffness of the bolt", "unit": "lbf/in or N/mm"},
+      {"symbol": "k_m", "description": "Stiffness of the clamped members", "unit": "lbf/in or N/mm"}
+    ],
+    "output": {"symbol": "C", "description": "Joint stiffness constant", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Proof Load",
+    "type": "formula",
+    "formula_string": "F_p = A_t * S_p",
+    "inputs": [
+      {"symbol": "A_t", "description": "Tensile-stress area", "unit": "in^2 or mm^2"},
+      {"symbol": "S_p", "description": "Proof strength of the bolt material", "unit": "psi or MPa"}
+    ],
+    "output": {"symbol": "F_p", "description": "Proof load", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Target Preload (Nonpermanent/Reusable Connections)",
+    "type": "formula",
+    "formula_string": "F_i = 0.75 * F_p",
+    "inputs": [
+      {"symbol": "F_p", "description": "Proof load", "unit": "lbf or N"}
+    ],
+    "output": {"symbol": "F_i", "description": "Initial preload force", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Target Preload (Permanent Connections)",
+    "type": "formula",
+    "formula_string": "F_i = 0.90 * F_p",
+    "inputs": [
+      {"symbol": "F_p", "description": "Proof load", "unit": "lbf or N"}
+    ],
+    "output": {"symbol": "F_i", "description": "Initial preload force", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Tightening Torque",
+    "type": "formula",
+    "formula_string": "T = K * F_i * d",
+    "inputs": [
+      {"symbol": "K", "description": "Torque coefficient / Nut factor", "unit": "dimensionless"},
+      {"symbol": "F_i", "description": "Initial preload force", "unit": "lbf or N"},
+      {"symbol": "d", "description": "Nominal diameter of the bolt", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "T", "description": "Tightening torque", "unit": "lbf-in or N-m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Force in Bolt (Under Static Load)",
+    "type": "formula",
+    "formula_string": "F_b = F_i + C * P",
+    "inputs": [
+      {"symbol": "F_i", "description": "Initial preload force", "unit": "lbf or N"},
+      {"symbol": "C", "description": "Joint stiffness constant", "unit": "dimensionless"},
+      {"symbol": "P", "description": "Total external tensile load applied", "unit": "lbf or N"}
+    ],
+    "output": {"symbol": "F_b", "description": "Force in the bolt", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Force in Members (Under Static Load)",
+    "type": "formula",
+    "formula_string": "F_m = F_i - (1 - C) * P",
+    "inputs": [
+      {"symbol": "F_i", "description": "Initial preload force", "unit": "lbf or N"},
+      {"symbol": "C", "description": "Joint stiffness constant", "unit": "dimensionless"},
+      {"symbol": "P", "description": "Total external tensile load applied", "unit": "lbf or N"}
+    ],
+    "output": {"symbol": "F_m", "description": "Force in the clamped members", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Bolt Stress",
+    "type": "formula",
+    "formula_string": "sigma_b = F_b / A_t",
+    "inputs": [
+      {"symbol": "F_b", "description": "Force in the bolt", "unit": "lbf or N"},
+      {"symbol": "A_t", "description": "Tensile-stress area", "unit": "in^2 or mm^2"}
+    ],
+    "output": {"symbol": "sigma_b", "description": "Stress in the bolt", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Yielding Factor of Safety",
+    "type": "formula",
+    "formula_string": "n_p = S_p / sigma_b",
+    "inputs": [
+      {"symbol": "S_p", "description": "Proof strength of the bolt material", "unit": "psi or MPa"},
+      {"symbol": "sigma_b", "description": "Stress in the bolt", "unit": "psi or MPa"}
+    ],
+    "output": {"symbol": "n_p", "description": "Yielding factor of safety", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Joint Separation Factor of Safety",
+    "type": "formula",
+    "formula_string": "n_0 = F_i / ((1 - C) * P)",
+    "inputs": [
+      {"symbol": "F_i", "description": "Initial preload force", "unit": "lbf or N"},
+      {"symbol": "C", "description": "Joint stiffness constant", "unit": "dimensionless"},
+      {"symbol": "P", "description": "Total external tensile load applied", "unit": "lbf or N"}
+    ],
+    "output": {"symbol": "n_0", "description": "Joint separation factor of safety", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Joint Separation Prevention Check",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "n_0", "description": "Joint separation factor of safety", "unit": "dimensionless"}
+    ],
+    "output": null,
+    "rule_logic": "IF n_0 >= 1.0 THEN joint remains closed and members do not separate ELSE joint separation occurs.",
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Alternating Stress (Fatigue)",
+    "type": "formula",
+    "formula_string": "sigma_a = (C * P_a) / A_t",
+    "inputs": [
+      {"symbol": "C", "description": "Joint stiffness constant", "unit": "dimensionless"},
+      {"symbol": "P_a", "description": "Alternating external tensile load", "unit": "lbf or N"},
+      {"symbol": "A_t", "description": "Tensile-stress area", "unit": "in^2 or mm^2"}
+    ],
+    "output": {"symbol": "sigma_a", "description": "Alternating stress in the bolt", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Initial Preload Stress",
+    "type": "formula",
+    "formula_string": "sigma_i = F_i / A_t",
+    "inputs": [
+      {"symbol": "F_i", "description": "Initial preload force", "unit": "lbf or N"},
+      {"symbol": "A_t", "description": "Tensile-stress area", "unit": "in^2 or mm^2"}
+    ],
+    "output": {"symbol": "sigma_i", "description": "Initial stress from preload", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Midrange Stress (Fatigue)",
+    "type": "formula",
+    "formula_string": "sigma_m = (C * P_m) / A_t + F_i / A_t",
+    "inputs": [
+      {"symbol": "C", "description": "Joint stiffness constant", "unit": "dimensionless"},
+      {"symbol": "P_m", "description": "Midrange (steady) external tensile load", "unit": "lbf or N"},
+      {"symbol": "A_t", "description": "Tensile-stress area", "unit": "in^2 or mm^2"},
+      {"symbol": "F_i", "description": "Initial preload force", "unit": "lbf or N"}
+    ],
+    "output": {"symbol": "sigma_m", "description": "Midrange stress in the bolt", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Screws, Fasteners, and Bolted Joints",
+    "topic": "Fatigue Factor of Safety (Modified Goodman)",
+    "type": "formula",
+    "formula_string": "n_f = S_e * (S_ut - sigma_i) / (sigma_a * (S_ut + S_e))",
+    "inputs": [
+      {"symbol": "S_e", "description": "Endurance limit of the bolt", "unit": "psi or MPa"},
+      {"symbol": "S_ut", "description": "Ultimate tensile strength of the bolt material", "unit": "psi or MPa"},
+      {"symbol": "sigma_i", "description": "Initial stress from preload", "unit": "psi or MPa"},
+      {"symbol": "sigma_a", "description": "Alternating stress in the bolt", "unit": "psi or MPa"}
+    ],
+    "output": {"symbol": "n_f", "description": "Fatigue factor of safety", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Weld Throat Thickness",
+    "type": "formula",
+    "formula_string": "t = 0.707 * h",
+    "inputs": [
+      {"symbol": "h", "description": "Weld leg size", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "t", "description": "Weld throat thickness", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Total Throat Area",
+    "type": "formula",
+    "formula_string": "A = 0.707 * h * L",
+    "inputs": [
+      {"symbol": "h", "description": "Weld leg size", "unit": "in or mm"},
+      {"symbol": "L", "description": "Total length of the weld group", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "A", "description": "Total throat area of the weld group", "unit": "in^2 or mm^2"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Second Moment of Area (Weld Throat)",
+    "type": "formula",
+    "formula_string": "I = 0.707 * h * I_u",
+    "inputs": [
+      {"symbol": "h", "description": "Weld leg size", "unit": "in or mm"},
+      {"symbol": "I_u", "description": "Unit second moment of area (treated as a line)", "unit": "in^3 or mm^3"}
+    ],
+    "output": {"symbol": "I", "description": "Second moment of area based on weld throat", "unit": "in^4 or mm^4"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Polar Second Moment of Area (Weld Throat)",
+    "type": "formula",
+    "formula_string": "J = 0.707 * h * J_u",
+    "inputs": [
+      {"symbol": "h", "description": "Weld leg size", "unit": "in or mm"},
+      {"symbol": "J_u", "description": "Unit polar second moment of area (treated as a line)", "unit": "in^3 or mm^3"}
+    ],
+    "output": {"symbol": "J", "description": "Polar second moment of area based on weld throat", "unit": "in^4 or mm^4"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Primary Shear Stress (Direct Shear)",
+    "type": "formula",
+    "formula_string": "tau_prime = V / A",
+    "inputs": [
+      {"symbol": "V", "description": "Applied direct shear force", "unit": "lbf or N"},
+      {"symbol": "A", "description": "Total throat area of the weld group", "unit": "in^2 or mm^2"}
+    ],
+    "output": {"symbol": "tau_prime", "description": "Primary shear stress", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Secondary Shear Stress (Torsion - General)",
+    "type": "formula",
+    "formula_string": "tau_double_prime = (T * r) / J",
+    "inputs": [
+      {"symbol": "T", "description": "Applied torsional moment", "unit": "lbf-in or N-m"},
+      {"symbol": "r", "description": "Radial distance from centroid to point of interest", "unit": "in or mm"},
+      {"symbol": "J", "description": "Polar second moment of area based on weld throat", "unit": "in^4 or mm^4"}
+    ],
+    "output": {"symbol": "tau_double_prime", "description": "Secondary shear stress due to torsion", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Secondary Shear Stress (Torsion - Horizontal Component)",
+    "type": "formula",
+    "formula_string": "tau_double_prime_x = (T * y) / J",
+    "inputs": [
+      {"symbol": "T", "description": "Applied torsional moment", "unit": "lbf-in or N-m"},
+      {"symbol": "y", "description": "Vertical distance from centroid", "unit": "in or mm"},
+      {"symbol": "J", "description": "Polar second moment of area based on weld throat", "unit": "in^4 or mm^4"}
+    ],
+    "output": {"symbol": "tau_double_prime_x", "description": "Horizontal component of secondary shear stress", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Secondary Shear Stress (Torsion - Vertical Component)",
+    "type": "formula",
+    "formula_string": "tau_double_prime_y = (T * x) / J",
+    "inputs": [
+      {"symbol": "T", "description": "Applied torsional moment", "unit": "lbf-in or N-m"},
+      {"symbol": "x", "description": "Horizontal distance from centroid", "unit": "in or mm"},
+      {"symbol": "J", "description": "Polar second moment of area based on weld throat", "unit": "in^4 or mm^4"}
+    ],
+    "output": {"symbol": "tau_double_prime_y", "description": "Vertical component of secondary shear stress", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Secondary Shear Stress (Bending)",
+    "type": "formula",
+    "formula_string": "tau_double_prime = (M * c) / I",
+    "inputs": [
+      {"symbol": "M", "description": "Applied bending moment", "unit": "lbf-in or N-m"},
+      {"symbol": "c", "description": "Distance from neutral axis to outer fiber in bending", "unit": "in or mm"},
+      {"symbol": "I", "description": "Second moment of area based on weld throat", "unit": "in^4 or mm^4"}
+    ],
+    "output": {"symbol": "tau_double_prime", "description": "Secondary shear stress due to bending", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Maximum Resultant Shear Stress",
+    "type": "formula",
+    "formula_string": "tau_max = ((tau_prime_x + tau_double_prime_x)**2 + (tau_prime_y + tau_double_prime_y)**2)**0.5",
+    "inputs": [
+      {"symbol": "tau_prime_x", "description": "Horizontal component of primary shear stress", "unit": "psi or MPa"},
+      {"symbol": "tau_double_prime_x", "description": "Horizontal component of secondary shear stress", "unit": "psi or MPa"},
+      {"symbol": "tau_prime_y", "description": "Vertical component of primary shear stress", "unit": "psi or MPa"},
+      {"symbol": "tau_double_prime_y", "description": "Vertical component of secondary shear stress", "unit": "psi or MPa"}
+    ],
+    "output": {"symbol": "tau_max", "description": "Maximum resultant shear stress", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Allowable Shear Stress (Weld Metal / Electrode)",
+    "type": "formula",
+    "formula_string": "tau_all = 0.30 * S_ut_e",
+    "inputs": [
+      {"symbol": "S_ut_e", "description": "Ultimate tensile strength of the welding electrode", "unit": "psi or MPa"}
+    ],
+    "output": {"symbol": "tau_all", "description": "Allowable shear stress for weld metal", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Allowable Shear Stress (Base Metal)",
+    "type": "formula",
+    "formula_string": "tau_all = 0.40 * S_y",
+    "inputs": [
+      {"symbol": "S_y", "description": "Yield strength of the base metal", "unit": "psi or MPa"}
+    ],
+    "output": {"symbol": "tau_all", "description": "Allowable shear stress for base metal", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Factor of Safety",
+    "type": "formula",
+    "formula_string": "n = tau_all / tau_max",
+    "inputs": [
+      {"symbol": "tau_all", "description": "Allowable shear stress (minimum of base or weld metal limits)", "unit": "psi or MPa"},
+      {"symbol": "tau_max", "description": "Maximum resultant shear stress", "unit": "psi or MPa"}
+    ],
+    "output": {"symbol": "n", "description": "Factor of safety", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Weld Safety Evaluation",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "n", "description": "Factor of safety", "unit": "dimensionless"}
+    ],
+    "output": null,
+    "rule_logic": "IF n >= 1.0 THEN weld group can safely carry the load ELSE weld group will fail in shear.",
+    "table_data": null
+  },
+  {
+    "domain": "Welding and Permanent Joints",
+    "topic": "Standard AWS Electrode Properties",
+    "type": "table",
+    "formula_string": null,
+    "inputs": null,
+    "output": null,
+    "rule_logic": null,
+    "table_data": {
+      "E60xx": {"Tensile Strength (S_ut)": "62 kpsi (427 MPa)", "Minimum Yield Strength (S_y)": "50 kpsi (345 MPa)", "Minimum Elongation": "17 - 22%"},
+      "E70xx": {"Tensile Strength (S_ut)": "70 kpsi (482 MPa)", "Minimum Yield Strength (S_y)": "57 kpsi (393 MPa)", "Minimum Elongation": "22%"},
+      "E80xx": {"Tensile Strength (S_ut)": "80 kpsi (551 MPa)", "Minimum Yield Strength (S_y)": "67 kpsi (462 MPa)", "Minimum Elongation": "19%"},
+      "E90xx": {"Tensile Strength (S_ut)": "90 kpsi (620 MPa)", "Minimum Yield Strength (S_y)": "77 kpsi (531 MPa)", "Minimum Elongation": "14 - 17%"}
+    }
+  },
+  {
+    "domain": "Clutches, Brakes, and Couplings",
+    "topic": "Uniform Wear Pressure Distribution",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "p", "description": "Instantaneous pressure at a specific radius", "unit": "psi or Pa"},
+      {"symbol": "r", "description": "Specific radius", "unit": "in or mm"},
+      {"symbol": "p_a", "description": "Maximum allowable contact pressure", "unit": "psi or Pa"},
+      {"symbol": "r_i", "description": "Inner radius of the friction disk", "unit": "in or mm"}
+    ],
+    "output": null,
+    "rule_logic": "IF uniform wear is assumed THEN p * r = p_a * r_i = Constant, meaning maximum pressure occurs at the inner radius.",
+    "table_data": null
+  },
+  {
+    "domain": "Clutches, Brakes, and Couplings",
+    "topic": "Required Actuating Force (Uniform Wear)",
+    "type": "formula",
+    "formula_string": "F = 2 * pi * p_a * r_i * (r_o - r_i)",
+    "inputs": [
+      {"symbol": "p_a", "description": "Maximum allowable contact pressure", "unit": "psi or Pa"},
+      {"symbol": "r_i", "description": "Inner radius of the friction disk", "unit": "in or mm"},
+      {"symbol": "r_o", "description": "Outer radius of the friction disk", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "F", "description": "Actuating/axial clamping force", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Clutches, Brakes, and Couplings",
+    "topic": "Maximum Torque Capacity (Uniform Wear - from Pressure)",
+    "type": "formula",
+    "formula_string": "T = pi * f * p_a * r_i * (r_o**2 - r_i**2) * N",
+    "inputs": [
+      {"symbol": "f", "description": "Coefficient of friction", "unit": "dimensionless"},
+      {"symbol": "p_a", "description": "Maximum allowable contact pressure", "unit": "psi or Pa"},
+      {"symbol": "r_i", "description": "Inner radius of the friction disk", "unit": "in or mm"},
+      {"symbol": "r_o", "description": "Outer radius of the friction disk", "unit": "in or mm"},
+      {"symbol": "N", "description": "Number of active friction interfaces", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "T", "description": "Torque capacity", "unit": "lbf-in or N-m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Clutches, Brakes, and Couplings",
+    "topic": "Maximum Torque Capacity (Uniform Wear - from Force)",
+    "type": "formula",
+    "formula_string": "T = (F * f / 2) * (r_o + r_i) * N",
+    "inputs": [
+      {"symbol": "F", "description": "Actuating/axial clamping force", "unit": "lbf or N"},
+      {"symbol": "f", "description": "Coefficient of friction", "unit": "dimensionless"},
+      {"symbol": "r_o", "description": "Outer radius of the friction disk", "unit": "in or mm"},
+      {"symbol": "r_i", "description": "Inner radius of the friction disk", "unit": "in or mm"},
+      {"symbol": "N", "description": "Number of active friction interfaces", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "T", "description": "Torque capacity", "unit": "lbf-in or N-m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Clutches, Brakes, and Couplings",
+    "topic": "Required Actuating Force (Uniform Pressure)",
+    "type": "formula",
+    "formula_string": "F = pi * p_a * (r_o**2 - r_i**2)",
+    "inputs": [
+      {"symbol": "p_a", "description": "Maximum allowable contact pressure", "unit": "psi or Pa"},
+      {"symbol": "r_o", "description": "Outer radius of the friction disk", "unit": "in or mm"},
+      {"symbol": "r_i", "description": "Inner radius of the friction disk", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "F", "description": "Actuating/axial clamping force", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Clutches, Brakes, and Couplings",
+    "topic": "Maximum Torque Capacity (Uniform Pressure - from Pressure)",
+    "type": "formula",
+    "formula_string": "T = (2 / 3) * pi * f * p_a * (r_o**3 - r_i**3) * N",
+    "inputs": [
+      {"symbol": "f", "description": "Coefficient of friction", "unit": "dimensionless"},
+      {"symbol": "p_a", "description": "Maximum allowable contact pressure", "unit": "psi or Pa"},
+      {"symbol": "r_o", "description": "Outer radius of the friction disk", "unit": "in or mm"},
+      {"symbol": "r_i", "description": "Inner radius of the friction disk", "unit": "in or mm"},
+      {"symbol": "N", "description": "Number of active friction interfaces", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "T", "description": "Torque capacity", "unit": "lbf-in or N-m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Clutches, Brakes, and Couplings",
+    "topic": "Maximum Torque Capacity (Uniform Pressure - from Force)",
+    "type": "formula",
+    "formula_string": "T = ((2 * F * f) / 3) * ((r_o**3 - r_i**3) / (r_o**2 - r_i**2)) * N",
+    "inputs": [
+      {"symbol": "F", "description": "Actuating/axial clamping force", "unit": "lbf or N"},
+      {"symbol": "f", "description": "Coefficient of friction", "unit": "dimensionless"},
+      {"symbol": "r_o", "description": "Outer radius of the friction disk", "unit": "in or mm"},
+      {"symbol": "r_i", "description": "Inner radius of the friction disk", "unit": "in or mm"},
+      {"symbol": "N", "description": "Number of active friction interfaces", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "T", "description": "Torque capacity", "unit": "lbf-in or N-m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Clutches, Brakes, and Couplings",
+    "topic": "Optimal Disk Clutch Design",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "r_o", "description": "Outer radius of the friction disk", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "r_i", "description": "Inner radius of the friction disk", "unit": "in or mm"},
+    "rule_logic": "IF designing for maximum torque capacity under a given outer diameter r_o THEN set r_i = sqrt(1/3) * r_o (approx 0.577 * r_o).",
+    "table_data": null
+  },
+  {
+    "domain": "Clutches, Brakes, and Couplings",
+    "topic": "Tension Ratio (Band Brake)",
+    "type": "formula",
+    "formula_string": "Ratio = exp(f * theta)",
+    "inputs": [
+      {"symbol": "f", "description": "Coefficient of friction", "unit": "dimensionless"},
+      {"symbol": "theta", "description": "Angle of wrap", "unit": "radians"}
+    ],
+    "output": {"symbol": "Ratio", "description": "Ratio of tight side tension to slack side tension (P_1 / P_2)", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Clutches, Brakes, and Couplings",
+    "topic": "Braking Torque (Band Brake)",
+    "type": "formula",
+    "formula_string": "T = (P_1 - P_2) * r",
+    "inputs": [
+      {"symbol": "P_1", "description": "Tension in the tight side of the band", "unit": "lbf or N"},
+      {"symbol": "P_2", "description": "Tension in the slack side of the band", "unit": "lbf or N"},
+      {"symbol": "r", "description": "Radius of the brake drum", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "T", "description": "Braking torque", "unit": "lbf-in or N-m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Clutches, Brakes, and Couplings",
+    "topic": "Maximum Contact Pressure (Band Brake)",
+    "type": "formula",
+    "formula_string": "p_a = P_1 / (b * r)",
+    "inputs": [
+      {"symbol": "P_1", "description": "Tension in the tight side of the band", "unit": "lbf or N"},
+      {"symbol": "b", "description": "Width of the brake band", "unit": "in or mm"},
+      {"symbol": "r", "description": "Radius of the brake drum", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "p_a", "description": "Maximum contact pressure", "unit": "psi or Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Clutches, Brakes, and Couplings",
+    "topic": "Required Actuating Force (Band Brake - Static Equilibrium)",
+    "type": "formula",
+    "formula_string": "F_a = (P_2 * a) / c",
+    "inputs": [
+      {"symbol": "P_2", "description": "Tension in the slack side of the band", "unit": "lbf or N"},
+      {"symbol": "a", "description": "Distance from pivot to slack side attachment", "unit": "in or mm"},
+      {"symbol": "c", "description": "Distance from pivot to actuating force application", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "F_a", "description": "Actuating force at the control lever", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Angle of Wrap (Small Pulley - Open Belt)",
+    "type": "formula",
+    "formula_string": "theta_d = pi - 2 * asin((D - d) / (2 * C))",
+    "inputs": [
+      {"symbol": "D", "description": "Diameter of the large pulley", "unit": "in or mm"},
+      {"symbol": "d", "description": "Diameter of the small pulley", "unit": "in or mm"},
+      {"symbol": "C", "description": "Center distance between shafts", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "theta_d", "description": "Angle of wrap on the small pulley", "unit": "radians"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Angle of Wrap (Large Pulley - Open Belt)",
+    "type": "formula",
+    "formula_string": "theta_D = pi + 2 * asin((D - d) / (2 * C))",
+    "inputs": [
+      {"symbol": "D", "description": "Diameter of the large pulley", "unit": "in or mm"},
+      {"symbol": "d", "description": "Diameter of the small pulley", "unit": "in or mm"},
+      {"symbol": "C", "description": "Center distance between shafts", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "theta_D", "description": "Angle of wrap on the large pulley", "unit": "radians"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Belt Length (Open Belt)",
+    "type": "formula",
+    "formula_string": "L = (4 * C**2 - (D - d)**2)**0.5 + 0.5 * (D * theta_D + d * theta_d)",
+    "inputs": [
+      {"symbol": "C", "description": "Center distance between shafts", "unit": "in or mm"},
+      {"symbol": "D", "description": "Diameter of the large pulley", "unit": "in or mm"},
+      {"symbol": "d", "description": "Diameter of the small pulley", "unit": "in or mm"},
+      {"symbol": "theta_D", "description": "Angle of wrap on the large pulley", "unit": "radians"},
+      {"symbol": "theta_d", "description": "Angle of wrap on the small pulley", "unit": "radians"}
+    ],
+    "output": {"symbol": "L", "description": "Total length of the belt", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Belt Linear Velocity (U.S. Customary)",
+    "type": "formula",
+    "formula_string": "V = pi * d * n / 12",
+    "inputs": [
+      {"symbol": "d", "description": "Diameter of the small pulley", "unit": "in"},
+      {"symbol": "n", "description": "Rotational speed of the driving pulley", "unit": "rev/min"}
+    ],
+    "output": {"symbol": "V", "description": "Belt linear velocity", "unit": "ft/min"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Centrifugal Tension (U.S. Customary)",
+    "type": "formula",
+    "formula_string": "F_c = (w / g) * (V / 60)**2",
+    "inputs": [
+      {"symbol": "w", "description": "Specific weight of the belt", "unit": "lbf/ft"},
+      {"symbol": "g", "description": "Acceleration due to gravity", "unit": "ft/s^2 (typically 32.17)"},
+      {"symbol": "V", "description": "Belt linear velocity", "unit": "ft/min"}
+    ],
+    "output": {"symbol": "F_c", "description": "Centrifugal tension", "unit": "lbf"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Belt Linear Velocity (SI Units)",
+    "type": "formula",
+    "formula_string": "V = pi * d * n / 60",
+    "inputs": [
+      {"symbol": "d", "description": "Diameter of the small pulley", "unit": "m"},
+      {"symbol": "n", "description": "Rotational speed of the driving pulley", "unit": "rev/min"}
+    ],
+    "output": {"symbol": "V", "description": "Belt linear velocity", "unit": "m/s"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Centrifugal Tension (SI Units)",
+    "type": "formula",
+    "formula_string": "F_c = w * V**2",
+    "inputs": [
+      {"symbol": "w", "description": "Mass per unit length of the belt", "unit": "kg/m"},
+      {"symbol": "V", "description": "Belt linear velocity", "unit": "m/s"}
+    ],
+    "output": {"symbol": "F_c", "description": "Centrifugal tension", "unit": "N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Limiting Tension Ratio (Flat Belts)",
+    "type": "formula",
+    "formula_string": "Ratio = exp(f * theta_d)",
+    "inputs": [
+      {"symbol": "F_1", "description": "Tension in the tight side of the belt", "unit": "lbf or N"},
+      {"symbol": "F_2", "description": "Tension in the slack side of the belt", "unit": "lbf or N"},
+      {"symbol": "F_c", "description": "Centrifugal tension", "unit": "lbf or N"},
+      {"symbol": "f", "description": "Coefficient of friction between belt and pulley", "unit": "dimensionless"},
+      {"symbol": "theta_d", "description": "Angle of wrap on the small pulley", "unit": "radians"}
+    ],
+    "output": {"symbol": "Ratio", "description": "Maximum ratio of tight-side to slack-side effective tension", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Effective Friction Coefficient (V-Belts)",
+    "type": "formula",
+    "formula_string": "f_prime = f / sin(beta)",
+    "inputs": [
+      {"symbol": "f", "description": "Coefficient of friction between belt and pulley", "unit": "dimensionless"},
+      {"symbol": "beta", "description": "Half the included groove angle of the V-belt", "unit": "degrees"}
+    ],
+    "output": {"symbol": "f_prime", "description": "Effective friction coefficient", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Limiting Tension Ratio (V-Belts)",
+    "type": "formula",
+    "formula_string": "Ratio = exp(f_prime * theta_d)",
+    "inputs": [
+      {"symbol": "F_1", "description": "Tension in the tight side of the belt", "unit": "lbf or N"},
+      {"symbol": "F_2", "description": "Tension in the slack side of the belt", "unit": "lbf or N"},
+      {"symbol": "F_c", "description": "Centrifugal tension", "unit": "lbf or N"},
+      {"symbol": "f_prime", "description": "Effective friction coefficient", "unit": "dimensionless"},
+      {"symbol": "theta_d", "description": "Angle of wrap on the small pulley", "unit": "radians"}
+    ],
+    "output": {"symbol": "Ratio", "description": "Maximum ratio of tight-side to slack-side effective tension", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Transmitted Torque",
+    "type": "formula",
+    "formula_string": "T = (F_1 - F_2) * (d / 2)",
+    "inputs": [
+      {"symbol": "F_1", "description": "Tension in the tight side of the belt", "unit": "lbf or N"},
+      {"symbol": "F_2", "description": "Tension in the slack side of the belt", "unit": "lbf or N"},
+      {"symbol": "d", "description": "Diameter of the small pulley", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "T", "description": "Transmitted torque", "unit": "lbf-in or N-m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Transmitted Power (U.S. Customary)",
+    "type": "formula",
+    "formula_string": "H = ((F_1 - F_2) * V) / 33000",
+    "inputs": [
+      {"symbol": "F_1", "description": "Tension in the tight side of the belt", "unit": "lbf"},
+      {"symbol": "F_2", "description": "Tension in the slack side of the belt", "unit": "lbf"},
+      {"symbol": "V", "description": "Belt linear velocity", "unit": "ft/min"}
+    ],
+    "output": {"symbol": "H", "description": "Power transmitted", "unit": "hp"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Transmitted Power (SI Units)",
+    "type": "formula",
+    "formula_string": "H = ((F_1 - F_2) * V) / 1000",
+    "inputs": [
+      {"symbol": "F_1", "description": "Tension in the tight side of the belt", "unit": "N"},
+      {"symbol": "F_2", "description": "Tension in the slack side of the belt", "unit": "N"},
+      {"symbol": "V", "description": "Belt linear velocity", "unit": "m/s"}
+    ],
+    "output": {"symbol": "H", "description": "Power transmitted", "unit": "kW"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Flexible Mechanical Elements (Belt Drives)",
+    "topic": "Initial Tension",
+    "type": "formula",
+    "formula_string": "F_i = (F_1 + F_2) / 2",
+    "inputs": [
+      {"symbol": "F_1", "description": "Tension in the tight side of the belt", "unit": "lbf or N"},
+      {"symbol": "F_2", "description": "Tension in the slack side of the belt", "unit": "lbf or N"}
+    ],
+    "output": {"symbol": "F_i", "description": "Initial tension required at rest", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Lubrication and Hydrodynamic Journal Bearings",
+    "topic": "Projected Bearing Area",
+    "type": "formula",
+    "formula_string": "A = 2 * r * L",
+    "inputs": [
+      {"symbol": "r", "description": "Radius of the journal", "unit": "in or mm"},
+      {"symbol": "L", "description": "Axial length of the bearing", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "A", "description": "Projected bearing area", "unit": "in^2 or mm^2"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Lubrication and Hydrodynamic Journal Bearings",
+    "topic": "Nominal Projected Bearing Pressure",
+    "type": "formula",
+    "formula_string": "P = W / (2 * r * L)",
+    "inputs": [
+      {"symbol": "W", "description": "Applied steady radial load", "unit": "lbf or N"},
+      {"symbol": "r", "description": "Radius of the journal", "unit": "in or mm"},
+      {"symbol": "L", "description": "Axial length of the bearing", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "P", "description": "Nominal projected bearing pressure", "unit": "psi or Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Lubrication and Hydrodynamic Journal Bearings",
+    "topic": "Sommerfeld Number (Bearing Characteristic Number)",
+    "type": "formula",
+    "formula_string": "S = (r / c)**2 * (mu * N / P)",
+    "inputs": [
+      {"symbol": "r", "description": "Radius of the journal", "unit": "in or mm"},
+      {"symbol": "c", "description": "Radial clearance between journal and bearing", "unit": "in or mm"},
+      {"symbol": "mu", "description": "Absolute (dynamic) viscosity of the lubricant", "unit": "reyn or Pa-s"},
+      {"symbol": "N", "description": "Rotational speed of the journal", "unit": "rev/s"},
+      {"symbol": "P", "description": "Nominal projected bearing pressure", "unit": "psi or Pa"}
+    ],
+    "output": {"symbol": "S", "description": "Sommerfeld Number", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Lubrication and Hydrodynamic Journal Bearings",
+    "topic": "Eccentricity Ratio",
+    "type": "formula",
+    "formula_string": "epsilon = e / c",
+    "inputs": [
+      {"symbol": "e", "description": "Eccentricity of the journal center", "unit": "in or mm"},
+      {"symbol": "c", "description": "Radial clearance between journal and bearing", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "epsilon", "description": "Eccentricity ratio", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Lubrication and Hydrodynamic Journal Bearings",
+    "topic": "Minimum Film Thickness",
+    "type": "formula",
+    "formula_string": "h_0 = c * (1 - epsilon)",
+    "inputs": [
+      {"symbol": "c", "description": "Radial clearance between journal and bearing", "unit": "in or mm"},
+      {"symbol": "epsilon", "description": "Eccentricity ratio", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "h_0", "description": "Minimum lubricant film thickness", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Lubrication and Hydrodynamic Journal Bearings",
+    "topic": "Petroff's Equation (Coefficient of Friction for Lightly Loaded Bearings)",
+    "type": "formula",
+    "formula_string": "f = 2 * pi**2 * (mu * N / P) * (r / c)",
+    "inputs": [
+      {"symbol": "mu", "description": "Absolute (dynamic) viscosity of the lubricant", "unit": "reyn or Pa-s"},
+      {"symbol": "N", "description": "Rotational speed of the journal", "unit": "rev/s"},
+      {"symbol": "P", "description": "Nominal projected bearing pressure", "unit": "psi or Pa"},
+      {"symbol": "r", "description": "Radius of the journal", "unit": "in or mm"},
+      {"symbol": "c", "description": "Radial clearance between journal and bearing", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "f", "description": "Coefficient of friction", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Lubrication and Hydrodynamic Journal Bearings",
+    "topic": "Friction Torque",
+    "type": "formula",
+    "formula_string": "T = f * W * r",
+    "inputs": [
+      {"symbol": "f", "description": "Coefficient of friction", "unit": "dimensionless"},
+      {"symbol": "W", "description": "Applied steady radial load", "unit": "lbf or N"},
+      {"symbol": "r", "description": "Radius of the journal", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "T", "description": "Frictional torque", "unit": "lbf-in or N-m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Lubrication and Hydrodynamic Journal Bearings",
+    "topic": "Power Loss (General)",
+    "type": "formula",
+    "formula_string": "Power = 2 * pi * T * N",
+    "inputs": [
+      {"symbol": "T", "description": "Frictional torque", "unit": "N-m or lbf-ft"},
+      {"symbol": "N", "description": "Rotational speed of the journal", "unit": "rev/s"}
+    ],
+    "output": {"symbol": "Power", "description": "Power lost to friction", "unit": "Watts or ft-lbf/s"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Lubrication and Hydrodynamic Journal Bearings",
+    "topic": "Power Loss (U.S. Customary - Horsepower)",
+    "type": "formula",
+    "formula_string": "H_loss = (2 * pi * T * N) / 550",
+    "inputs": [
+      {"symbol": "T", "description": "Frictional torque", "unit": "lbf-ft"},
+      {"symbol": "N", "description": "Rotational speed of the journal", "unit": "rev/s"}
+    ],
+    "output": {"symbol": "H_loss", "description": "Power lost to friction", "unit": "hp"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Lubrication and Hydrodynamic Journal Bearings",
+    "topic": "Temperature Rise (Heat Dissipation)",
+    "type": "formula",
+    "formula_string": "Delta_T = H_loss / (rho * C_p * Q)",
+    "inputs": [
+      {"symbol": "H_loss", "description": "Power lost to friction (Heat generated)", "unit": "BTU/s or Watts"},
+      {"symbol": "rho", "description": "Fluid density", "unit": "lbf/in^3 or kg/m^3"},
+      {"symbol": "C_p", "description": "Specific heat capacity of lubricant", "unit": "BTU/(lbf-deg F) or J/(kg-K)"},
+      {"symbol": "Q", "description": "Volumetric flow rate of lubricant", "unit": "in^3/s or m^3/s"}
+    ],
+    "output": {"symbol": "Delta_T", "description": "Temperature rise of the lubricant", "unit": "deg F or deg C"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Pitch Diameter of Pinion (U.S. Customary)",
+    "type": "formula",
+    "formula_string": "d_P = N_P / P_d",
+    "inputs": [
+      {"symbol": "N_P", "description": "Number of teeth on the pinion", "unit": "dimensionless"},
+      {"symbol": "P_d", "description": "Diametral pitch", "unit": "teeth/in"}
+    ],
+    "output": {"symbol": "d_P", "description": "Pitch diameter of the pinion", "unit": "in"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Pitch Diameter of Gear (U.S. Customary)",
+    "type": "formula",
+    "formula_string": "d_G = N_G / P_d",
+    "inputs": [
+      {"symbol": "N_G", "description": "Number of teeth on the gear", "unit": "dimensionless"},
+      {"symbol": "P_d", "description": "Diametral pitch", "unit": "teeth/in"}
+    ],
+    "output": {"symbol": "d_G", "description": "Pitch diameter of the gear", "unit": "in"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Circular Pitch (U.S. Customary)",
+    "type": "formula",
+    "formula_string": "p = pi / P_d",
+    "inputs": [
+      {"symbol": "P_d", "description": "Diametral pitch", "unit": "teeth/in"}
+    ],
+    "output": {"symbol": "p", "description": "Circular pitch", "unit": "in"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Pitch Diameter of Pinion (SI Units)",
+    "type": "formula",
+    "formula_string": "d_P = m * N_P",
+    "inputs": [
+      {"symbol": "m", "description": "Module", "unit": "mm/tooth"},
+      {"symbol": "N_P", "description": "Number of teeth on the pinion", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "d_P", "description": "Pitch diameter of the pinion", "unit": "mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Pitch Diameter of Gear (SI Units)",
+    "type": "formula",
+    "formula_string": "d_G = m * N_G",
+    "inputs": [
+      {"symbol": "m", "description": "Module", "unit": "mm/tooth"},
+      {"symbol": "N_G", "description": "Number of teeth on the gear", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "d_G", "description": "Pitch diameter of the gear", "unit": "mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Circular Pitch (SI Units)",
+    "type": "formula",
+    "formula_string": "p = pi * m",
+    "inputs": [
+      {"symbol": "m", "description": "Module", "unit": "mm/tooth"}
+    ],
+    "output": {"symbol": "p", "description": "Circular pitch", "unit": "mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Addendum (Standard Full-Depth)",
+    "type": "formula",
+    "formula_string": "a = 1 / P_d",
+    "inputs": [
+      {"symbol": "P_d", "description": "Diametral pitch (substitute m for SI units)", "unit": "teeth/in"}
+    ],
+    "output": {"symbol": "a", "description": "Addendum", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Dedendum (Standard Full-Depth)",
+    "type": "formula",
+    "formula_string": "b = 1.25 / P_d",
+    "inputs": [
+      {"symbol": "P_d", "description": "Diametral pitch (substitute m for SI units)", "unit": "teeth/in"}
+    ],
+    "output": {"symbol": "b", "description": "Dedendum", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Clearance (Standard Full-Depth)",
+    "type": "formula",
+    "formula_string": "c = b - a",
+    "inputs": [
+      {"symbol": "b", "description": "Dedendum", "unit": "in or mm"},
+      {"symbol": "a", "description": "Addendum", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "c", "description": "Clearance", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Circular Tooth Thickness (Theoretical)",
+    "type": "formula",
+    "formula_string": "t = p / 2",
+    "inputs": [
+      {"symbol": "p", "description": "Circular pitch", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "t", "description": "Circular tooth thickness", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Center Distance",
+    "type": "formula",
+    "formula_string": "C = (d_P + d_G) / 2",
+    "inputs": [
+      {"symbol": "d_P", "description": "Pitch diameter of the pinion", "unit": "in or mm"},
+      {"symbol": "d_G", "description": "Pitch diameter of the gear", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "C", "description": "Center distance between shafts", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Gear Ratio (Velocity Ratio)",
+    "type": "formula",
+    "formula_string": "m_R = N_G / N_P",
+    "inputs": [
+      {"symbol": "N_G", "description": "Number of teeth on the gear", "unit": "dimensionless"},
+      {"symbol": "N_P", "description": "Number of teeth on the pinion", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "m_R", "description": "Gear ratio / Velocity ratio", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Base Circle Radius",
+    "type": "formula",
+    "formula_string": "r_b = (d / 2) * cos(phi)",
+    "inputs": [
+      {"symbol": "d", "description": "Pitch diameter (pinion or gear)", "unit": "in or mm"},
+      {"symbol": "phi", "description": "Pressure angle", "unit": "degrees"}
+    ],
+    "output": {"symbol": "r_b", "description": "Base circle radius", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Base Pitch",
+    "type": "formula",
+    "formula_string": "p_b = p * cos(phi)",
+    "inputs": [
+      {"symbol": "p", "description": "Circular pitch", "unit": "in or mm"},
+      {"symbol": "phi", "description": "Pressure angle", "unit": "degrees"}
+    ],
+    "output": {"symbol": "p_b", "description": "Base pitch", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Length of Line of Action",
+    "type": "formula",
+    "formula_string": "L_ab = (r_aP**2 - r_bP**2)**0.5 + (r_aG**2 - r_bG**2)**0.5 - C * sin(phi)",
+    "inputs": [
+      {"symbol": "r_aP", "description": "Addendum circle radius of pinion", "unit": "in or mm"},
+      {"symbol": "r_bP", "description": "Base circle radius of pinion", "unit": "in or mm"},
+      {"symbol": "r_aG", "description": "Addendum circle radius of gear", "unit": "in or mm"},
+      {"symbol": "r_bG", "description": "Base circle radius of gear", "unit": "in or mm"},
+      {"symbol": "C", "description": "Center distance between shafts", "unit": "in or mm"},
+      {"symbol": "phi", "description": "Pressure angle", "unit": "degrees"}
+    ],
+    "output": {"symbol": "L_ab", "description": "Length of the line of action", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Contact Ratio",
+    "type": "formula",
+    "formula_string": "m_c = L_ab / p_b",
+    "inputs": [
+      {"symbol": "L_ab", "description": "Length of the line of action", "unit": "in or mm"},
+      {"symbol": "p_b", "description": "Base pitch", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "m_c", "description": "Contact ratio", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Minimum Teeth on Pinion (Meshing with Rack)",
+    "type": "formula",
+    "formula_string": "N_P_min = (2 * k) / (sin(phi)**2)",
+    "inputs": [
+      {"symbol": "k", "description": "Addendum constant (1.0 for standard full-depth)", "unit": "dimensionless"},
+      {"symbol": "phi", "description": "Pressure angle", "unit": "degrees"}
+    ],
+    "output": {"symbol": "N_P_min", "description": "Minimum number of teeth to prevent interference with a rack", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Gear Kinematics and Spur Gear Geometry",
+    "topic": "Minimum Teeth on Pinion (Meshing with Gear)",
+    "type": "formula",
+    "formula_string": "N_P_min = (2 * k) / ((1 + 2 * m_R) * sin(phi)**2 * (m_R + (m_R**2 + (1 + 2 * m_R) * sin(phi)**2)**0.5))",
+    "inputs": [
+      {"symbol": "k", "description": "Addendum constant (1.0 for standard full-depth)", "unit": "dimensionless"},
+      {"symbol": "m_R", "description": "Gear ratio / Velocity ratio", "unit": "dimensionless"},
+      {"symbol": "phi", "description": "Pressure angle", "unit": "degrees"}
+    ],
+    "output": {"symbol": "N_P_min", "description": "Minimum number of teeth to prevent interference with a finite gear", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Fatigue Failure and Endurance Limit",
+    "topic": "Uncorrected Endurance Limit (Steels)",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "S_ut", "description": "Ultimate tensile strength of the material", "unit": "kpsi or MPa"}
+    ],
+    "output": {"symbol": "S_e_prime", "description": "Uncorrected rotary-beam test endurance limit", "unit": "kpsi or MPa"},
+    "rule_logic": "IF S_ut <= 200 kpsi (1400 MPa) THEN S_e_prime = 0.5 * S_ut ELSE IF S_ut > 200 kpsi (1400 MPa) THEN S_e_prime = 100 kpsi (700 MPa).",
+    "table_data": null
+  },
+  {
+    "domain": "Fatigue Failure and Endurance Limit",
+    "topic": "Surface Condition Factor",
+    "type": "formula",
+    "formula_string": "k_a = a * S_ut**b",
+    "inputs": [
+      {"symbol": "S_ut", "description": "Ultimate tensile strength of the material", "unit": "kpsi or MPa"},
+      {"symbol": "a", "description": "Surface finish constant (multiplier)", "unit": "dimensionless"},
+      {"symbol": "b", "description": "Surface finish constant (exponent)", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "k_a", "description": "Surface condition modification factor", "unit": "dimensionless"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Fatigue Failure and Endurance Limit",
+    "topic": "Surface Finish Constants",
+    "type": "table",
+    "formula_string": null,
+    "inputs": null,
+    "output": null,
+    "rule_logic": null,
+    "table_data": {
+      "Ground": {"a (kpsi)": 1.34, "a (MPa)": 1.58, "b": -0.085},
+      "Machined or Cold-Drawn": {"a (kpsi)": 2.70, "a (MPa)": 4.51, "b": -0.265},
+      "Hot-Rolled": {"a (kpsi)": 14.4, "a (MPa)": 57.7, "b": -0.718},
+      "As-Forged": {"a (kpsi)": 39.9, "a (MPa)": 272, "b": -0.995}
+    }
+  },
+  {
+    "domain": "Fatigue Failure and Endurance Limit",
+    "topic": "Size Factor (U.S. Customary)",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "d", "description": "Diameter of the rotating round part", "unit": "in"}
+    ],
+    "output": {"symbol": "k_b", "description": "Size modification factor", "unit": "dimensionless"},
+    "rule_logic": "IF 0.11 <= d <= 2 in THEN k_b = 0.879 * d**(-0.107) ELSE IF 2 < d <= 10 in THEN k_b = 0.91 * d**(-0.157).",
+    "table_data": null
+  },
+  {
+    "domain": "Fatigue Failure and Endurance Limit",
+    "topic": "Size Factor (SI Units)",
+    "type": "rule",
+    "formula_string": null,
+    "inputs": [
+      {"symbol": "d", "description": "Diameter of the rotating round part", "unit": "mm"}
+    ],
+    "output": {"symbol": "k_b", "description": "Size modification factor", "unit": "dimensionless"},
+    "rule_logic": "IF 2.79 <= d <= 51 mm THEN k_b = 1.24 * d**(-0.107) ELSE IF 51 < d <= 254 mm THEN k_b = 1.51 * d**(-0.157).",
+    "table_data": null
+  },
+  {
+    "domain": "Fatigue Failure and Endurance Limit",
+    "topic": "Effective Diameter (Non-rotating or Non-circular)",
+    "type": "formula",
+    "formula_string": "d_e = 0.370 * D",
+    "inputs": [
+      {"symbol": "D", "description": "Nominal diameter or equivalent dimension", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "d_e", "description": "Effective diameter for size factor calculation", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Fatigue Failure and Endurance Limit",
+    "topic": "Load Factor",
+    "type": "table",
+    "formula_string": null,
+    "inputs": null,
+    "output": null,
+    "rule_logic": null,
+    "table_data": {
+      "Bending": 1.0,
+      "Axial": 0.85,
+      "Torsion": 0.59
+    }
+  },
+  {
+    "domain": "Fatigue Failure and Endurance Limit",
+    "topic": "Reliability Factor",
+    "type": "table",
+    "formula_string": null,
+    "inputs": null,
+    "output": null,
+    "rule_logic": null,
+    "table_data": {
+      "90% Reliability": 0.897,
+      "95% Reliability": 0.868,
+      "99% Reliability": 0.814,
+      "99.9% Reliability": 0.753
+    }
+  },
+  {
+    "domain": "Fatigue Failure and Endurance Limit",
+    "topic": "Fully Corrected Endurance Limit",
+    "type": "formula",
+    "formula_string": "S_e = k_a * k_b * k_c * k_d * k_e * k_f * S_e_prime",
+    "inputs": [
+      {"symbol": "k_a", "description": "Surface condition modification factor", "unit": "dimensionless"},
+      {"symbol": "k_b", "description": "Size modification factor", "unit": "dimensionless"},
+      {"symbol": "k_c", "description": "Load modification factor", "unit": "dimensionless"},
+      {"symbol": "k_d", "description": "Temperature modification factor", "unit": "dimensionless"},
+      {"symbol": "k_e", "description": "Reliability factor", "unit": "dimensionless"},
+      {"symbol": "k_f", "description": "Miscellaneous-effects factor", "unit": "dimensionless"},
+      {"symbol": "S_e_prime", "description": "Uncorrected rotary-beam test endurance limit", "unit": "psi or MPa"}
+    ],
+    "output": {"symbol": "S_e", "description": "Fully corrected endurance limit", "unit": "psi or MPa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Press Fits and Contact Stresses",
+    "topic": "Radial Interference Deflection (General Materials)",
+    "type": "formula",
+    "formula_string": "delta = (p * R / E_o) * ((r_o**2 + R**2) / (r_o**2 - R**2) + v_o) + (p * R / E_i) * ((R**2 + r_i**2) / (R**2 - r_i**2) - v_i)",
+    "inputs": [
+      {"symbol": "p", "description": "Interface contact pressure", "unit": "psi or Pa"},
+      {"symbol": "R", "description": "Nominal interface radius (d/2)", "unit": "in or mm"},
+      {"symbol": "E_o", "description": "Modulus of elasticity for outer member", "unit": "psi or Pa"},
+      {"symbol": "r_o", "description": "Outer radius of the outside member", "unit": "in or mm"},
+      {"symbol": "v_o", "description": "Poisson's ratio for outer member", "unit": "dimensionless"},
+      {"symbol": "E_i", "description": "Modulus of elasticity for inner member", "unit": "psi or Pa"},
+      {"symbol": "r_i", "description": "Inner radius of the inside member (0 if solid)", "unit": "in or mm"},
+      {"symbol": "v_i", "description": "Poisson's ratio for inner member", "unit": "dimensionless"}
+    ],
+    "output": {"symbol": "delta", "description": "Total radial interference (radial overlap)", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Press Fits and Contact Stresses",
+    "topic": "Interface Pressure (Identical Materials)",
+    "type": "formula",
+    "formula_string": "p = (E * delta / R) * (((r_o**2 - R**2) * (R**2 - r_i**2)) / (2 * R**2 * (r_o**2 - r_i**2)))",
+    "inputs": [
+      {"symbol": "E", "description": "Modulus of elasticity (E_i = E_o)", "unit": "psi or Pa"},
+      {"symbol": "delta", "description": "Total radial interference", "unit": "in or mm"},
+      {"symbol": "R", "description": "Nominal interface radius", "unit": "in or mm"},
+      {"symbol": "r_o", "description": "Outer radius of the outside member", "unit": "in or mm"},
+      {"symbol": "r_i", "description": "Inner radius of the inside member", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "p", "description": "Interface contact pressure", "unit": "psi or Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Press Fits and Contact Stresses",
+    "topic": "Outer Member (Hub) Max Hoop Stress",
+    "type": "formula",
+    "formula_string": "sigma_t_o = p * ((r_o**2 + R**2) / (r_o**2 - R**2))",
+    "inputs": [
+      {"symbol": "p", "description": "Interface contact pressure", "unit": "psi or Pa"},
+      {"symbol": "r_o", "description": "Outer radius of the outside member", "unit": "in or mm"},
+      {"symbol": "R", "description": "Nominal interface radius", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "sigma_t_o", "description": "Maximum hoop stress in outer member (tension)", "unit": "psi or Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Press Fits and Contact Stresses",
+    "topic": "Inner Member (Shaft) Max Hoop Stress",
+    "type": "formula",
+    "formula_string": "sigma_t_i = -p * ((R**2 + r_i**2) / (R**2 - r_i**2))",
+    "inputs": [
+      {"symbol": "p", "description": "Interface contact pressure", "unit": "psi or Pa"},
+      {"symbol": "R", "description": "Nominal interface radius", "unit": "in or mm"},
+      {"symbol": "r_i", "description": "Inner radius of the inside member", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "sigma_t_i", "description": "Maximum hoop stress in inner member (compression)", "unit": "psi or Pa"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Press Fits and Contact Stresses",
+    "topic": "Normal Force at Interface",
+    "type": "formula",
+    "formula_string": "F_n = p * pi * d * l",
+    "inputs": [
+      {"symbol": "p", "description": "Interface contact pressure", "unit": "psi or Pa"},
+      {"symbol": "d", "description": "Nominal interface diameter", "unit": "in or mm"},
+      {"symbol": "l", "description": "Length of the press fit engagement", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "F_n", "description": "Total normal force at the interface", "unit": "lbf or N"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Press Fits and Contact Stresses",
+    "topic": "Holding Torque Capacity",
+    "type": "formula",
+    "formula_string": "T = (pi / 2) * p * f * l * d**2",
+    "inputs": [
+      {"symbol": "p", "description": "Interface contact pressure", "unit": "psi or Pa"},
+      {"symbol": "f", "description": "Coefficient of static friction", "unit": "dimensionless"},
+      {"symbol": "l", "description": "Length of the press fit engagement", "unit": "in or mm"},
+      {"symbol": "d", "description": "Nominal interface diameter", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "T", "description": "Maximum holding torque capacity", "unit": "lbf-in or N-m"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Press Fits and Contact Stresses",
+    "topic": "Hertzian Contact Patch Half-Width (Parallel Cylinders)",
+    "type": "formula",
+    "formula_string": "b = ((2 * F / (pi * l)) * ((1 - v_1**2) / E_1 + (1 - v_2**2) / E_2) / ((1 / d_1) + (1 / d_2)))**0.5",
+    "inputs": [
+      {"symbol": "F", "description": "Applied contact load", "unit": "lbf or N"},
+      {"symbol": "l", "description": "Length of the contact line", "unit": "in or mm"},
+      {"symbol": "v_1", "description": "Poisson's ratio of cylinder 1", "unit": "dimensionless"},
+      {"symbol": "E_1", "description": "Modulus of elasticity of cylinder 1", "unit": "psi or Pa"},
+      {"symbol": "v_2", "description": "Poisson's ratio of cylinder 2", "unit": "dimensionless"},
+      {"symbol": "E_2", "description": "Modulus of elasticity of cylinder 2", "unit": "psi or Pa"},
+      {"symbol": "d_1", "description": "Diameter of cylinder 1", "unit": "in or mm"},
+      {"symbol": "d_2", "description": "Diameter of cylinder 2", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "b", "description": "Contact patch half-width", "unit": "in or mm"},
+    "rule_logic": null,
+    "table_data": null
+  },
+  {
+    "domain": "Press Fits and Contact Stresses",
+    "topic": "Maximum Hertzian Contact Pressure",
+    "type": "formula",
+    "formula_string": "p_max = (2 * F) / (pi * b * l)",
+    "inputs": [
+      {"symbol": "F", "description": "Applied contact load", "unit": "lbf or N"},
+      {"symbol": "b", "description": "Contact patch half-width", "unit": "in or mm"},
+      {"symbol": "l", "description": "Length of the contact line", "unit": "in or mm"}
+    ],
+    "output": {"symbol": "p_max", "description": "Maximum contact pressure", "unit": "psi or Pa"},
+    "rule_logic": null,
+    "table_data": null
+  }
+]
