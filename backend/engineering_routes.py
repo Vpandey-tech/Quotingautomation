@@ -16,13 +16,17 @@ import time, os, uuid, json
 from services.engineering.params import (
     get_params_for_component, get_next_missing_param,
     validate_param, are_all_params_collected, COMPONENT_LABELS,
-    COMPONENT_PARAMS, get_material,
+    COMPONENT_PARAMS, get_material, compute_smart_defaults
 )
 from services.engineering.math_engine import run_calculation
 from services.engineering.knowledge_lookup import (
     get_kb_stats, search_kb, build_ai_context,
     safe_eval_formula, validate_calculation, reload_kb,
 )
+from services.engineering.report_generator import (
+    build_report_markdown, generate_pdf_report,
+)
+from services.engineering.cad_engine import generate_cad as cad_generate
 
 router = APIRouter(prefix="/api/design", tags=["Engineering Design"])
 
@@ -184,10 +188,15 @@ async def create_session(body: CreateSessionBody):
 async def get_session(session_id: str):
     session = _get_session(session_id)
     next_param = get_next_missing_param(session["component_type"], session["params"])
+    assumptions = []
+    if next_param is None:
+        assumptions = compute_smart_defaults(session["component_type"], session["params"])
+
     return {
         **_session_summary(session),
         "messages": session["messages"],
         "next_param": next_param,
+        "assumptions": assumptions,
         "all_params_collected": are_all_params_collected(session["component_type"], session["params"]),
     }
 
@@ -346,13 +355,17 @@ async def submit_param(session_id: str, body: SubmitParamBody):
     session["updated_at"] = time.time()
 
     next_param = get_next_missing_param(session["component_type"], session["params"])
+    assumptions = []
     if next_param is None:
         session["status"] = "params_complete"
+        # Compute smart defaults to show to the user
+        assumptions = compute_smart_defaults(session["component_type"], session["params"])
 
     return {
         "param_accepted": True, "key": body.key, "value": body.value,
         "next_param": next_param,
         "all_params_collected": next_param is None,
+        "assumptions": assumptions,
         "params": session["params"], "status": session["status"],
     }
 
@@ -362,6 +375,13 @@ async def generate_report(session_id: str):
     session = _get_session(session_id)
     if session["status"] == "collecting_params":
         raise HTTPException(400, "Complete parameter intake first.")
+        
+    # Auto-fill missing assumptions with their defaults before calculating
+    assumptions = compute_smart_defaults(session["component_type"], session["params"])
+    for a in assumptions:
+        if a["key"] not in session["params"] or session["params"][a["key"]] is None:
+            session["params"][a["key"]] = a["default_value"]
+            
     try:
         result = run_calculation(session["component_type"], session["params"])
     except Exception as e:
@@ -370,7 +390,30 @@ async def generate_report(session_id: str):
     session["result"] = result
     session["status"] = "report_ready"
     session["updated_at"] = time.time()
-    return {"session_id": session_id, "status": "report_ready", "result": result}
+
+    # Generate Markdown report
+    try:
+        md_report = build_report_markdown(
+            session["component_type"], session["params"], result, session_id
+        )
+        session["report_markdown"] = md_report
+    except Exception:
+        session["report_markdown"] = None
+
+    # Generate PDF report
+    try:
+        pdf_path = generate_pdf_report(
+            session["component_type"], session["params"], result, session_id
+        )
+        session["report_pdf_path"] = pdf_path
+    except Exception:
+        session["report_pdf_path"] = None
+
+    return {
+        "session_id": session_id, "status": "report_ready", "result": result,
+        "has_pdf": session.get("report_pdf_path") is not None,
+        "has_markdown": session.get("report_markdown") is not None,
+    }
 
 
 @router.get("/sessions/{session_id}/report")
@@ -563,7 +606,7 @@ async def approve_report(session_id: str):
 
 
 @router.post("/sessions/{session_id}/generate-cad")
-async def generate_cad(session_id: str):
+async def generate_cad_endpoint(session_id: str):
     session = _get_session(session_id)
     if session["status"] != "report_approved":
         raise HTTPException(400, "Approve the report before generating CAD.")
@@ -572,46 +615,23 @@ async def generate_cad(session_id: str):
     ctype = session["component_type"]
 
     try:
-        import cadquery as cq
-        if ctype == "shaft":
-            d = dims.get("diameter_mm", 30)
-            L = dims.get("length_mm", 300)
-            d_inner = dims.get("inner_diameter_mm")
-            if d_inner and d_inner > 0:
-                shape = cq.Workplane("XY").circle(d/2).circle(d_inner/2).extrude(L)
-            else:
-                shape = cq.Workplane("XY").circle(d/2).extrude(L)
-        elif ctype == "gearbox":
-            d1 = dims.get("pinion_pitch_dia_mm", 50)
-            fw = dims.get("face_width_mm", 20)
-            shape = cq.Workplane("XY").circle(d1/2).extrude(fw)
-        elif ctype == "bearing":
-            bore = dims.get("bore_diameter_mm", 25)
-            shape = cq.Workplane("XY").circle(bore*1.1).circle(bore/2).extrude(bore*0.5)
-        elif ctype == "cam":
-            Rmax = dims.get("max_radius_mm", 50)
-            width = dims.get("cam_width_mm", 20)
-            shape = cq.Workplane("XY").circle(Rmax).extrude(width)
-        elif ctype == "custom":
-            L = dims.get("length_mm", 100)
-            W = dims.get("width_mm", 50)
-            H = dims.get("height_mm", 25)
-            shape = cq.Workplane("XY").box(L, W, H)
+        cad_result = cad_generate(ctype, dims, session["params"])
+        step_path = cad_result.get("step_file")
 
-        out_dir = os.path.join(os.path.dirname(__file__), "generated_cad")
-        os.makedirs(out_dir, exist_ok=True)
-        step_path = os.path.join(out_dir, f"design_{session_id}.step")
-        cq.exporters.export(shape, step_path)
-        session["cad_file_path"] = step_path
+        if step_path:
+            session["cad_file_path"] = step_path
         session["status"] = "cad_ready"
         session["updated_at"] = time.time()
-        return {"status": "cad_ready", "session_id": session_id,
-                "download_url": f"/api/design/sessions/{session_id}/download-cad"}
-    except ImportError:
-        session["status"] = "cad_ready"
-        session["updated_at"] = time.time()
-        return {"status": "cad_ready", "session_id": session_id,
-                "note": "CadQuery not available — dimensions only.", "dimensions": dims}
+
+        return {
+            "status": "cad_ready",
+            "session_id": session_id,
+            "engine": cad_result.get("engine", "none"),
+            "step_file": step_path,
+            "download_url": f"/api/design/sessions/{session_id}/download-cad" if step_path else None,
+            "dimensions": dims,
+            "note": cad_result.get("note"),
+        }
     except Exception as e:
         raise HTTPException(500, f"CAD error: {str(e)}")
 
@@ -625,6 +645,28 @@ async def download_cad(session_id: str):
         raise HTTPException(404, "No CAD file generated yet.")
     return FileResponse(fpath, media_type="application/octet-stream",
                         filename=f"AccuDesign_{session['component_type']}_{session_id}.step")
+
+
+@router.get("/sessions/{session_id}/download-pdf")
+async def download_pdf(session_id: str):
+    """Download the generated PDF engineering report."""
+    from fastapi.responses import FileResponse
+    session = _get_session(session_id)
+    fpath = session.get("report_pdf_path")
+    if not fpath or not os.path.isfile(fpath):
+        raise HTTPException(404, "No PDF report generated yet.")
+    return FileResponse(fpath, media_type="application/pdf",
+                        filename=f"AccuDesign_Report_{session['component_type']}_{session_id}.pdf")
+
+
+@router.get("/sessions/{session_id}/report-markdown")
+async def get_report_markdown(session_id: str):
+    """Get the Markdown-formatted engineering report."""
+    session = _get_session(session_id)
+    md = session.get("report_markdown")
+    if not md:
+        raise HTTPException(404, "No Markdown report generated yet.")
+    return {"session_id": session_id, "markdown": md}
 
 
 # ── Auto-Transfer to Quoting Engine ─────────────────────────────────────────

@@ -1,4 +1,4 @@
-# AccuDesign — Backend Dependencies (Phase 4)
+# AccuDesign — Backend Dependencies (Phase 5: Engineering Automation Engine)
 # Install: pip install -r requirements.txt
 
 # ── Web Framework ─────────────────────────────────────────────────────────────
@@ -6,15 +6,30 @@ fastapi==0.115.0
 uvicorn[standard]==0.30.6
 python-multipart==0.0.9         # Required for UploadFile / FormData
 
-# ── B-Rep Geometry Engine ─────────────────────────────────────────────────────
-cadquery==2.4.0                  # CadQuery wraps OpenCASCADE (OCCT) for B-Rep analysis
+# ── Parametric CAD Engine ─────────────────────────────────────────────────────
+# Primary: build123d (modern, Pythonic API over OpenCASCADE)
+# Fallback: cadquery (stable, widely used)
+# Install whichever is available on your system:
+#   pip install build123d    (recommended)
+#   pip install cadquery     (fallback)
+
+# ── Engineering Mathematics ───────────────────────────────────────────────────
+sympy>=1.12                      # Symbolic math for formula verification
+forallpeople>=2.6.4              # SI unit enforcement — prevents dimensional errors
+
+# ── Engineering Reports ───────────────────────────────────────────────────────
+handcalcs>=1.8.1                 # Mathcad-style calculation rendering
+fpdf2==2.7.9                     # PDF report generation
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 python-dotenv==1.0.1
 pydantic==1.10.21               # v1 — @validator syntax; v2 requires @field_validator
 httpx==0.27.0                    # Async HTTP for price APIs + exchange rate APIs
-fpdf2==2.7.9                     # PDF quote generation (ACCU DESIGN format)
 numpy==1.26.4                    # Array ops for geometry utils
 
 # ── AI / PDF Analysis ────────────────────────────────────────────────────────
-google-generativeai>=0.8.0       # Google Gemini for PDF engineering drawing analysis
+google-generativeai>=0.8.0       # Google Gemini for AI cross-validation
+
+# ── Optional (install separately if needed) ──────────────────────────────────
+# pylife>=0.7.0                  # Fatigue & life calculations (Bosch Research)
+# llama-index>=0.11.0            # RAG over engineering PDF standards

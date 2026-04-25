@@ -319,14 +319,14 @@ export default function DesignSession() {
             <PenTool size={14} />
           </Link>
           <ChevronRight size={10} className="text-gray-700" />
-          <span className="font-mono text-[10px] text-cyan-400/60 border border-cyan-400/20 px-1.5 py-0.5 rounded">
+          <span className="font-mono text-[10pt] text-cyan-400/60 border border-cyan-400/20 px-1.5 py-0.5 rounded">
             #{id}
           </span>
           <span className="text-sm font-bold text-white tracking-widest uppercase" style={{ fontFamily: 'Outfit, sans-serif' }}>
             {isCustom ? 'User Part' : session.component_type}
           </span>
           <ChevronRight size={10} className="text-gray-700" />
-          <span className="font-mono text-[9px] px-2 py-0.5 rounded tracking-wider"
+          <span className="font-mono text-[9pt] px-2 py-0.5 rounded tracking-wider"
             style={{ color: '#22d3ee', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)' }}>
             {STATUS_LABELS[session.status] || session.status}
           </span>
@@ -349,7 +349,7 @@ export default function DesignSession() {
                     background: allDone ? '#34d399' : 'linear-gradient(90deg, #7c3aed, #818cf8)',
                   }} />
                 </div>
-                <div className="font-mono text-[10px] text-gray-500">
+                <div className="font-mono text-[10pt] text-gray-500">
                   {allDone
                     ? <span className="text-violet-400 flex items-center gap-1"><CheckCircle2 size={10} /> Custom part info complete</span>
                     : <span className="text-violet-400/80">{customProgress} — Gathering details...</span>
@@ -367,15 +367,15 @@ export default function DesignSession() {
                         background: filled ? 'rgba(34,211,238,0.08)' : isNext ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.02)',
                         border: `1px solid ${filled ? 'rgba(34,211,238,0.25)' : isNext ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.04)'}`,
                       }}>
-                        <div className="font-mono text-[8px] text-gray-600 truncate">{p.label.split(' ')[0]}</div>
-                        <div className={`font-mono text-[10px] font-bold mt-0.5 ${filled ? 'text-cyan-400' : isNext ? 'text-amber-400' : 'text-gray-700'}`}>
+                        <div className="font-mono text-[9pt] text-gray-600 truncate">{p.label.split(' ')[0]}</div>
+                        <div className={`font-mono text-[10pt] font-bold mt-0.5 ${filled ? 'text-cyan-400' : isNext ? 'text-amber-400' : 'text-gray-700'}`}>
                           {filled ? '✓' : isNext ? '→' : '—'}
                         </div>
                       </div>
                     );
                   })}
                 </div>
-                <div className="font-mono text-[10px] text-gray-500">
+                <div className="font-mono text-[10pt] text-gray-500">
                   {allDone
                     ? <span className="text-cyan-400 flex items-center gap-1"><CheckCircle2 size={10} /> All {totalRequired} parameters collected</span>
                     : <span className="text-amber-400/80">{filledCount}/{totalRequired} — Awaiting: {np?.label}</span>
@@ -390,7 +390,7 @@ export default function DesignSession() {
             style={{ scrollbarWidth: 'thin', scrollbarColor: '#1e3448 transparent' }}>
             {chatMessages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] px-3 py-2 text-xs leading-relaxed rounded-lg ${
+                <div className={`max-w-[85%] px-3 py-2 text-[10pt] leading-relaxed rounded-lg ${
                   msg.role === 'user'
                     ? 'text-white'
                     : msg.role === 'error'
@@ -419,7 +419,7 @@ export default function DesignSession() {
               <form onSubmit={handleCustomSubmit} className="flex gap-2">
                 <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)}
                   placeholder="Type your answer..."
-                  className="flex-1 px-3 py-2 text-xs font-mono text-white rounded-lg outline-none
+                  className="flex-1 px-3 py-2 text-[10pt] font-mono text-white rounded-lg outline-none
                     focus:ring-1 focus:ring-violet-400/40 placeholder:text-gray-600"
                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                   disabled={submitting} autoComplete="off" />
@@ -436,7 +436,7 @@ export default function DesignSession() {
                     {np.options?.map(opt => (
                       <button key={opt.value} onClick={() => handleOptionClick(opt.value)}
                         disabled={submitting}
-                        className="w-full text-left px-3 py-2 text-xs font-mono rounded-lg transition-all
+                        className="w-full text-left px-3 py-2 text-[10pt] font-mono rounded-lg transition-all
                           hover:bg-cyan-400/10 text-gray-400 hover:text-cyan-300 disabled:opacity-50"
                         style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
                         {opt.label}
@@ -447,7 +447,7 @@ export default function DesignSession() {
                   <form onSubmit={handleSubmit} className="flex gap-2">
                     <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)}
                       placeholder={`Enter ${np.label} (${np.unit || 'value'})...`}
-                      className="flex-1 px-3 py-2 text-xs font-mono text-white rounded-lg outline-none
+                      className="flex-1 px-3 py-2 text-[10pt] font-mono text-white rounded-lg outline-none
                         focus:ring-1 focus:ring-cyan-400/40 placeholder:text-gray-600"
                       style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                       disabled={submitting} autoComplete="off" />
@@ -459,11 +459,11 @@ export default function DesignSession() {
                   </form>
                 )}
                 {np.type === 'number' && np.min != null && (
-                  <div className="text-[9px] font-mono text-gray-600 px-1">Range: {np.min} — {np.max} {np.unit}</div>
+                  <div className="text-[9pt] font-mono text-gray-600 px-1">Range: {np.min} — {np.max} {np.unit}</div>
                 )}
               </div>
             ) : (
-              <div className="text-center py-1 text-xs font-mono text-cyan-400 flex items-center justify-center gap-2">
+              <div className="text-center py-1 text-[10pt] font-mono text-cyan-400 flex items-center justify-center gap-2">
                 <CheckCircle2 size={12} /> Intake complete — review report →
               </div>
             )}
@@ -481,7 +481,7 @@ export default function DesignSession() {
               badge={hasReport ? (isApproved ? { text: 'APPROVED', color: '#34d399' } : { text: 'REVIEW', color: '#f59e0b' }) : null}
               action={!hasReport && allDone ? (
                 <button onClick={handleGenerateReport} disabled={generatingReport}
-                  className="px-3 py-1.5 text-[10px] font-mono font-bold tracking-wider rounded-lg transition-all
+                  className="px-3 py-1.5 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
                     text-cyan-300 hover:text-white disabled:opacity-50"
                   style={{ background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.3)' }}>
                   {generatingReport ? <><Loader2 size={12} className="inline animate-spin mr-1" />GENERATING</> : 'GENERATE REPORT'}
@@ -492,7 +492,7 @@ export default function DesignSession() {
                 <div className="space-y-4">
                   {/* Editable Parameters Summary */}
                   <div className="px-3 py-2.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                    <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <div className="text-[10pt] font-mono text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                       <Edit3 size={10} /> Input Parameters <span className="text-gray-700">(click to edit)</span>
                     </div>
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-1.5">
@@ -501,25 +501,25 @@ export default function DesignSession() {
                           {editingParam === k ? (
                             <div className="flex gap-1">
                               <input value={editValue} onChange={e => setEditValue(e.target.value)}
-                                className="flex-1 px-2 py-1 text-[10px] font-mono text-white rounded bg-transparent outline-none"
+                                className="flex-1 px-2 py-1 text-[10pt] font-mono text-white rounded bg-transparent outline-none"
                                 style={{ border: '1px solid rgba(34,211,238,0.4)' }}
                                 autoFocus onKeyDown={e => e.key === 'Enter' && handleSaveEdit()} />
                               <button onClick={handleSaveEdit} disabled={savingEdit}
                                 className="p-1 rounded text-emerald-400 hover:bg-emerald-400/10">
-                                {savingEdit ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
+                                {savingEdit ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                               </button>
                               <button onClick={() => setEditingParam(null)} className="p-1 rounded text-gray-500 hover:bg-white/5">
-                                <X size={10} />
+                                <X size={12} />
                               </button>
                             </div>
                           ) : (
                             <button onClick={() => handleStartEdit(k, v)}
                               className="w-full text-left px-2 py-1.5 rounded transition-all hover:bg-white/[0.03] group"
                               style={{ border: '1px solid transparent' }}>
-                              <div className="text-[8px] font-mono text-gray-600 truncate">{k}</div>
-                              <div className="text-[11px] font-mono text-cyan-400 font-bold truncate flex items-center gap-1">
+                              <div className="text-[10pt] font-mono text-gray-500 truncate">{k}</div>
+                              <div className="text-[10pt] font-mono text-cyan-400 font-bold truncate flex items-center gap-1">
                                 {String(v)}
-                                <Edit3 size={8} className="text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <Edit3 size={10} className="text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity" />
                               </div>
                             </button>
                           )}
@@ -533,11 +533,11 @@ export default function DesignSession() {
                     {report.result.calculations?.map((c, i) => (
                       <div key={i} className="px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-semibold text-gray-300">{c.name}</span>
-                          <span className="font-mono text-xs font-bold text-cyan-400">{c.result} {c.unit}</span>
+                          <span className="text-[10pt] font-semibold text-gray-300">{c.name}</span>
+                          <span className="font-mono text-[10pt] font-bold text-cyan-400">{c.result} {c.unit}</span>
                         </div>
-                        <div className="font-mono text-[10px] text-gray-600 mt-0.5">{c.formula}</div>
-                        <div className="text-[10px] text-gray-500 mt-0.5">{c.description}</div>
+                        <div className="font-mono text-[10pt] text-gray-600 mt-0.5">{c.formula}</div>
+                        <div className="text-[10pt] text-gray-500 mt-0.5">{c.description}</div>
                       </div>
                     ))}
                   </div>
@@ -545,7 +545,7 @@ export default function DesignSession() {
                   {/* Safety Assessment */}
                   <SafetyBlock safety={report.result.safety} />
 
-                  {/* AI Validation */}
+                  {/* Internal Validation */}
                   {validation && (
                     <div className="rounded-lg p-3 space-y-2" style={{
                       background: validation.validation_status === 'PASS' ? 'rgba(52,211,153,0.05)' : validation.validation_status === 'FAIL' ? 'rgba(239,68,68,0.05)' : 'rgba(245,158,11,0.05)',
@@ -553,28 +553,33 @@ export default function DesignSession() {
                     }}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Brain size={14} className={validation.validation_status === 'PASS' ? 'text-emerald-400' : 'text-amber-400'} />
-                          <span className="text-[10px] font-mono font-bold text-white uppercase tracking-wider">AI Validation</span>
+                          <ShieldCheck size={14} className={validation.validation_status === 'PASS' ? 'text-emerald-400' : 'text-amber-400'} />
+                          <span className="text-[10pt] font-mono font-bold text-white uppercase tracking-wider">Engineering Assessment</span>
                         </div>
-                        <span className={`px-2 py-0.5 text-[9px] font-mono font-bold rounded ${validation.validation_status === 'PASS' ? 'text-emerald-400' : 'text-amber-400'}`}
+                        <span className={`px-2 py-0.5 text-[10pt] font-mono font-bold rounded ${validation.validation_status === 'PASS' ? 'text-emerald-400' : 'text-amber-400'}`}
                           style={{ background: validation.validation_status === 'PASS' ? 'rgba(52,211,153,0.1)' : 'rgba(245,158,11,0.1)' }}>
-                          {validation.validation_status} — {Math.round((validation.confidence_score || 0) * 100)}%
+                          {validation.validation_status}
                         </span>
                       </div>
-                      <div className="text-[10px] text-gray-400">{validation.overall_assessment}</div>
+                      <div className="text-[10pt] text-gray-400">{validation.overall_assessment}</div>
                       {validation.checks?.slice(0, 5).map((c, i) => (
-                        <div key={i} className="flex items-center gap-2 text-[10px] font-mono">
-                          <span className={c.status === 'OK' ? 'text-emerald-400' : c.status === 'ERROR' ? 'text-red-400' : 'text-amber-400'}>
+                        <div key={i} className="flex items-start gap-2 text-[10pt] font-mono">
+                          <span className={`shrink-0 mt-0.5 ${c.status === 'OK' ? 'text-emerald-400' : c.status === 'ERROR' ? 'text-red-400' : 'text-amber-400'}`}>
                             {c.status === 'OK' ? '✓' : c.status === 'ERROR' ? '✗' : '⚠'}
                           </span>
-                          <span className="text-gray-400">{c.item}</span>
-                          {c.note && <span className="text-gray-600">— {c.note}</span>}
+                          <div>
+                            <span className="text-gray-300">{c.item}</span>
+                            {c.note && <span className="text-gray-500 block mt-0.5">{c.note}</span>}
+                          </div>
                         </div>
                       ))}
                       {validation.recommendations?.length > 0 && (
-                        <div className="mt-1 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                           {validation.recommendations.map((r, i) => (
-                            <div key={i} className="text-[10px] font-mono text-gray-500">→ {r}</div>
+                            <div key={i} className="text-[10pt] font-mono text-gray-400 flex items-start gap-2">
+                              <span className="text-cyan-400 shrink-0 mt-0.5">→</span>
+                              <span>{r}</span>
+                            </div>
                           ))}
                         </div>
                       )}
@@ -584,9 +589,9 @@ export default function DesignSession() {
                   {/* Standards */}
                   {report.result.standards?.length > 0 && (
                     <div className="px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                      <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1">Standards Referenced</div>
+                      <div className="text-[10pt] font-mono text-gray-500 uppercase tracking-wider mb-1">Standards Referenced</div>
                       {report.result.standards.map((s, i) => (
-                        <div key={i} className="text-[10px] text-gray-400">• {s}</div>
+                        <div key={i} className="text-[10pt] text-gray-400">• {s}</div>
                       ))}
                     </div>
                   )}
@@ -596,20 +601,20 @@ export default function DesignSession() {
                     <div className="flex items-center justify-between">
                       <div className="flex gap-2">
                         <button onClick={handleValidate} disabled={validating}
-                          className="px-3 py-1.5 text-[10px] font-mono font-bold tracking-wider rounded-lg transition-all
+                          className="px-3 py-1.5 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
                             text-violet-300 hover:text-white disabled:opacity-50"
                           style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.3)' }}>
-                          {validating ? <><Loader2 size={12} className="inline animate-spin mr-1" />VALIDATING</> : <><ShieldCheck size={12} className="inline mr-1" />AI VALIDATE</>}
+                          {validating ? <><Loader2 size={12} className="inline animate-spin mr-1" />CHECKING</> : <><ShieldCheck size={12} className="inline mr-1" />SYSTEM CHECK</>}
                         </button>
                         <button onClick={handleGenerateReport} disabled={generatingReport}
-                          className="px-3 py-1.5 text-[10px] font-mono font-bold tracking-wider rounded-lg transition-all
+                          className="px-3 py-1.5 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
                             text-amber-300 hover:text-white disabled:opacity-50"
                           style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}>
                           <RefreshCw size={12} className="inline mr-1" />RE-GENERATE
                         </button>
                       </div>
                       <button onClick={handleApprove} disabled={approvingReport}
-                        className="px-4 py-2 text-[10px] font-mono font-bold tracking-wider rounded-lg transition-all
+                        className="px-4 py-2 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
                           text-emerald-300 hover:text-white disabled:opacity-50"
                         style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.3)' }}>
                         {approvingReport ? <><Loader2 size={12} className="inline animate-spin mr-1" />APPROVING</> : <><CheckCircle2 size={12} className="inline mr-1" />APPROVE REPORT</>}
@@ -618,11 +623,62 @@ export default function DesignSession() {
                   )}
                 </div>
               ) : allDone ? (
-                <div className="text-center py-6 font-mono text-xs text-gray-600">
-                  Click GENERATE REPORT to compute engineering calculations.
+                <div className="space-y-4">
+                  {session.assumptions?.length > 0 && (
+                    <div className="px-4 py-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div className="text-[10pt] font-mono text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <Brain size={14} className="text-cyan-400" /> Engineering Assumptions
+                      </div>
+                      <div className="text-[10pt] text-gray-500 mb-4 font-mono">
+                        The system has automatically filled standard engineering defaults based on best practices. You can edit them or proceed.
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {session.assumptions.map(a => {
+                          const isEdited = session.params[a.key] !== undefined && session.params[a.key] !== a.default_value;
+                          const displayVal = session.params[a.key] !== undefined ? session.params[a.key] : a.default_value;
+                          return (
+                            <div key={a.key} className="group relative">
+                              {editingParam === a.key ? (
+                                <div className="flex gap-2">
+                                  <input value={editValue} onChange={e => setEditValue(e.target.value)}
+                                    className="flex-1 px-3 py-2 text-[10pt] font-mono text-white rounded bg-transparent outline-none"
+                                    style={{ border: '1px solid rgba(34,211,238,0.4)' }}
+                                    autoFocus onKeyDown={e => e.key === 'Enter' && handleSaveEdit()} />
+                                  <button onClick={handleSaveEdit} disabled={savingEdit}
+                                    className="p-2 rounded text-emerald-400 hover:bg-emerald-400/10">
+                                    {savingEdit ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                  </button>
+                                  <button onClick={() => setEditingParam(null)} className="p-2 rounded text-gray-500 hover:bg-white/5">
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button onClick={() => handleStartEdit(a.key, displayVal)}
+                                  className="w-full text-left px-3 py-2 rounded transition-all hover:bg-white/[0.03] group"
+                                  style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+                                  <div className="text-[10pt] font-mono text-gray-400 flex items-center justify-between">
+                                    <span className="truncate">{a.label}</span>
+                                    {isEdited && <span className="text-[9pt] text-amber-400 px-1.5 rounded bg-amber-400/10 border border-amber-400/20">EDITED</span>}
+                                  </div>
+                                  <div className="text-[10pt] font-mono font-bold mt-1 flex items-center gap-1" style={{ color: isEdited ? '#fcd34d' : '#22d3ee' }}>
+                                    {String(displayVal)} {a.unit || ''}
+                                    <Edit3 size={12} className="text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
+                                  </div>
+                                  <div className="text-[9pt] text-gray-600 mt-1.5 leading-tight">{a.reason}</div>
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <div className="text-center py-4 font-mono text-[10pt] text-gray-600">
+                    Review assumptions above, then click GENERATE REPORT to compute engineering calculations.
+                  </div>
                 </div>
               ) : (
-                <div className="text-center py-6 font-mono text-xs text-gray-700">
+                <div className="text-center py-6 font-mono text-[10pt] text-gray-700">
                   Complete parameter intake in the chat to unlock.
                 </div>
               )}
@@ -632,10 +688,10 @@ export default function DesignSession() {
             <StageCard icon={Box} title="CAD Generation" locked={!isApproved}>
               {isCadReady ? (
                 <div className="text-center space-y-3">
-                  <div className="font-mono text-xs text-cyan-400">✓ Model generated successfully.</div>
+                  <div className="font-mono text-[10pt] text-cyan-400">✓ Model generated successfully.</div>
                   <div className="flex gap-3 justify-center">
                     <a href={`/api/design/sessions/${id}/download-cad`} download>
-                      <button className="px-4 py-2 text-[10px] font-mono font-bold tracking-wider rounded-lg
+                      <button className="px-4 py-2 text-[10pt] font-mono font-bold tracking-wider rounded-lg
                         text-cyan-300 hover:text-white transition-all"
                         style={{ background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.3)' }}>
                         <Download size={12} className="inline mr-1" /> DOWNLOAD STEP
@@ -658,7 +714,7 @@ export default function DesignSession() {
                         alert('Transfer error — check server connection.');
                       }
                     }}
-                      className="px-4 py-2 text-[10px] font-mono font-bold tracking-wider rounded-lg
+                      className="px-4 py-2 text-[10pt] font-mono font-bold tracking-wider rounded-lg
                         text-indigo-300 hover:text-white transition-all"
                       style={{ background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.3)' }}>
                       <Cog size={12} className="inline mr-1" /> SEND TO QUOTING
@@ -668,14 +724,14 @@ export default function DesignSession() {
               ) : isApproved ? (
                 <div className="text-center py-4">
                   <button onClick={handleGenerateCad} disabled={generatingCad}
-                    className="px-4 py-2 text-[10px] font-mono font-bold tracking-wider rounded-lg transition-all
+                    className="px-4 py-2 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
                       text-cyan-300 hover:text-white disabled:opacity-50"
                     style={{ background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.3)' }}>
                     {generatingCad ? <><Loader2 size={12} className="inline animate-spin mr-1" />GENERATING CAD</> : <><Box size={12} className="inline mr-1" />GENERATE CAD MODEL</>}
                   </button>
                 </div>
               ) : (
-                <div className="text-center py-4 font-mono text-xs text-gray-700">
+                <div className="text-center py-4 font-mono text-[10pt] text-gray-700">
                   Approve report to unlock.
                 </div>
               )}
@@ -700,13 +756,13 @@ function StageCard({ icon: Icon, title, locked, badge, action, children }) {
         style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.15)' }}>
         <div className="flex items-center gap-2">
           <Icon size={14} className="text-cyan-400" />
-          <span className="text-xs font-bold text-white uppercase tracking-widest" style={{ fontFamily: 'Outfit, sans-serif' }}>
+          <span className="text-[10pt] font-bold text-white uppercase tracking-widest" style={{ fontFamily: 'Outfit, sans-serif' }}>
             {title}
           </span>
         </div>
         <div className="flex items-center gap-2">
           {badge && (
-            <span className="px-2 py-0.5 text-[9px] font-mono font-bold tracking-wider rounded"
+            <span className="px-2 py-0.5 text-[9pt] font-mono font-bold tracking-wider rounded"
               style={{ color: badge.color, background: badge.color + '15', border: `1px solid ${badge.color}30` }}>
               {badge.text}
             </span>
@@ -730,29 +786,29 @@ function SafetyBlock({ safety }) {
     }}>
       <div className="flex items-center gap-6">
         <div>
-          <div className="text-[9px] font-mono text-gray-500 uppercase">Actual FOS</div>
+          <div className="text-[9pt] font-mono text-gray-500 uppercase">Actual FOS</div>
           <div className={`text-xl font-bold font-mono ${safe ? 'text-emerald-400' : 'text-red-400'}`}>
             {safety.fos_actual}
           </div>
         </div>
         <div>
-          <div className="text-[9px] font-mono text-gray-500 uppercase">Required</div>
+          <div className="text-[9pt] font-mono text-gray-500 uppercase">Required</div>
           <div className="text-xl font-bold font-mono text-white">{safety.fos_required}</div>
         </div>
         <div className="ml-auto">
-          <span className={`px-2 py-0.5 text-[9px] font-mono font-bold tracking-wider rounded ${safe ? 'text-emerald-400' : 'text-red-400'}`}
+          <span className={`px-2 py-0.5 text-[9pt] font-mono font-bold tracking-wider rounded ${safe ? 'text-emerald-400' : 'text-red-400'}`}
             style={{ background: safe ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${safe ? 'rgba(52,211,153,0.3)' : 'rgba(239,68,68,0.3)'}` }}>
             {safe ? 'SAFE' : 'CRITICAL'}
           </span>
         </div>
       </div>
       {safety.warnings?.map((w, i) => (
-        <div key={i} className="flex items-start gap-2 text-[10px] font-mono text-amber-400">
+        <div key={i} className="flex items-start gap-2 text-[10pt] font-mono text-amber-400">
           <AlertTriangle size={11} className="shrink-0 mt-0.5" /> {w}
         </div>
       ))}
       {safety.recommendations?.map((r, i) => (
-        <div key={i} className="text-[10px] font-mono text-gray-500">• {r}</div>
+        <div key={i} className="text-[10pt] font-mono text-gray-500">• {r}</div>
       ))}
     </div>
   );

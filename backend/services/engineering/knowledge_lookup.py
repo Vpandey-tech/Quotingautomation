@@ -175,11 +175,11 @@ def build_ai_context(component_type: str, params: Dict[str, Any]) -> str:
     Maps component types to relevant KB domains.
     """
     domain_map = {
-        "shaft": ["Shaft Design for Stress", "Fatigue Failure and Endurance Limit"],
-        "gearbox": ["Spur and Helical Gears (AGMA Standards)", "Gear Kinematics and Spur Gear Geometry"],
-        "bearing": ["Lubrication and Hydrodynamic Journal Bearings"],
-        "cam": [],  # Cam uses its own math engine directly
-        "custom": ["Press Fits and Contact Stresses", "Screws, Fasteners, and Bolted Joints"],
+        "shaft": ["Shaft Design for Stress", "Fatigue Failure and Endurance Limit", "Mechanics"],
+        "gearbox": ["Spur and Helical Gears (AGMA Standards)", "Gear Kinematics and Spur Gear Geometry", "Mechanics"],
+        "bearing": ["Lubrication and Hydrodynamic Journal Bearings", "Rolling-Contact Bearings"],
+        "cam": ["Mechanics", "Geometry"],
+        "custom": ["Press Fits and Contact Stresses", "Screws, Fasteners, and Bolted Joints", "Geometry", "Mathematics"],
     }
 
     domains = domain_map.get(component_type, [])

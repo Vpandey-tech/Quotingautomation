@@ -46,6 +46,8 @@ __pycache__/
 
 # Uploaded Files / Temp
 backend/uploads/
+backend/generated_cad/
+backend/generated_reports/
 *.step
 *.stp
 *.pdf

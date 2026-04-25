@@ -41,7 +41,20 @@ With its sleek, glassmorphic Dark Mode UI, built-in interactive 3D WebGL Viewer,
   - Predicts Y-axis page overlap to ensure clean page breaks rather than overlapping static footers.
   - Translates massive numerical sums into professional "Amount in Words" (e.g., *Forty Six Thousand Rupees Only*).
 
-### 4. Interactive Frontend Application
+### 4. Parametric Engineering Rules Engine (New in Phase 4)
+- **Deterministic Math Engine:**
+  - Performs complex calculations for mechanical components (Shafts, Gears, Bearings, Cams).
+  - Evaluates formulas purely in Python per strict industry standards (ASME B106.1M, ISO 281, AGMA 2001) rather than relying on unreliable LLM arithmetic.
+- **AI-Cross-Validated Knowledge Base:**
+  - Built-in `knowledge_base.json` with 250+ engineering formulas and rules.
+  - Safely evaluates string formulas using restricted `safe_eval`.
+  - Employs Gemini AI as a secondary validator to double-check edge cases.
+- **Parametric CAD Generation:**
+  - Uses **build123d** to dynamically generate `.STEP` files directly from computed design dimensions.
+- **Engineering PDF Reporting:**
+  - Auto-generates detailed calculation reports with actual formulas rendered into PDF format for immediate review and approval.
+
+### 5. Interactive Frontend Application
 - **Modern React + Vite Frontend:**
   - Responsive, high-performance UI styled entirely with native customized **Tailwind CSS**.
   - **Draggable Context Sidebar:** Users can simultaneously view 3D geometries or 2D PDFs alongside the active quoting configuration sidebar, seamlessly dragging to resize the UI workspace securely bypassing 3D hover-locks.

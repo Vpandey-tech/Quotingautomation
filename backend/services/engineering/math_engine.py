@@ -4,12 +4,15 @@ Each component type uses proper engineering formulas per:
   - Shigley's Mechanical Engineering Design
   - Engineers Edge reference tables
   - ISO 281 (bearings), AGMA 2001 (gears), ASME B106.1M (shafts)
-No LLM arithmetic — Python handles all numbers.
+
+Cross-validation: Results are verified against knowledge_base.json
+where matching formulas exist. No LLM arithmetic — Python handles all numbers.
 """
 
 import math
 from typing import Dict, Any, List, Optional
-from .params import get_material, MATERIAL_DB
+from .params import get_material, MATERIAL_DB, parse_gear_ratio
+from .knowledge_lookup import validate_calculation as kb_validate, search_kb
 
 
 # ── Result Structures ─────────────────────────────────────────────────────────
@@ -18,6 +21,54 @@ def _calc(name: str, formula: str, result: float, unit: str, desc: str) -> Dict:
         "name": name, "formula": formula,
         "result": round(result, 4), "unit": unit, "description": desc,
     }
+
+
+def _kb_cross_check(domain: str, topic: str, inputs: Dict[str, float],
+                    our_result: float, tolerance: float = 0.01) -> Optional[Dict]:
+    """
+    Cross-check our hardcoded result against the KB formula.
+    Returns a verification dict or None if no matching KB entry.
+    """
+    try:
+        kb_result = kb_validate(domain, topic, inputs)
+        if kb_result.get("valid"):
+            kb_val = kb_result["result"]
+            diff = abs(kb_val - our_result) / max(abs(our_result), 1e-9)
+            return {
+                "kb_verified": diff <= tolerance,
+                "kb_value": kb_val,
+                "our_value": round(our_result, 6),
+                "deviation_pct": round(diff * 100, 4),
+                "source": f"{domain}/{topic}",
+            }
+    except Exception:
+        pass
+    return None
+
+def _run_kb_checks(P, N, T, omega, sigma_b, tau_actual, sigma_vm) -> List[Dict]:
+    """
+    Run KB cross-validation checks for shaft calculations.
+    Compares our hardcoded results against knowledge_base.json formulas.
+    """
+    checks = []
+
+    # Torque: T = 9550 * P / N
+    v = _kb_cross_check("Mechanics", "Torque", {"P": P, "N": N}, T)
+    if v:
+        checks.append({"formula": "Torque (T = 9550*P/N)", **v})
+
+    # Angular velocity: omega = 2*pi*N / 60
+    v = _kb_cross_check("Mechanics", "Angular Velocity", {"N": N}, omega)
+    if v:
+        checks.append({"formula": "Angular Velocity (omega = 2piN/60)", **v})
+
+    # Von Mises: sigma_vm = sqrt(sigma_b^2 + 3*tau^2)
+    v = _kb_cross_check("Mechanics", "Von Mises",
+                         {"sigma_b": sigma_b, "tau": tau_actual}, sigma_vm)
+    if v:
+        checks.append({"formula": "Von Mises Stress", **v})
+
+    return checks
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -31,6 +82,7 @@ def calculate_shaft(params: Dict[str, Any]) -> Dict[str, Any]:
     shaft_type = params.get("shaft_type", "solid")
     K = float(params.get("inner_diameter_ratio", 0)) if shaft_type == "hollow" else 0.0
     has_keyway = params.get("keyway", "no") == "yes"
+    num_keyways = float(params.get("num_keyways", 1)) if has_keyway else 0
     fos = float(params["fos"])
     M_b = float(params.get("bending_moment_nm", 0))
 
@@ -54,7 +106,9 @@ def calculate_shaft(params: Dict[str, Any]) -> Dict[str, Any]:
 
     # 3. Allowable shear stress — Max Shear Stress Theory
     #    τ_allow = σy / (2 × FOS) per Tresca criterion
-    Kt_key = 1.6 if has_keyway else 1.0
+    Kt_key = 1.0
+    if has_keyway:
+        Kt_key = 1.6 + 0.1 * (num_keyways - 1)  # empirical addition for multiple keyways
     tau_allow = sigma_y / (2 * fos * Kt_key)
     calcs.append(_calc("Allowable Shear Stress",
                         f"τ_allow = σy / (2·FOS·Kt) = {sigma_y}/(2×{fos}×{Kt_key})",
@@ -75,11 +129,15 @@ def calculate_shaft(params: Dict[str, Any]) -> Dict[str, Any]:
                             d_mm, "mm", "Pure torsion design"))
     else:
         # Combined bending + torsion with ASME shock factors
-        # Kb = 1.5 (minor shock bending), Kt = 1.0 (steady torque)
-        if loading == "fluctuating":
-            Kb, Kt_shock = 2.0, 1.5  # heavy shock
-        else:
-            Kb, Kt_shock = 1.5, 1.0  # moderate
+        Kb = float(params.get("kb_shock", 0))
+        Kt_shock = float(params.get("kt_shock", 0))
+        
+        if Kb == 0 or Kt_shock == 0:
+            if loading == "fluctuating":
+                Kb, Kt_shock = 2.0, 1.5  # heavy shock
+            else:
+                Kb, Kt_shock = 1.5, 1.0  # moderate
+                
         calcs.append(_calc("Shock Factors", f"Kb={Kb}, Kt={Kt_shock}",
                             0, "—", "ASME B106.1M shock load factors"))
 
@@ -173,6 +231,7 @@ def calculate_shaft(params: Dict[str, Any]) -> Dict[str, Any]:
             "warnings": warnings,
             "recommendations": recommendations,
         },
+        "kb_verifications": _run_kb_checks(P, N, T, omega, sigma_b, tau_actual, sigma_vm),
         "standards": [
             "ASME B106.1M — Shaft Design",
             "ASME B17.1 — Keys and Keyseats",
@@ -309,9 +368,20 @@ def calculate_bearing(params: Dict[str, Any]) -> Dict[str, Any]:
 def calculate_gearbox(params: Dict[str, Any]) -> Dict[str, Any]:
     P = float(params["power_kw"])
     N1 = float(params["input_speed_rpm"])
-    i = float(params["gear_ratio"])
+    N2_desired = float(params["output_speed_rpm"])
+    
+    raw_ratio = str(params.get("gear_ratio", "")).strip()
+    if not raw_ratio or raw_ratio == "auto":
+        i = N1 / N2_desired if N2_desired > 0 else 1.0
+    else:
+        parsed = parse_gear_ratio(raw_ratio)
+        i = parsed if parsed is not None else (N1 / N2_desired if N2_desired > 0 else 1.0)
+    
+    multi_stage = params.get("multi_stage", "no") == "yes"
+    num_stages = int(params.get("num_stages", 2)) if multi_stage else 1
+    
     gear_type = params["gear_type"]
-    phi = float(params["pressure_angle"])
+    phi = float(params.get("pressure_angle", 20))
     mat_id = params.get("material_id", "steel_1045")
     fos = float(params["fos"])
 
@@ -321,6 +391,11 @@ def calculate_gearbox(params: Dict[str, Any]) -> Dict[str, Any]:
     calcs = []
     warnings = []
     recommendations = []
+    
+    motor_phase = params.get("motor_phase", "")
+    motor_poles = params.get("motor_poles", "")
+    if motor_poles != "na" and motor_poles != "":
+        calcs.append(_calc("Motor Specs", f"{motor_phase}, {motor_poles} poles", 0, "—", ""))
 
     # 1. Torque on pinion
     omega1 = (2 * math.pi * N1) / 60
@@ -329,22 +404,27 @@ def calculate_gearbox(params: Dict[str, Any]) -> Dict[str, Any]:
                         T1, "N·m", "Input torque on pinion"))
 
     # 2. Output speed & torque
+    i_stage = i ** (1/num_stages) if num_stages > 0 else i
+    calcs.append(_calc("Stage Ratio", "i_stage = ⁿ√i", i_stage, "—", f"Overall ratio = {i:.2f}, {num_stages} stages"))
+
     N2 = N1 / i
-    T2 = T1 * i * 0.97  # 97% efficiency
+    eff_per_stage = float(params.get("efficiency_per_stage", 97)) / 100.0
+    eff_total = eff_per_stage ** num_stages
+    T2 = T1 * i * eff_total
     calcs.append(_calc("Output Speed", "N2 = N1 / i",
-                        N2, "RPM", f"Gear ratio = {i}"))
-    calcs.append(_calc("Output Torque", "T2 = T1 × i × η",
-                        T2, "N·m", "With 97% mechanical efficiency"))
+                        N2, "RPM", f"Target was {N2_desired} RPM"))
+    calcs.append(_calc("Output Torque", "T2 = T1 × i × η_total",
+                        T2, "N·m", f"With {eff_total*100:.1f}% total mech efficiency"))
 
     # 3. Minimum pinion teeth (to avoid undercutting)
     phi_rad = math.radians(phi)
     z_min = max(int(math.ceil(2 / (math.sin(phi_rad) ** 2))), 14)
     z1 = max(z_min, 18)  # practical minimum
-    z2 = int(round(z1 * i))
+    z2 = int(round(z1 * i_stage))
     calcs.append(_calc("Pinion Teeth (z1)", f"z_min = 2/sin²(φ) ≥ {z_min}",
                         z1, "teeth", f"Pressure angle = {phi}°"))
-    calcs.append(_calc("Gear Teeth (z2)", "z2 = z1 × i",
-                        z2, "teeth", "Wheel teeth count"))
+    calcs.append(_calc("Gear Teeth (z2 per stage)", "z2 = z1 × i_stage",
+                        z2, "teeth", "Wheel teeth count for one stage"))
 
     # 4. Module from Lewis beam strength
     sigma_b = sigma_y / fos
@@ -372,9 +452,10 @@ def calculate_gearbox(params: Dict[str, Any]) -> Dict[str, Any]:
                         d2, "mm", ""))
 
     # 6. Face width
-    b = 10 * m_std
-    calcs.append(_calc("Face Width", "b = 10 × m",
-                        b, "mm", "Standard face width ratio"))
+    face_ratio = float(params.get("face_width_ratio", 10))
+    b = face_ratio * m_std
+    calcs.append(_calc("Face Width", f"b = {face_ratio} × m",
+                        b, "mm", "From face width ratio assumption"))
 
     # 7. Tangential force & stress verification
     Ft = (2 * T1 * 1000) / d1 if d1 > 0 else 0
@@ -392,6 +473,19 @@ def calculate_gearbox(params: Dict[str, Any]) -> Dict[str, Any]:
         recommendations.append("Helical: apply helix angle correction (β=15-25°)")
     if fos_actual < fos:
         warnings.append(f"Bending FOS ({fos_actual:.2f}) is below required ({fos})")
+
+    size_w = float(params.get("size_max_width_mm", 0))
+    size_h = float(params.get("size_max_height_mm", 0))
+    # rough size estimate for gearbox:
+    est_width = b * num_stages * 1.5
+    est_height = (d1 + d2) * 1.2
+    calcs.append(_calc("Estimated GB Width", "b × stages × casing factor", est_width, "mm", ""))
+    calcs.append(_calc("Estimated GB Height", "(d1+d2) × casing factor", est_height, "mm", ""))
+
+    if size_w > 0 and est_width > size_w:
+        warnings.append(f"Estimated width ({est_width:.1f}mm) exceeds max constraint ({size_w}mm)")
+    if size_h > 0 and est_height > size_h:
+        warnings.append(f"Estimated height ({est_height:.1f}mm) exceeds max constraint ({size_h}mm)")
 
     return {
         "calculations": calcs,
