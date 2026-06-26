@@ -78,6 +78,10 @@ class QuoteRequest(BaseModel):
     include_drilling_surcharge: bool = Field(True, description="Include/exclude drilling surcharge in quote")
     hole_count_override: int = Field(-1, ge=-1, description="Override hole count. -1 = use AI/B-Rep detected count")
     stock_type: str = Field("round_bar", description="Stock type: round_bar, plate, hex_bar")
+    # Region and Bends additions:
+    region: str = Field("pune", description="Region: pune, ahmedabad, mumbai, chennai, bangalore, delhi")
+    bends_count: int = Field(0, ge=0, description="Number of bends for sheet metal")
+    bend_length_mm: float = Field(0.0, ge=0.0, description="Total length of bends in mm")
 
 class ChatRequest(BaseModel):
     message: str
@@ -105,10 +109,9 @@ class MaterialEstimateRequest(BaseModel):
     quantity: int = Field(1, ge=1, le=10000)
     stock_type: str = Field("round_bar", description="round_bar, plate, hex_bar")
     part_volume_mm3: float = Field(0.0, description="Exact part volume for utilization calc")
+    region: str = Field("pune", description="pune, ahmedabad, mumbai, chennai, bangalore, delhi")
 
 class AiValidationRequest(BaseModel):
-    # Raw inputs only — the endpoint calculates our_ values itself
-    # so "Match: Unknown" (caused by frontend passing our_gross_weight=0) is impossible
     size_x: float = Field(...)
     size_y: float = Field(...)
     size_z: float = Field(...)
@@ -116,6 +119,11 @@ class AiValidationRequest(BaseModel):
     quantity: int = Field(1, ge=1)
     stock_type: str = Field("round_bar")
     part_volume_mm3: float = Field(0.0)
+    region: str = Field("pune")
+
+class UpdateMaterialPricesRequest(BaseModel):
+    prices: dict = Field(..., description="Mapping of material_id -> base_inr_kg")
+
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -153,11 +161,220 @@ async def get_materials():
             "name":          m["name"],
             "density":       m["density"],
             "price_usd_kg":  m["price_usd_kg"],
-            "price_inr_kg":  convert_material_price(m["price_usd_kg"], rate),
+            "price_inr_kg":  convert_material_price(m["price_usd_kg"], rate, mid),
             "machinability": m["machinability"],
+            "grade":         m.get("grade", "-"),
+            "standard":      m.get("standard", "-"),
+            "tensile_strength": m.get("tensile_strength", "-"),
+            "yield_strength":   m.get("yield_strength", "-"),
+            "notes":         m.get("notes", "-"),
         }
         for mid, m in MATERIALS.items()
     }
+
+
+@app.post("/api/materials/update", tags=["Catalogue"])
+async def update_material_prices(req: UpdateMaterialPricesRequest):
+    """Update material base prices in INR/kg and persist to materials_db.json."""
+    from services.pricing import MATERIALS, save_stored_prices
+    updated_count = 0
+    for mid, price in req.prices.items():
+        if mid in MATERIALS:
+            MATERIALS[mid]["base_inr_kg"] = float(price)
+            updated_count += 1
+    
+    if updated_count > 0:
+        save_stored_prices()
+        return {"success": True, "updated_count": updated_count}
+    raise HTTPException(400, "No valid materials found to update.")
+
+
+@app.post("/api/materials/reset", tags=["Catalogue"])
+async def reset_material_prices():
+    """Reset material prices by deleting materials_db.json and reloading defaults."""
+    from services.pricing import DB_FILE, load_stored_prices, MATERIALS
+    import os
+    if os.path.exists(DB_FILE):
+        try:
+            os.remove(DB_FILE)
+        except Exception as e:
+            raise HTTPException(500, f"Failed to reset database: {e}")
+            
+    # Restore defaults
+    DEFAULTS = {
+        "aluminum_6061": 225.0, "aluminum_7075": 320.0, "commercial_aluminium_he30": 210.0,
+        "mild_steel": 70.0, "low_carbon_steel_1018": 75.0, "medium_carbon_steel_1045": 80.0,
+        "high_carbon_steel_1095": 85.0, "free_machining_steel_1212": 70.0, "alloy_steel_4140": 115.0,
+        "tool_steel_d2": 450.0, "stainless_steel_304": 275.0, "stainless_steel_304l": 295.0,
+        "stainless_steel_316": 375.0, "stainless_steel_316l": 395.0, "stainless_steel_410": 225.0,
+        "cast_iron_gray": 100.0, "cast_iron_ductile": 150.0, "titanium_ti6al4v": 3250.0,
+        "copper": 750.0, "brass_360": 500.0, "inconel_718": 3500.0,
+        "pla_plastic": 200.0, "abs_plastic": 175.0, "nylon_plastic": 275.0, "polycarbonate": 325.0
+    }
+    for mid, default_price in DEFAULTS.items():
+        if mid in MATERIALS:
+            MATERIALS[mid]["base_inr_kg"] = default_price
+            
+    return {"success": True, "message": "Database reset to defaults."}
+
+
+@app.post("/api/materials/upload-excel", tags=["Catalogue"])
+async def upload_material_prices_excel(file: UploadFile = File(...)):
+    """
+    Upload an Excel (.xlsx) or CSV (.csv) file to update raw material base prices (INR/kg).
+    Parses headers loosely to locate 'Material' and 'Price' columns.
+    """
+    import io
+    import csv
+    try:
+        import openpyxl
+    except ImportError:
+        raise HTTPException(500, "openpyxl is not installed in the backend environment. Run pip install openpyxl.")
+
+    filename = (file.filename or "").lower()
+    if not (filename.endswith('.xlsx') or filename.endswith('.xls') or filename.endswith('.csv')):
+        raise HTTPException(400, "Unsupported file format. Please upload an Excel (.xlsx) or CSV (.csv) file.")
+
+    contents = await file.read()
+    if len(contents) == 0:
+        raise HTTPException(400, "File is empty.")
+
+    from services.pricing import MATERIALS, save_stored_prices
+    
+    rows = []
+    
+    # Parse based on extension
+    if filename.endswith('.csv'):
+        try:
+            decoded = contents.decode('utf-8-sig', errors='ignore')
+            reader = csv.reader(io.StringIO(decoded))
+            for row in reader:
+                rows.append([cell.strip() for cell in row])
+        except Exception as e:
+            raise HTTPException(400, f"Error parsing CSV file: {str(e)}")
+    else:
+        # Excel .xlsx or .xls
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
+            sheet = wb.active
+            for row in sheet.iter_rows(values_only=True):
+                if any(cell is not None for cell in row):
+                    rows.append([str(cell).strip() if cell is not None else "" for cell in row])
+        except Exception as e:
+            raise HTTPException(400, f"Error parsing Excel file: {str(e)}. Ensure it is a valid .xlsx file.")
+
+    if not rows:
+        raise HTTPException(400, "No data rows found in the uploaded file.")
+
+    # Locate headers in the first few rows (usually row 0 or 1)
+    header_idx = 0
+    mat_col_idx = -1
+    price_col_idx = -1
+    
+    for idx, r in enumerate(rows[:5]):
+        for col_idx, cell in enumerate(r):
+            cell_lower = cell.lower()
+            if any(k in cell_lower for k in ["material", "grade", "standard", "alias", "id", "name"]):
+                if mat_col_idx == -1:
+                    mat_col_idx = col_idx
+                    header_idx = idx
+            if any(k in cell_lower for k in ["price", "rate", "inr", "cost", "rs"]):
+                if price_col_idx == -1:
+                    price_col_idx = col_idx
+                    header_idx = idx
+
+    # Fallbacks if headers not detected: assume col 0 is material, col 1 is price
+    if mat_col_idx == -1:
+        mat_col_idx = 0
+    if price_col_idx == -1:
+        price_col_idx = 1 if len(rows[0]) > 1 else 0
+
+    updated_materials = []
+    unrecognized = []
+    
+    def find_matching_material_id(text: str) -> Optional[str]:
+        if not text:
+            return None
+        text_clean = str(text).strip().lower().replace("-", "").replace("_", "").replace(" ", "")
+        
+        aliases = {
+            "ss304": "stainless_steel_304",
+            "ss304l": "stainless_steel_304",
+            "304": "stainless_steel_304",
+            "ss316": "stainless_steel_316l",
+            "ss316l": "stainless_steel_316l",
+            "316": "stainless_steel_316l",
+            "ms": "mild_steel",
+            "is2062": "mild_steel",
+            "a36": "mild_steel",
+            "en8": "mild_steel",
+            "al6061": "aluminum_6061",
+            "6061": "aluminum_6061",
+            "al7075": "aluminum_7075",
+            "7075": "aluminum_7075",
+            "he30": "commercial_aluminium_he30",
+            "brass": "brass_360",
+            "copper": "copper",
+            "titanium": "titanium_ti6al4v",
+            "inconel": "inconel_718",
+            "d2": "tool_steel_d2",
+            "abs": "abs_plastic",
+            "pla": "pla_plastic"
+        }
+        if text_clean in aliases:
+            return aliases[text_clean]
+
+        for mid, mat in MATERIALS.items():
+            mid_clean = mid.replace("_", "")
+            name_clean = mat["name"].lower().replace("-", "").replace("_", "").replace(" ", "")
+            grade_clean = mat.get("grade", "").lower().replace("-", "").replace("_", "").replace(" ", "")
+            std_clean = mat.get("standard", "").lower().replace("-", "").replace("_", "").replace(" ", "")
+            
+            if text_clean in [mid_clean, name_clean, grade_clean, std_clean]:
+                return mid
+            if text_clean in name_clean or name_clean in text_clean:
+                return mid
+        return None
+
+    # Parse rows
+    for r in rows[header_idx + 1:]:
+        if len(r) <= max(mat_col_idx, price_col_idx):
+            continue
+        mat_text = r[mat_col_idx].strip()
+        price_text = r[price_col_idx].strip()
+        
+        if not mat_text:
+            continue
+            
+        mid = find_matching_material_id(mat_text)
+        
+        if mid:
+            try:
+                clean_price = price_text.replace("₹", "").replace("$", "").replace(",", "").strip()
+                price_val = float(clean_price)
+                if price_val > 0:
+                    MATERIALS[mid]["base_inr_kg"] = price_val
+                    updated_materials.append({
+                        "id": mid,
+                        "name": MATERIALS[mid]["name"],
+                        "matched_from": mat_text,
+                        "new_price": price_val
+                    })
+            except ValueError:
+                continue
+        else:
+            unrecognized.append(mat_text)
+
+    if len(updated_materials) > 0:
+        save_stored_prices()
+        return {
+            "success": True,
+            "updated_count": len(updated_materials),
+            "updated_materials": updated_materials,
+            "unrecognized": unrecognized
+        }
+    else:
+        raise HTTPException(400, f"No matching materials found in the uploaded file. Columns assumed: Material Col={mat_col_idx}, Price Col={price_col_idx}.")
 
 
 @app.get("/api/processes", tags=["Catalogue"])
@@ -226,7 +443,12 @@ async def material_estimate(req: MaterialEstimateRequest):
     rate = fx["rate"]
     price_data = await get_live_prices()
     usd_price = price_data["prices"].get(req.material_id, mat["price_usd_kg"])
-    metal_price_inr = convert_material_price(usd_price, rate)
+    metal_price_inr = convert_material_price(usd_price, rate, req.material_id)
+
+    # Apply regional material index adjustment
+    from services.costing import REGIONAL_INDICES
+    reg_index = REGIONAL_INDICES.get(req.region.lower(), {"material": 1.0, "machine": 1.0, "labor": 1.0})
+    metal_price_inr = metal_price_inr * reg_index["material"]
 
     result["material_name"] = mat["name"]
     result["density_g_cm3"] = mat["density"]
@@ -252,7 +474,12 @@ async def validate_material_ai(req: AiValidationRequest):
     rate = fx["rate"]
     price_data = await get_live_prices()
     usd_price = price_data["prices"].get(req.material_id, mat["price_usd_kg"])
-    metal_price_inr = convert_material_price(usd_price, rate)
+    metal_price_inr = convert_material_price(usd_price, rate, req.material_id)
+
+    # Apply regional material index adjustment
+    from services.costing import REGIONAL_INDICES
+    reg_index = REGIONAL_INDICES.get(req.region.lower(), {"material": 1.0, "machine": 1.0, "labor": 1.0})
+    metal_price_inr = metal_price_inr * reg_index["material"]
 
     # ── Calculate our values here in the backend — never trust frontend to pass them ──
     # This is the SAME calculation used in /api/material-estimate and compute_quote()
@@ -318,7 +545,7 @@ async def get_prices():
 
     inr_prices = {}
     for mid, usd_price in price_data["prices"].items():
-        inr_prices[mid] = convert_material_price(usd_price, rate)
+        inr_prices[mid] = convert_material_price(usd_price, rate, mid)
 
     return {
         "prices_usd": price_data["prices"],
@@ -385,26 +612,14 @@ async def analyze_pdf(file: UploadFile = File(...)):
     gemini_key = os.getenv("GEMINI_API_KEY", "")
     if not gemini_key or gemini_key == "your_gemini_api_key_here":
         raise HTTPException(503,
-            "PDF analysis requires a valid GEMINI_API_KEY. "
-            "Get one free at https://aistudio.google.com/app/apikey "
-            "and set it in backend/.env"
+            "PDF analysis requires valid ACCU AI credentials in the workspace backend."
         )
 
-    result = await run_in_threadpool(_run_pdf_analysis, contents, file.filename)
+    result = await run_in_threadpool(analyze_pdf_drawing, contents, file.filename)
     if result is None:
-        raise HTTPException(429, "Google Gemini API Limit Exceeded. Your free tier quota has run out. Please wait for the daily reset.")
+        raise HTTPException(429, "ACCU AI rate limit exceeded. Please try again shortly or configure a premium endpoint.")
 
     return JSONResponse(content=result)
-
-
-def _run_pdf_analysis(pdf_bytes: bytes, filename: str):
-    """Synchronous wrapper for PDF analysis (runs in threadpool)."""
-    import asyncio
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(analyze_pdf_drawing(pdf_bytes, filename))
-    finally:
-        loop.close()
 
 
 # ── Chat Assistant (Gemini) ───────────────────────────────────────────────────
@@ -418,7 +633,7 @@ async def chat_adjust(req: ChatRequest):
     import json
     api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key:
-        return JSONResponse(content={"response": "I'm offline since GEMINI_API_KEY is not set. Please manually configure.", "metrics": req.metrics})
+        return JSONResponse(content={"response": "I am offline since ACCU AI credentials are not configured in backend/.env. Please configure them to enable chat.", "metrics": req.metrics})
         
     try:
         prompt = f"""You are ACCU AI Copilot, a helpful manufacturing quoting assistant. 
@@ -501,7 +716,7 @@ async def gen_quote(req: QuoteRequest):
         req.material_id,
         MATERIALS[req.material_id]["price_usd_kg"]
     )
-    metal_price_inr = convert_material_price(usd_price, rate)
+    metal_price_inr = convert_material_price(usd_price, rate, req.material_id)
 
     # Generate quotation number
     quote_number = generate_quote_number(req.client_company or req.client_name)
@@ -521,6 +736,9 @@ async def gen_quote(req: QuoteRequest):
             include_drilling_surcharge=req.include_drilling_surcharge,
             hole_count_override=req.hole_count_override,
             stock_type=req.stock_type,
+            region=req.region,
+            bends_count=req.bends_count,
+            bend_length_mm=req.bend_length_mm,
         )
         quote["price_source"]    = price_data["source"]
         quote["price_note"]      = price_data.get("note", "")
@@ -557,7 +775,7 @@ async def gen_quote_pdf(req: QuoteRequest, background_tasks: BackgroundTasks):
         req.material_id,
         MATERIALS[req.material_id]["price_usd_kg"]
     )
-    metal_price_inr = convert_material_price(usd_price, rate)
+    metal_price_inr = convert_material_price(usd_price, rate, req.material_id)
     quote_number = generate_quote_number(req.client_company or req.client_name)
 
     try:
@@ -575,6 +793,9 @@ async def gen_quote_pdf(req: QuoteRequest, background_tasks: BackgroundTasks):
             include_drilling_surcharge=req.include_drilling_surcharge,
             hole_count_override=req.hole_count_override,
             stock_type=req.stock_type,
+            region=req.region,
+            bends_count=req.bends_count,
+            bend_length_mm=req.bend_length_mm,
         )
         quote["price_source"] = price_data["source"]
         quote["quote_number"] = quote_number
@@ -735,6 +956,7 @@ def _analyze_with_cadquery(path: str, original_name: str) -> dict:
     size_x = round(bb.xmax - bb.xmin, 4)
     size_y = round(bb.ymax - bb.ymin, 4)
     size_z = round(bb.zmax - bb.zmin, 4)
+    thickness = min(size_x, size_y, size_z)
 
     volume       = round(abs(solid.Volume()), 4)
     surface_area = round(solid.Area(), 4)
@@ -748,6 +970,16 @@ def _analyze_with_cadquery(path: str, original_name: str) -> dict:
     faces    = solid.Faces()
     edges    = solid.Edges()
     vertices = solid.Vertices()
+
+    total_edge_length = 0.0
+    for edge in edges:
+        try:
+            total_edge_length += edge.Length()
+        except Exception:
+            pass
+
+    if total_edge_length <= 0.0:
+        total_edge_length = 2 * (size_x + size_y)
 
     holes = []
     seen_centers = []
@@ -798,6 +1030,8 @@ def _analyze_with_cadquery(path: str, original_name: str) -> dict:
         "volume":      volume,
         "surfaceArea": surface_area,
         "centroid":    centroid,
+        "perimeter":   round(total_edge_length, 4),
+        "thickness":   round(thickness, 4),
         "topology":    {"faces": n_faces, "edges": n_edges, "vertices": len(vertices)},
         "holes":       holes,
         "complexity":  {"score": round(score, 1), "tier": tier,

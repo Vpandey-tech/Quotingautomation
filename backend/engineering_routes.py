@@ -7,8 +7,9 @@ Now with:
   - Gemini AI cross-validation agent
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 import time, os, uuid, json
@@ -363,6 +364,251 @@ async def submit_param(session_id: str, body: SubmitParamBody):
 
     return {
         "param_accepted": True, "key": body.key, "value": body.value,
+        "next_param": next_param,
+        "all_params_collected": next_param is None,
+        "assumptions": assumptions,
+        "params": session["params"], "status": session["status"],
+    }
+
+
+@router.post("/sessions/{session_id}/chat/multimodal")
+async def custom_chat_multimodal(
+    session_id: str, 
+    file: UploadFile = File(...),
+    message: str = Form("")
+):
+    """Handle free-form chat for custom parts with an uploaded file."""
+    session = _get_session(session_id)
+    if session["component_type"] != "custom":
+        raise HTTPException(400, "Chat endpoint is for custom parts only.")
+
+    current_q = _get_next_custom_question(session)
+    val = message.strip()
+    
+    if file:
+        import google.generativeai as genai
+        import json
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        if api_key:
+            genai.configure(api_key=api_key)
+            contents = await file.read()
+            fname = (file.filename or "").lower()
+            mime_type = "application/pdf"
+            if fname.endswith(('.png', '.jpg', '.jpeg')):
+                mime_type = "image/jpeg" if fname.endswith(('jpg', 'jpeg')) else "image/png"
+            elif fname.endswith(('.step', '.stp')):
+                mime_type = "text/plain"
+            unanswered_qs = [q for q in CUSTOM_QUESTIONS if q["key"] not in session["params"] or session["params"][q["key"]] is None]
+            prompt = f"""The user uploaded '{fname}' and said: '{message}'.
+We need to collect the following missing information for their custom part:
+{json.dumps(unanswered_qs, indent=2)}
+
+Extract as many answers as you can find from the uploaded file and message.
+Return ONLY valid JSON in this exact format, with no markdown, just the raw braces:
+{{
+  "extracted": {{
+    "key1": "value",
+    "key2": 123
+  }}
+}}
+If you cannot find the answer to a specific question, omit its key from the 'extracted' object."""
+            
+            parts = [prompt]
+            if mime_type == "text/plain":
+                parts.append(contents.decode('utf-8', errors='ignore')[:50000])
+            else:
+                parts.append({"mime_type": mime_type, "data": contents})
+                
+            models_to_try = [
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-2.5-pro",
+                "gemini-2.0-flash-001",
+            ]
+            
+            val = None
+            extracted_dict = {}
+            last_err = None
+            for model_name in models_to_try:
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    response = await run_in_threadpool(
+                        model.generate_content,
+                        parts,
+                        generation_config=genai.types.GenerationConfig(temperature=0.0)
+                    )
+                    text = response.text.strip()
+                    if "```json" in text:
+                        text = text.split("```json", 1)[1]
+                        text = text.split("```", 1)[0]
+                    elif "```" in text:
+                        text = text.split("```", 1)[1]
+                        text = text.split("```", 1)[0]
+                    text = text.strip()
+                    start = text.find("{")
+                    end = text.rfind("}")
+                    if start != -1 and end != -1 and end >= start:
+                        text = text[start: end + 1]
+                    data = json.loads(text)
+                    extracted_dict = data.get("extracted", {})
+                    break
+                except Exception as e:
+                    last_err = e
+                    continue
+            
+            if not extracted_dict and last_err:
+                return {"error": f"Failed to extract information: {str(last_err)}", "current_question": current_q}
+            
+            # Apply extracted answers
+            extracted_summary = []
+            for q in unanswered_qs:
+                if q["key"] in extracted_dict:
+                    v = extracted_dict[q["key"]]
+                    if q.get("type") == "number":
+                        try:
+                            import re
+                            nums = re.findall(r"[-+]?\d*\.\d+|\d+", str(v))
+                            if nums:
+                                v = float(nums[0])
+                            else:
+                                v = float(v)
+                        except ValueError:
+                            continue # skip invalid numbers
+                    session["params"][q["key"]] = v
+                    extracted_summary.append(f"{q['key']}: {v}")
+            
+            val = ", ".join(extracted_summary) if extracted_summary else None
+            session["updated_at"] = time.time()
+            
+    elif current_q and val:
+        if current_q.get("type") == "number":
+            try:
+                import re
+                nums = re.findall(r"[-+]?\d*\.\d+|\d+", val)
+                if nums:
+                    val = float(nums[0])
+                else:
+                    val = float(val)
+            except ValueError:
+                return {
+                    "error": f"Please enter a valid number for {current_q['key']}.",
+                    "current_question": current_q,
+                }
+        session["params"][current_q["key"]] = val
+        session["updated_at"] = time.time()
+
+    next_q = _get_next_custom_question(session)
+    if next_q is None:
+        session["status"] = "params_complete"
+        return {
+            "all_done": True,
+            "status": "params_complete",
+            "params": session["params"],
+            "message": "All information collected! Ready to generate your design report.",
+        }
+
+    return {
+        "all_done": False,
+        "answered": current_q["key"] if current_q else None,
+        "extracted_val": val if current_q and val else None,
+        "next_question": next_q,
+        "params_so_far": session["params"],
+        "progress": f"{len(session['params'])}/{len(CUSTOM_QUESTIONS)}",
+    }
+
+
+@router.post("/sessions/{session_id}/params/multimodal")
+async def submit_param_multimodal(
+    session_id: str,
+    key: str = Form(...),
+    file: UploadFile = File(...)
+):
+    session = _get_session(session_id)
+    if session["status"] != "collecting_params":
+        raise HTTPException(400, "Parameters already collected.")
+
+    all_params = get_params_for_component(session["component_type"])
+    param_def = next((p for p in all_params if p["key"] == key), None)
+    if not param_def:
+        raise HTTPException(400, f"Unknown parameter key: {key}")
+
+    val = "Uploaded file"
+    if file:
+        import google.generativeai as genai
+        import json
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        if api_key:
+            genai.configure(api_key=api_key)
+            contents = await file.read()
+            fname = (file.filename or "").lower()
+            mime_type = "application/pdf"
+            if fname.endswith(('.png', '.jpg', '.jpeg')):
+                mime_type = "image/jpeg" if fname.endswith(('jpg', 'jpeg')) else "image/png"
+            elif fname.endswith(('.step', '.stp')):
+                mime_type = "text/plain"
+            
+            prompt = f"The user uploaded '{fname}'. Extract the answer for the parameter '{param_def['label']}' (unit: {param_def.get('unit', '')}). Return JUST the answer value directly, no markdown."
+            
+            parts = [prompt]
+            if mime_type == "text/plain":
+                parts.append(contents.decode('utf-8', errors='ignore')[:50000])
+            else:
+                parts.append({"mime_type": mime_type, "data": contents})
+                
+            models_to_try = [
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-2.5-pro",
+                "gemini-2.0-flash-001",
+            ]
+            
+            val = None
+            last_err = None
+            for model_name in models_to_try:
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    response = await run_in_threadpool(
+                        model.generate_content,
+                        parts,
+                        generation_config=genai.types.GenerationConfig(temperature=0.0)
+                    )
+                    text = response.text.strip()
+                    import re
+                    if param_def.get("type") == "number":
+                        nums = re.findall(r"[-+]?\d*\.\d+|\d+", text)
+                        if nums:
+                            val = str(nums[0])
+                        else:
+                            raise ValueError("No numeric value detected")
+                    else:
+                        val = text
+                    break
+                except Exception as e:
+                    last_err = e
+                    continue
+            
+            if not val:
+                raise HTTPException(422, f"Could not extract '{param_def['label']}' from {fname}. Please enter it manually.")
+
+    err = validate_param(param_def, val)
+    if err:
+        raise HTTPException(422, f"Invalid value extracted from file: {err}. Please enter manually.")
+
+    if param_def["type"] == "number":
+        session["params"][key] = float(val)
+    else:
+        session["params"][key] = str(val)
+    session["updated_at"] = time.time()
+
+    next_param = get_next_missing_param(session["component_type"], session["params"])
+    assumptions = []
+    if next_param is None:
+        session["status"] = "params_complete"
+        # Compute smart defaults to show to the user
+        assumptions = compute_smart_defaults(session["component_type"], session["params"])
+
+    return {
+        "param_accepted": True, "key": key, "value": val,
         "next_param": next_param,
         "all_params_collected": next_param is None,
         "assumptions": assumptions,

@@ -140,6 +140,9 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
                 notes: firstPart.notes || '',
                 holes: geom.holes || [],
                 allParts: parts,
+                bendsCount: safeNum(firstPart.bends_count || 0),
+                bendLengthMm: safeNum(firstPart.bend_length_mm || 0.0),
+                reasoning: result.reasoning || null,
                 // Client info extracted from PDF
                 clientName: result.client_info?.client_name || null,
                 clientCompany: result.client_info?.client_company || null,
@@ -161,7 +164,7 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
         } catch (err) {
             console.error('[Viewer] PDF analysis error:', err);
             setStatus('error');
-            setErrorMsg(err.message || 'Failed to analyze PDF. Is the backend running with GEMINI_API_KEY?');
+            setErrorMsg(err.message || 'Failed to analyze PDF. Is the backend running with the ACCU AI configuration?');
         }
     }, [onMetrics, onAddPart, pdfUrl]);
 

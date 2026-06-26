@@ -79,12 +79,35 @@ async def get_usd_to_inr() -> dict:
 
 # ── Conversion formulas (per senior's instructions) ─────────────────────────
 
-def convert_material_price(usd_per_kg: float, exchange_rate: float) -> float:
+def convert_material_price(usd_per_kg: float, exchange_rate: float, material_id: str = None) -> float:
     """
     Section A: Material price conversion.
-    Formula: (USD/kg × exchange_rate) + ₹150/kg
+    Formula: Local Indian Base Price scaled by LME commodity price fluctuations.
+    Falls back to direct Section A: (USD/kg × exchange_rate) + ₹150/kg if material_id is unknown.
     """
+    try:
+        from services.pricing import MATERIALS, LME_BASELINE_USD
+    except ImportError:
+        try:
+            from pricing import MATERIALS, LME_BASELINE_USD
+        except ImportError:
+            return round((usd_per_kg * exchange_rate) + 150.0, 2)
+
+    if material_id and material_id in MATERIALS:
+        mat = MATERIALS[material_id]
+        base_inr = mat.get("base_inr_kg", 0.0)
+        
+        dev_key = mat.get("metals_dev_key")
+        if dev_key and dev_key in LME_BASELINE_USD:
+            baseline_usd = LME_BASELINE_USD[dev_key]
+            scale = usd_per_kg / baseline_usd if baseline_usd > 0 else 1.0
+            scale = max(0.5, min(2.0, scale))  # Prevent crazy price outliers
+            return round(base_inr * scale, 2)
+            
+        return round(base_inr, 2)
+
     return round((usd_per_kg * exchange_rate) + 150.0, 2)
+
 
 
 def convert_machine_rate(usd_per_hr: float, exchange_rate: float) -> float:

@@ -2,9 +2,10 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Viewer from './components/viewer/Viewer';
 import QuotePanel from './components/quote/QuotePanel';
+import AdminPanel from './components/admin/AdminPanel';
 import {
   Box, FileText, Activity, Ruler, FlaskConical,
-  DollarSign, Layers, ChevronRight, MessageSquare, Send, X, Eye
+  DollarSign, Layers, ChevronRight, MessageSquare, Send, X, Eye, Settings
 } from 'lucide-react';
 
 /* ─── Metric row ─────────────────────────────────────────────────────────── */
@@ -306,7 +307,7 @@ export default function App() {
     setParts([newPart]);
     setActivePartId(newId);
 
-    // For PDF files — geometry is already extracted by Gemini, no B-Rep needed
+    // For PDF files — geometry is already extracted by ACCU AI, no B-Rep needed
     if (m.source === 'pdf') {
       setGeometry(geom);
       setBrepStatus('pdf');
@@ -621,7 +622,7 @@ export default function App() {
         {/* ── Sidebar ────────────────────────────────────────────────────────── */}
         <aside
           className="flex-shrink-0 flex flex-col z-40 sidebar-bg"
-          style={{ width: sidebarWidth, minWidth: 280, maxWidth: '75vw' }}
+          style={tab === 'admin' ? { width: '100%' } : { width: sidebarWidth, minWidth: 280, maxWidth: '75vw' }}
           onMouseEnter={handleSidebarEnter}
           onMouseLeave={handleSidebarLeave}
         >
@@ -632,10 +633,12 @@ export default function App() {
               icon={Layers} label="Details" />
             <Tab active={tab === 'quote'} onClick={() => setTab('quote')}
               icon={DollarSign} label="Quote" badge={parts.length > 1 ? parts.length : 0} />
+            <Tab active={tab === 'admin'} onClick={() => setTab('admin')}
+              icon={Settings} label="Admin" />
           </div>
 
           {/* ── Scrollable content — completely isolated scroll context ── */}
-          <div className="flex-1 sidebar-scroll-container p-3 space-y-3 min-h-0">
+          <div className={`flex-1 sidebar-scroll-container space-y-3 min-h-0 ${tab === 'admin' ? 'p-6 lg:p-8' : 'p-3'}`}>
 
             {tab === 'details' && (
               <>
@@ -716,6 +719,18 @@ export default function App() {
                         label="Surface Area"
                         value={`${Number(metrics.surfaceArea).toLocaleString()} mm²`}
                       />
+                      {metrics.perimeter != null && (
+                        <MetricRow
+                          label="Total Perimeter"
+                          value={`${Number(metrics.perimeter).toLocaleString()} mm`}
+                        />
+                      )}
+                      {metrics.thickness != null && (
+                        <MetricRow
+                          label="Min Thickness"
+                          value={`${Number(metrics.thickness).toLocaleString()} mm`}
+                        />
+                      )}
                     </>
                   ) : (
                     <p className="text-[10px] text-gray-700 py-2">Upload a file.</p>
@@ -861,29 +876,37 @@ export default function App() {
                 onRemovePart={handleRemovePart}
               />
             )}
+
+            {tab === 'admin' && (
+              <AdminPanel />
+            )}
           </div>
         </aside>
 
         {/* ── Sidebar Resize Handle ── */}
-        <div
-          className="sidebar-resize-handle"
-          onMouseDown={handleResizeStart}
-          title="Drag to resize"
-        />
+        {tab !== 'admin' && (
+          <div
+            className="sidebar-resize-handle"
+            onMouseDown={handleResizeStart}
+            title="Drag to resize"
+          />
+        )}
 
         {/* ── 3D Viewer ────────────────────────────────────────────────────── */}
-        <section
-          ref={viewerRef}
-          className="flex-1 relative overflow-hidden"
-          style={{ background: '#080c14' }}
-        >
-          <Viewer
-            onMetrics={handleMetrics}
-            onAddPart={handleAddPart}
-            hasExistingParts={parts.length > 0}
-            activePart={parts.find(p => p.id === activePartId)}
-          />
-        </section>
+        {tab !== 'admin' && (
+          <section
+            ref={viewerRef}
+            className="flex-1 relative overflow-hidden"
+            style={{ background: '#080c14' }}
+          >
+            <Viewer
+              onMetrics={handleMetrics}
+              onAddPart={handleAddPart}
+              hasExistingParts={parts.length > 0}
+              activePart={parts.find(p => p.id === activePartId)}
+            />
+          </section>
+        )}
       </div>
     </div>
   );

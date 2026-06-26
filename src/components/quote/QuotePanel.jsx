@@ -40,8 +40,8 @@ function Select({ label, value, onChange, options, disabled }) {
                     disabled={disabled || options.length === 0}
                     className="w-full bg-gray-800/70 border border-gray-700/60 text-gray-200
                         text-[11px] rounded-lg px-3 py-2 appearance-none focus:outline-none
-                        focus:border-cyan-500/50 cursor-pointer font-mono
-                        group-hover:border-gray-600 transition-colors
+                        focus:border-cyan-500/80 focus:shadow-[0_0_8px_rgba(34,211,238,0.2)] cursor-pointer font-mono
+                        group-hover:border-gray-600 transition-all duration-200
                         disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                     {options.length === 0
@@ -77,8 +77,8 @@ function TextInput({ label, value, onChange, placeholder, icon: Icon, type = "te
                     onChange={e => onChange(type === 'range' || type === 'number' ? parseFloat(e.target.value) : e.target.value)}
                     placeholder={placeholder}
                     className={`w-full bg-gray-800/70 text-gray-200 text-[11px] rounded-lg
-                        ${type !== 'range' ? `border border-gray-700/60 py-2 focus:outline-none focus:border-cyan-500/50 hover:border-gray-600 ${Icon ? 'pl-8 pr-3' : 'px-3'}` : 'accent-cyan-500'}
-                        font-mono placeholder:text-gray-700 transition-colors cursor-pointer`}
+                        ${type !== 'range' ? `border border-gray-700/60 py-2 focus:outline-none focus:border-cyan-500/80 focus:shadow-[0_0_8px_rgba(34,211,238,0.2)] hover:border-gray-600 ${Icon ? 'pl-8 pr-3' : 'px-3'}` : 'accent-cyan-500'}
+                        font-mono placeholder:text-gray-700 transition-all duration-200 cursor-pointer`}
                 />
             </div>
         </div>
@@ -180,6 +180,9 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
     const [includeDrillingSurcharge, setIncludeDrillingSurcharge] = useState(pcfg.includeDrillingSurcharge ?? true);
     const [holeCountOverride, setHoleCountOverride] = useState(pcfg.holeCountOverride ?? -1); // -1 = auto
     const [stockType, setStockType] = useState(pcfg.stockType || 'round_bar');
+    const [region, setRegion] = useState(pcfg.region || 'pune');
+    const [bendsCount, setBendsCount] = useState(pcfg.bendsCount || 0);
+    const [bendLengthMm, setBendLengthMm] = useState(pcfg.bendLengthMm || 0.0);
     
     const [materialEstimate, setMaterialEstimate] = useState(activePart?.materialEstimate || null);
     const [estimateLoading, setEstimateLoading] = useState(false);
@@ -205,13 +208,13 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
             config: {
                 materialId, processIds, surfaceTreatmentIds, toleranceId,
                 quantity, profitMarginPct, includeSetupCost, includeDrillingSurcharge,
-                holeCountOverride, stockType
+                holeCountOverride, stockType, region, bendsCount, bendLengthMm
             },
             quote,
             materialEstimate,
             aiValidation
         });
-    }, [activePart?.id, materialId, processIds, surfaceTreatmentIds, toleranceId, quantity, profitMarginPct, includeSetupCost, includeDrillingSurcharge, holeCountOverride, stockType, quote, materialEstimate, aiValidation, onUpdatePartData]);
+    }, [activePart?.id, materialId, processIds, surfaceTreatmentIds, toleranceId, quantity, profitMarginPct, includeSetupCost, includeDrillingSurcharge, holeCountOverride, stockType, region, bendsCount, bendLengthMm, quote, materialEstimate, aiValidation, onUpdatePartData]);
 
     const resultRef = React.useRef(null);
 
@@ -337,6 +340,7 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     quantity: Math.max(1, quantity),
                     stock_type: stockType,
                     part_volume_mm3: parseFloat(geometry.volume) || 0,
+                    region: region,
                 }),
             });
             if (resp.ok) {
@@ -350,7 +354,7 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
     useEffect(() => {
         if (geometry) fetchMaterialEstimate();
         setAiValidation(null); // Reset AI validation on param change
-    }, [geometry, materialId, stockType, quantity]);
+    }, [geometry, materialId, stockType, quantity, region]);
 
     // ── Validate with Gemini AI (on-demand only)
     const validateWithAI = async () => {
@@ -370,6 +374,7 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     quantity: Math.max(1, quantity),
                     stock_type: stockType,
                     part_volume_mm3: parseFloat(geometry?.volume) || 0,
+                    region: region,
                     our_stock_size: materialEstimate.standard_diameter_mm
                         ? `Ø${materialEstimate.standard_diameter_mm}mm`
                         : materialEstimate.standard_thickness_mm
@@ -431,6 +436,9 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     const partProcIds = (partConfig.processIds && partConfig.processIds.length) ? partConfig.processIds : ['cnc_milling_3ax'];
                     const partTolId = partConfig.toleranceId || 'standard';
                     const partQty = partConfig.quantity || 1;
+                    const partRegion = partConfig.region || 'pune';
+                    const partBendsCount = partConfig.bendsCount || 0;
+                    const partBendLengthMm = partConfig.bendLengthMm || 0.0;
 
                     const resp = await fetch(`${API}/quote`, {
                         method: 'POST',
@@ -452,6 +460,9 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                             include_drilling_surcharge: partConfig.includeDrillingSurcharge ?? true,
                             hole_count_override: partConfig.holeCountOverride ?? -1,
                             stock_type: partConfig.stockType || 'round_bar',
+                            region: partRegion,
+                            bends_count: partProcIds.includes('sheet_metal_bending') ? partBendsCount : 0,
+                            bend_length_mm: partProcIds.includes('sheet_metal_bending') ? partBendLengthMm : 0.0,
                         }),
                     });
 
@@ -560,6 +571,9 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                             hsn_code: hsnCode, source_filename: fileMetrics?.fileName || '',
                             screenshot: null, include_setup_cost: includeSetupCost,
                             hole_count_override: holeCountOverride, stock_type: stockType,
+                            region: region,
+                            bends_count: (part.process_id === 'sheet_metal_bending' || (!part.process_id && processIds.includes('sheet_metal_bending'))) ? (part.bends_count || bendsCount || 0) : 0,
+                            bend_length_mm: (part.process_id === 'sheet_metal_bending' || (!part.process_id && processIds.includes('sheet_metal_bending'))) ? (part.bend_length_mm || bendLengthMm || 0.0) : 0.0,
                         }),
                     });
                     if (!resp.ok) {
@@ -632,6 +646,9 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                         include_drilling_surcharge: includeDrillingSurcharge,
                         hole_count_override: holeCountOverride,
                         stock_type: stockType,
+                        region: region,
+                        bends_count: processIds.includes('sheet_metal_bending') ? bendsCount : 0,
+                        bend_length_mm: processIds.includes('sheet_metal_bending') ? bendLengthMm : 0.0,
                     }),
                 });
                 if (!resp.ok) {
@@ -678,6 +695,9 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                 include_drilling_surcharge: includeDrillingSurcharge,
                 hole_count_override: holeCountOverride,
                 stock_type: stockType,
+                region: region,
+                bends_count: processIds.includes('sheet_metal_bending') ? bendsCount : 0,
+                bend_length_mm: processIds.includes('sheet_metal_bending') ? bendLengthMm : 0.0,
             };
 
             const resp = await fetch(`${API}/quote/pdf`, {
@@ -839,6 +859,15 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     placeholder="e.g. Aerochamp Aviation Pvt. Ltd." icon={Building} />
                 <TextInput label="HSN/SAC Code" value={hsnCode} onChange={setHsnCode}
                     placeholder="e.g. 84669310" icon={FileText} />
+                <Select label="Region / Manufacturing Hub" value={region} onChange={setRegion}
+                    options={[
+                        { value: 'pune', label: 'Pune (Base)' },
+                        { value: 'ahmedabad', label: 'Ahmedabad' },
+                        { value: 'mumbai', label: 'Mumbai' },
+                        { value: 'chennai', label: 'Chennai' },
+                        { value: 'bangalore', label: 'Bangalore' },
+                        { value: 'delhi', label: 'Delhi' },
+                    ]} />
             </div>
 
             {/* ── PDF auto-fill indicator ─────────────────────────────────── */}
@@ -874,6 +903,24 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     options={matOptions} disabled={catLoading} />
                 <MultiSelect label="Manufacturing Processes" selectedIds={processIds} onChange={setProcessIds}
                     options={procOptions} disabled={catLoading} />
+                {processIds.includes('sheet_metal_bending') && (
+                    <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/10 animate-fadeIn">
+                        <TextInput
+                            label="Bends Count"
+                            type="number"
+                            min={0}
+                            value={bendsCount}
+                            onChange={val => setBendsCount(Math.max(0, parseInt(val) || 0))}
+                        />
+                        <TextInput
+                            label="Bend Length (mm)"
+                            type="number"
+                            min={0}
+                            value={bendLengthMm}
+                            onChange={val => setBendLengthMm(Math.max(0, parseFloat(val) || 0))}
+                        />
+                    </div>
+                )}
                 <MultiSelect label="Surface Treatment" selectedIds={surfaceTreatmentIds} onChange={setSurfaceTreatmentIds}
                     options={surfaceOptions} disabled={catLoading} />
                 <Select label="Tolerance" value={toleranceId} onChange={setToleranceId}
@@ -1057,7 +1104,7 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                         >
                             {aiValidating
                                 ? <><RefreshCw size={11} className="animate-spin" /> Validating...</>
-                                : <><ShieldCheck size={11} /> Validate with AI</>}
+                                : <><ShieldCheck size={11} /> Validate with ACCU AI</>}
                         </button>
 
                         {/* AI Validation Result */}
@@ -1336,6 +1383,46 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                         <LineItem label="Machine Rate" value={`₹${fmt(quote.machine_rate_inr_hr)}/hr`} />
                         <LineItem label="Exchange Rate" value={`₹${fmt(quote.exchange_rate, 2)}/USD`} />
                     </div>
+
+                    {/* DFM Feedback Section */}
+                    {quote.dfm_feedback && (quote.dfm_feedback.warnings?.length > 0 || quote.dfm_feedback.recommendations?.length > 0) && (
+                        <div className="border-t border-gray-700/40 pt-3 space-y-3">
+                            <div className="flex items-center gap-1.5">
+                                <Zap size={13} className="text-cyan-400 animate-pulse" />
+                                <span className="text-[10px] font-bold text-gray-200 uppercase tracking-widest">
+                                    Design for Manufacturing (DFM)
+                                </span>
+                            </div>
+                            
+                            {quote.dfm_feedback.warnings?.length > 0 && (
+                                <div className="space-y-1.5">
+                                    <p className="text-[9px] text-amber-400 font-bold uppercase tracking-wider">Warnings</p>
+                                    <div className="space-y-1">
+                                        {quote.dfm_feedback.warnings.map((warn, idx) => (
+                                            <div key={idx} className="flex items-start gap-1.5 bg-amber-500/5 border border-amber-500/10 rounded-lg p-2">
+                                                <AlertCircle size={12} className="text-amber-400 shrink-0 mt-0.5" />
+                                                <p className="text-[10px] text-amber-200/90 font-mono leading-relaxed">{warn}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {quote.dfm_feedback.recommendations?.length > 0 && (
+                                <div className="space-y-1.5">
+                                    <p className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider">Recommendations</p>
+                                    <div className="space-y-1">
+                                        {quote.dfm_feedback.recommendations.map((rec, idx) => (
+                                            <div key={idx} className="flex items-start gap-1.5 bg-cyan-500/5 border border-cyan-500/10 rounded-lg p-2">
+                                                <Zap size={12} className="text-cyan-400 shrink-0 mt-0.5" />
+                                                <p className="text-[10px] text-cyan-200/90 font-mono leading-relaxed">{rec}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Download PDF */}
                     <button

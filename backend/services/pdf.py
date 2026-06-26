@@ -165,6 +165,7 @@ def _draw_material_calculation_page(pdf, part_data: dict, title: str, source_fil
     _lbl_val("Stock Type", part_data.get("stock_type_name", "Round Bar"))
     _lbl_val("Standard Stock Size", me.get("standard_stock_size", "-"))
     _lbl_val("Material Specification", part_data.get("material", "-"))
+    _lbl_val("Manufacturing Region", str(part_data.get("region", "pune")).upper())
     
     bb = part_data.get("boundingBox", {})
     if "boundingBox" not in part_data and "geometry" in part_data:
@@ -180,6 +181,13 @@ def _draw_material_calculation_page(pdf, part_data: dict, title: str, source_fil
         for k, v in alw.items():
             _lbl_val(f"{k.replace('_', ' ').title()} Allowance", f"{v} mm")
     _lbl_val("Calculated Envelope Volume", f"{me.get('envelope_volume_mm3', 0):,.0f} mm³")
+    
+    # Bending details if sheet metal bending is used
+    bends_count = part_data.get("bends_count", 0)
+    bend_length = part_data.get("bend_length_mm", 0.0)
+    if bends_count > 0 or bend_length > 0:
+        _lbl_val("Sheet Metal Bends Count", f"{bends_count}")
+        _lbl_val("Total Bend Length", f"{bend_length:.2f} mm")
 
     # 3. Weight & Cost
     mat_cost = part_data.get("breakdown", {}).get("material_cost", 0)

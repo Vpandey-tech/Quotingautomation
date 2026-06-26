@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Loader2, Send, CheckCircle2, AlertTriangle, Download, Calculator,
   Box, ChevronRight, Home, PenTool, Lock, ArrowRight, Cog,
-  Edit3, ShieldCheck, X, Save, RefreshCw, Brain
+  Edit3, ShieldCheck, X, Save, RefreshCw, Brain, Layers
 } from 'lucide-react';
 
 const STATUS_LABELS = {
@@ -32,6 +32,7 @@ export default function DesignSession() {
   const [generatingReport, setGeneratingReport] = useState(false);
   const [generatingCad, setGeneratingCad] = useState(false);
   const [approvingReport, setApprovingReport] = useState(false);
+  const [chatAttachment, setChatAttachment] = useState(null);
 
   // Edit & AI Validation
   const [editingParam, setEditingParam] = useState(null);
@@ -134,16 +135,30 @@ export default function DesignSession() {
 
   const handleCustomSubmit = async (e) => {
     e.preventDefault();
-    if (!inputValue.trim() || submitting) return;
-    const val = inputValue.trim();
+    if ((!inputValue.trim() && !chatAttachment) || submitting) return;
+    const val = inputValue.trim() || 'Uploaded a file';
     setSubmitting(true);
     setInputValue('');
-    setChatMessages(prev => [...prev, { role: 'user', text: val }]);
+    setChatMessages(prev => [...prev, { role: 'user', text: val, attachment: chatAttachment?.name }]);
+    
     try {
-      const res = await fetch(`/api/design/sessions/${id}/chat`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: val }),
-      });
+      let res;
+      if (chatAttachment) {
+          const formData = new FormData();
+          formData.append('file', chatAttachment);
+          formData.append('message', val);
+          res = await fetch(`/api/design/sessions/${id}/chat/multimodal`, {
+              method: 'POST',
+              body: formData
+          });
+          setChatAttachment(null);
+      } else {
+          res = await fetch(`/api/design/sessions/${id}/chat`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: val }),
+          });
+      }
+      
       const data = await res.json();
       if (data.error) {
         setChatMessages(prev => [...prev, { role: 'error', text: data.error }]);
@@ -154,7 +169,14 @@ export default function DesignSession() {
       } else if (data.next_question) {
         setCustomQuestion(data.next_question);
         setCustomProgress(data.progress || '');
-        setChatMessages(prev => [...prev, { role: 'assistant', text: data.next_question.q }]);
+        setChatMessages(prev => {
+            const msgs = [...prev];
+            if (data.extracted_val !== undefined && data.extracted_val !== null) {
+                msgs.push({ role: 'assistant', text: `Got it. Extracted: **${data.extracted_val}**` });
+            }
+            msgs.push({ role: 'assistant', text: data.next_question.q });
+            return msgs;
+        });
       }
     } catch (e) {
       setChatMessages(prev => [...prev, { role: 'error', text: 'Network error' }]);
@@ -165,10 +187,10 @@ export default function DesignSession() {
   // Submit parameter
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!inputValue.trim() || !session?.next_param || submitting) return;
+    if ((!inputValue.trim() && !chatAttachment) || !session?.next_param || submitting) return;
 
     const np = session.next_param;
-    let value = inputValue.trim();
+    let value = inputValue.trim() || 'File uploaded';
 
     // For select types, try matching by label or value
     if (np.type === 'select') {
@@ -180,13 +202,27 @@ export default function DesignSession() {
 
     setSubmitting(true);
     setInputValue('');
+    setChatMessages(prev => [...prev, { role: 'user', text: value, attachment: chatAttachment?.name }]);
 
     try {
-      const res = await fetch(`/api/design/sessions/${id}/params`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: np.key, value }),
-      });
+      let res;
+      if (chatAttachment) {
+          const formData = new FormData();
+          formData.append('file', chatAttachment);
+          formData.append('key', np.key);
+          res = await fetch(`/api/design/sessions/${id}/params/multimodal`, {
+              method: 'POST',
+              body: formData
+          });
+          setChatAttachment(null);
+      } else {
+          res = await fetch(`/api/design/sessions/${id}/params`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: np.key, value }),
+          });
+      }
+      
       if (!res.ok) {
         const err = await res.json();
         setChatMessages(prev => [...prev, { role: 'error', text: err.detail || 'Invalid value' }]);
@@ -196,6 +232,12 @@ export default function DesignSession() {
       setChatMessages(prev => [...prev, { role: 'error', text: 'Network error' }]);
     }
     setSubmitting(false);
+  };
+  
+  const handleChatFileSelect = (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+          setChatAttachment(e.target.files[0]);
+      }
   };
 
   // Select option click
@@ -400,6 +442,11 @@ export default function DesignSession() {
                   background: msg.role === 'user' ? 'rgba(34,211,238,0.12)' : msg.role === 'error' ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
                   border: `1px solid ${msg.role === 'user' ? 'rgba(34,211,238,0.2)' : msg.role === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)'}`,
                 }}>
+                  {msg.attachment && (
+                      <div className="text-[8pt] text-cyan-300 font-mono bg-black/20 px-1.5 py-0.5 mb-1 rounded truncate">
+                          📎 {msg.attachment}
+                      </div>
+                  )}
                   {msg.text}
                 </div>
               </div>
@@ -416,14 +463,18 @@ export default function DesignSession() {
           {/* Input */}
           <div className="p-3 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.015)' }}>
             {isCustom && isCollecting ? (
-              <form onSubmit={handleCustomSubmit} className="flex gap-2">
+              <form onSubmit={handleCustomSubmit} className="flex gap-2 relative">
+                <label className="absolute left-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-cyan-400 cursor-pointer">
+                    <input type="file" className="hidden" onChange={handleChatFileSelect} accept=".pdf,.step,.stp,.png,.jpg,.jpeg" />
+                    <Layers size={14} />
+                </label>
                 <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)}
-                  placeholder="Type your answer..."
-                  className="flex-1 px-3 py-2 text-[10pt] font-mono text-white rounded-lg outline-none
+                  placeholder={chatAttachment ? `Attached: ${chatAttachment.name}` : "Type your answer or upload..."}
+                  className="flex-1 pl-9 pr-3 py-2 text-[10pt] font-mono text-white rounded-lg outline-none
                     focus:ring-1 focus:ring-violet-400/40 placeholder:text-gray-600"
                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                   disabled={submitting} autoComplete="off" />
-                <button type="submit" disabled={submitting || !inputValue.trim()}
+                <button type="submit" disabled={submitting || (!inputValue.trim() && !chatAttachment)}
                   className="px-3 py-2 rounded-lg transition-all disabled:opacity-30"
                   style={{ background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)' }}>
                   {submitting ? <Loader2 size={14} className="animate-spin text-violet-400" /> : <Send size={14} className="text-violet-400" />}
@@ -444,14 +495,18 @@ export default function DesignSession() {
                     ))}
                   </div>
                 ) : (
-                  <form onSubmit={handleSubmit} className="flex gap-2">
+                  <form onSubmit={handleSubmit} className="flex gap-2 relative">
+                    <label className="absolute left-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-cyan-400 cursor-pointer">
+                        <input type="file" className="hidden" onChange={handleChatFileSelect} accept=".pdf,.step,.stp,.png,.jpg,.jpeg" />
+                        <Layers size={14} />
+                    </label>
                     <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)}
-                      placeholder={`Enter ${np.label} (${np.unit || 'value'})...`}
-                      className="flex-1 px-3 py-2 text-[10pt] font-mono text-white rounded-lg outline-none
+                      placeholder={chatAttachment ? `Attached: ${chatAttachment.name}` : `Enter ${np.label} (${np.unit || 'value'})...`}
+                      className="flex-1 pl-9 pr-3 py-2 text-[10pt] font-mono text-white rounded-lg outline-none
                         focus:ring-1 focus:ring-cyan-400/40 placeholder:text-gray-600"
                       style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                       disabled={submitting} autoComplete="off" />
-                    <button type="submit" disabled={submitting || !inputValue.trim()}
+                    <button type="submit" disabled={submitting || (!inputValue.trim() && !chatAttachment)}
                       className="px-3 py-2 rounded-lg transition-all disabled:opacity-30"
                       style={{ background: 'rgba(34,211,238,0.15)', border: '1px solid rgba(34,211,238,0.3)' }}>
                       {submitting ? <Loader2 size={14} className="animate-spin text-cyan-400" /> : <Send size={14} className="text-cyan-400" />}

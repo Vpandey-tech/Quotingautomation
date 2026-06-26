@@ -160,34 +160,87 @@ def _b3d_cam(dims: Dict, params: Dict) -> str:
 
 
 def _b3d_custom(dims: Dict, params: Dict) -> str:
-    """Generate custom part STEP using build123d."""
-    from build123d import Box, Cylinder, Pos, Location, export_step, Align
-    import re
+    """Generate custom part STEP using build123d advanced operations."""
+    from build123d import Box, Cylinder, Sphere, Pos, Location, export_step, Align, fillet, Part
+    import json
+    import time
+    
+    # Try to parse 'operations' from params (could be string or list)
+    ops_raw = params.get("operations")
+    
+    # If no advanced ops, fallback to the basic box with holes logic
+    if not ops_raw:
+        import re
+        Lp = float(dims.get("length_mm", 100))
+        Wp = float(dims.get("width_mm", 50))
+        Hp = float(dims.get("height_mm", 25))
+        part = Box(Lp, Wp, Hp)
+        holes_desc = str(params.get("has_holes", "no"))
+        if holes_desc.lower() not in ("no", "none", ""):
+            nums = re.findall(r'(\d+\.?\d*)', holes_desc)
+            if len(nums) >= 2:
+                n_holes = int(float(nums[0]))
+                d_hole = float(nums[1])
+                depth = min(Hp, 25)
+                spacing = Lp / (n_holes + 1)
+                for i in range(n_holes):
+                    x_pos = -Lp / 2 + spacing * (i + 1)
+                    hole = Cylinder(d_hole / 2, depth + 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
+                    hole = hole.locate(Location(Pos(x_pos, 0, -Hp / 2)))
+                    part = part - hole
+        out_path = os.path.join(_get_output_dir(), f"custom_{int(Lp)}x{int(Wp)}x{int(Hp)}.step")
+        export_step(part, out_path)
+        return out_path
 
-    Lp = float(dims.get("length_mm", 100))
-    Wp = float(dims.get("width_mm", 50))
-    Hp = float(dims.get("height_mm", 25))
-
-    part = Box(Lp, Wp, Hp)
-
-    # Hole deductions
-    holes_desc = str(params.get("has_holes", "no"))
-    if holes_desc.lower() not in ("no", "none", ""):
-        nums = re.findall(r'(\d+\.?\d*)', holes_desc)
-        if len(nums) >= 2:
-            n_holes = int(float(nums[0]))
-            d_hole = float(nums[1])
-            depth = min(Hp, 25)
-            spacing = Lp / (n_holes + 1)
-            for i in range(n_holes):
-                x_pos = -Lp / 2 + spacing * (i + 1)
-                hole = Cylinder(d_hole / 2, depth + 2, align=(Align.CENTER, Align.CENTER, Align.MIN))
-                hole = hole.locate(Location(Pos(x_pos, 0, -Hp / 2)))
-                part = part - hole
-
-    out_path = os.path.join(_get_output_dir(), f"custom_{int(Lp)}x{int(Wp)}x{int(Hp)}.step")
-    export_step(part, out_path)
-    return out_path
+    # Advanced Peak mode
+    try:
+        if isinstance(ops_raw, str):
+            ops = json.loads(ops_raw)
+        else:
+            ops = ops_raw
+            
+        part = Part()
+        
+        for op in ops:
+            op_type = op.get("type")
+            if op_type == "box":
+                b = Box(op.get("l", 10), op.get("w", 10), op.get("h", 10))
+                b = b.locate(Location(Pos(op.get("x", 0), op.get("y", 0), op.get("z", 0))))
+                if op.get("action") == "cut":
+                    part = part - b
+                else:
+                    if part.volume == 0: part = b
+                    else: part = part + b
+            elif op_type == "cylinder":
+                c = Cylinder(op.get("r", 5), op.get("h", 10))
+                c = c.locate(Location(Pos(op.get("x", 0), op.get("y", 0), op.get("z", 0))))
+                if op.get("action") == "cut":
+                    part = part - c
+                else:
+                    if part.volume == 0: part = c
+                    else: part = part + c
+            elif op_type == "sphere":
+                s = Sphere(op.get("r", 5))
+                s = s.locate(Location(Pos(op.get("x", 0), op.get("y", 0), op.get("z", 0))))
+                if op.get("action") == "cut":
+                    part = part - s
+                else:
+                    if part.volume == 0: part = s
+                    else: part = part + s
+            elif op_type == "fillet":
+                # Fillet all edges
+                if part.volume > 0:
+                    part = fillet(part.edges(), radius=op.get("r", 1))
+        
+        out_path = os.path.join(_get_output_dir(), f"custom_advanced_{int(time.time())}.step")
+        export_step(part, out_path)
+        return out_path
+    except Exception as e:
+        print(f"Advanced CAD failed: {e}")
+        # Return a simple box if it fails
+        out_path = os.path.join(_get_output_dir(), f"custom_fail.step")
+        export_step(Box(10,10,10), out_path)
+        return out_path
 
 
 # ══════════════════════════════════════════════════════════════════════════════

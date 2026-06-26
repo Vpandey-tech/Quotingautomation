@@ -38,6 +38,10 @@ def _configure_gemini():
 EXTRACTION_PROMPT = """You are an expert manufacturing engineer analyzing an engineering drawing PDF.
 Your job is to extract ALL manufacturing-relevant information for creating a quotation.
 
+=== REASONING & CHAIN-OF-THOUGHT SCRATCHPAD ===
+You MUST include a "reasoning" key at the root level of your JSON response.
+Inside the "reasoning" field, you MUST write down an extremely concise (1 to 2 sentences max) summary of the final key calculation numbers, materials, and processes you identified. The user is an executive who does not need long explanations; they only care about direct parameters and accurate calculations. Do NOT output a long step-by-step markdown list. Keep it purely focused on the resulting metrics.
+
 CRITICAL INSTRUCTION FOR CONSISTENCY: 
 If this drawing contains multiple parts (e.g., an assembly), you MUST extract the parts in a strictly logical order. 
 1. If there is a Bill of Materials (BOM) or Parts List, extract the parts in the EXACT order they appear in the BOM (from top to bottom or bottom to top as listed).
@@ -48,6 +52,7 @@ CRITICAL INSTRUCTION FOR DIMENSIONS AND BOUNDING BOX:
 - `boundingBox` MUST represent the absolute MAXIMUM overall outer dimensions of the part.
 - For a cylindrical part like a rod or shaft: `sizeX` MUST be the TOTAL maximum overall length of the part (look for the largest length dimension line that spans the FULL part). DO NOT use partial segment lengths or thread lengths. `sizeY` and `sizeZ` MUST BOTH be equal to the MAXIMUM outer diameter of the part.
 - For rectangular parts: `sizeX`, `sizeY` and `sizeZ` are the Max Length, Max Width, and Max Thickness respectively.
+- For sheet metal / plate parts: `sizeX` is flat length, `sizeY` is flat width, and `sizeZ` is the plate thickness.
 - You MUST be completely deterministic and solely use the largest explicit dimension spanning the part.
 
 Extract the following information for EACH part visible in the drawing:
@@ -68,6 +73,8 @@ Extract the following information for EACH part visible in the drawing:
 14. Bounding box: sizeX, sizeY, sizeZ in mm
 15. Determine if it is a "machined part" or "buyout item" (e.g. O-Rings, off-the-shelf bolts).
 16. Extract Critical Machining Considerations (e.g. Maintaining straightness, critical boring tolerances, multi-sided complex pocketing).
+17. Bends Count (number of bends for sheet metal parts, 0 if none)
+18. Total Bend Length in mm (total length of all bend lines added together, 0.0 if none)
 
 Return as valid JSON (no markdown, no code fences):
 {
@@ -97,7 +104,9 @@ Return as valid JSON (no markdown, no code fences):
             "notes": "chamfers, threads, special requirements",
             "critical_considerations": "e.g. maintaining straightness, deep pocketing, tight angular hole precision",
             "estimated_volume_mm3": 0,
-            "estimated_surface_area_mm2": 0
+            "estimated_surface_area_mm2": 0,
+            "bends_count": 0,
+            "bend_length_mm": 0.0
         }
     ],
     "assembly_name": "Assembly name if this is part of an assembly, else null",
@@ -106,13 +115,14 @@ Return as valid JSON (no markdown, no code fences):
         "client_name": "Person name found in the PDF (from 'Prepared for', 'Customer', 'Client', 'Attention', 'To', title block, or any recipient name) or null",
         "client_company": "Company/organization name found in the PDF (from header, title block, 'Prepared for', 'Customer', 'Client', company logo text, or any business name) or null",
         "client_contact": "Any phone, email, or address found for the client, or null"
-    },
+      },
     "title_block": {
         "drawing_number": "",
         "revision": "",
         "scale": "",
         "drawn_by": ""
-    }
+    },
+    "reasoning": "Extremely concise 1-2 sentence summary of key calculation parameters extracted (dimensions, material, quantity) - no conversational fluff."
 }
 
 CRITICAL RULES — DO NOT HALLUCINATE:
@@ -132,7 +142,7 @@ CRITICAL RULES — DO NOT HALLUCINATE:
 - Return ONLY the JSON, no other text"""
 
 
-async def analyze_pdf_drawing(pdf_bytes: bytes, filename: str) -> Optional[dict]:
+def analyze_pdf_drawing(pdf_bytes: bytes, filename: str) -> Optional[dict]:
     """
     Analyze a PDF engineering drawing using Google Gemini.
 
@@ -158,9 +168,10 @@ async def analyze_pdf_drawing(pdf_bytes: bytes, filename: str) -> Optional[dict]
 
         # Try models in order of preference with retry
         models_to_try = [
+            "gemini-2.5-pro",
+            "gemini-1.5-pro",
             "gemini-2.5-flash",
             "gemini-2.0-flash",
-            "gemini-2.5-pro",
             "gemini-2.0-flash-001"
         ]
         last_error = None
