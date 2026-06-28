@@ -95,27 +95,65 @@ function buildMesh(geometryMesh) {
  * Extra padding (1.9×) ensures dimension lines outside the model stay visible.
  */
 function AutoCamera({ groupRef, trigger }) {
-    const { camera, size } = useThree();
+    const { camera, size, gl, scene } = useThree();
 
-    useEffect(() => {
-        if (!trigger || !groupRef.current) return;
+    const alignFrontView = useRef(null);
 
-        const box = new THREE.Box3().setFromObject(groupRef.current);
+    alignFrontView.current = () => {
+        const targetObj = trigger || groupRef.current;
+        if (!targetObj) return;
+
+        const box = new THREE.Box3().setFromObject(targetObj);
         if (box.isEmpty()) return;
 
         const sphere = new THREE.Sphere();
         box.getBoundingSphere(sphere);
 
         const fov = (camera.fov * Math.PI) / 180;
-        const distance = (sphere.radius / Math.sin(fov / 2)) * 1.9;
+        const aspect = camera.aspect || 1;
+        const halfFov = fov / 2;
+        let fitRadius = sphere.radius;
+        if (aspect < 1) {
+            fitRadius = fitRadius / aspect;
+        }
 
-        const dir = new THREE.Vector3(1, 0.7, 1).normalize();
+        // 1.0x padding multiplier ensures dimension overlays and parts are comfortably framed
+        const distance = (fitRadius / Math.sin(halfFov)) * 1.0;
+
+        // Clean Front View: Camera looking directly down the Z-axis
+        const dir = new THREE.Vector3(0, 0, 1).normalize();
+
         camera.position.copy(sphere.center).addScaledVector(dir, distance);
-        camera.near = distance * 0.001;
+        camera.near = distance * 0.01;
         camera.far = distance * 100;
         camera.updateProjectionMatrix();
         camera.lookAt(sphere.center);
+
+        // Center OrbitControls rotation target
+        const controls = camera.controls || gl.domElement.__controls;
+        if (controls) {
+            controls.target.copy(sphere.center);
+            controls.update();
+        }
+
+        // Force synchronous render to update the canvas buffer immediately for screenshot
+        gl.render(scene, camera);
+    };
+
+    useEffect(() => {
+        if (!trigger || !groupRef.current) return;
+        alignFrontView.current();
     }, [trigger, groupRef, camera, size]);
+
+    useEffect(() => {
+        const handleCaptureReset = () => {
+            if (alignFrontView.current) {
+                alignFrontView.current();
+            }
+        };
+        window.addEventListener('reset-camera-front', handleCaptureReset);
+        return () => window.removeEventListener('reset-camera-front', handleCaptureReset);
+    }, []);
 
     return null;
 }

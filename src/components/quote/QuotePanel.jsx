@@ -194,12 +194,42 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
     const [clientCompany, setClientCompany] = useState('');
     const [hsnCode, setHsnCode] = useState('84669310'); // Default HSN code
 
-    // ── Output state
+     // ── Output state
     const [quote, setQuote] = useState(activePart?.quote || null);
     const [multiQuote, setMultiQuote] = useState(null);
     const [loading, setLoading] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // Override trackers for PDF-extracted BOM quoting
+    const [userOverriddenProcess, setUserOverriddenProcess] = useState(false);
+    const [userOverriddenMaterial, setUserOverriddenMaterial] = useState(false);
+    const [userOverriddenTolerance, setUserOverriddenTolerance] = useState(false);
+
+    // Track manual overrides
+    useEffect(() => {
+        if (fileMetrics?.source === 'pdf' && fileMetrics.processId && processIds.length > 0) {
+            if (processIds.length !== 1 || processIds[0] !== fileMetrics.processId) {
+                setUserOverriddenProcess(true);
+            }
+        }
+    }, [processIds, fileMetrics?.processId]);
+
+    useEffect(() => {
+        if (fileMetrics?.source === 'pdf' && fileMetrics.materialId && materialId) {
+            if (materialId !== fileMetrics.materialId) {
+                setUserOverriddenMaterial(true);
+            }
+        }
+    }, [materialId, fileMetrics?.materialId]);
+
+    useEffect(() => {
+        if (fileMetrics?.source === 'pdf' && fileMetrics.toleranceId && toleranceId) {
+            if (toleranceId !== fileMetrics.toleranceId) {
+                setUserOverriddenTolerance(true);
+            }
+        }
+    }, [toleranceId, fileMetrics?.toleranceId]);
 
     // Sync state changes to global layout for persistence
     useEffect(() => {
@@ -226,6 +256,11 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
             if (fileMetrics.processId && (!pcfg.processIds || pcfg.processIds.length === 0)) setProcessIds([fileMetrics.processId]);
             if (fileMetrics.toleranceId && !pcfg.toleranceId) setToleranceId(fileMetrics.toleranceId);
             
+            // Reset override flags when a new drawing is analyzed
+            setUserOverriddenProcess(false);
+            setUserOverriddenMaterial(false);
+            setUserOverriddenTolerance(false);
+
             // Auto-fill client info ONLY if currently empty (prevents overwriting when switching parts)
             if (fileMetrics.clientName) {
                 setClientName(prev => prev ? prev : fileMetrics.clientName);
@@ -287,6 +322,7 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     cnc_milling_2ax: { name: 'CNC Milling (2-Axis)' },
                     cnc_milling_3ax: { name: 'CNC Milling (3-Axis)' },
                     cnc_milling_5ax: { name: 'CNC Milling (5-Axis)' },
+                    drilling_dro: { name: 'Drilling/DRO' },
                     fdm_3d_print: { name: '3D Printing (FDM)' },
                     edm_wire: { name: 'EDM Wire Cutting' },
                     laser_cutting: { name: 'Laser Cutting' },
@@ -561,19 +597,19 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             geometry: partGeometry,
-                            material_id: part.material_id || materialId || fallbackMatId,
-                            process_ids: part.process_id ? [part.process_id] : (processIds.length ? processIds : [fallbackProcId]),
+                            material_id: userOverriddenMaterial ? materialId : (part.material_id || materialId || fallbackMatId),
+                            process_ids: userOverriddenProcess ? processIds : (part.process_id ? [part.process_id] : (processIds.length ? processIds : [fallbackProcId])),
                             surface_treatment_ids: surfaceTreatmentIds,
                             profit_margin_pct: profitMarginPct,
-                            tolerance_id: part.tolerance_id || toleranceId,
+                            tolerance_id: userOverriddenTolerance ? toleranceId : (part.tolerance_id || toleranceId),
                             quantity: pQty,
                             client_name: clientName, client_company: clientCompany,
                             hsn_code: hsnCode, source_filename: fileMetrics?.fileName || '',
                             screenshot: null, include_setup_cost: includeSetupCost,
                             hole_count_override: holeCountOverride, stock_type: stockType,
                             region: region,
-                            bends_count: (part.process_id === 'sheet_metal_bending' || (!part.process_id && processIds.includes('sheet_metal_bending'))) ? (part.bends_count || bendsCount || 0) : 0,
-                            bend_length_mm: (part.process_id === 'sheet_metal_bending' || (!part.process_id && processIds.includes('sheet_metal_bending'))) ? (part.bend_length_mm || bendLengthMm || 0.0) : 0.0,
+                            bends_count: (userOverriddenProcess ? processIds.includes('sheet_metal_bending') : (part.process_id === 'sheet_metal_bending')) ? (part.bends_count || bendsCount || 0) : 0,
+                            bend_length_mm: (userOverriddenProcess ? processIds.includes('sheet_metal_bending') : (part.process_id === 'sheet_metal_bending')) ? (part.bend_length_mm || bendLengthMm || 0.0) : 0.0,
                         }),
                     });
                     if (!resp.ok) {
@@ -587,12 +623,12 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     return {
                         isBuyout: false, item_number: part.item_number || '-',
                         name: pName,
-                        material: materials[part.material_id || materialId]?.name || part.material || '-',
-                        material_id: part.material_id || materialId,
-                        process_id: part.process_id || processIds[0] || 'cnc_turning',
-                        tolerance_id: part.tolerance_id || toleranceId,
+                        material: materials[userOverriddenMaterial ? materialId : (part.material_id || materialId)]?.name || part.material || '-',
+                        material_id: userOverriddenMaterial ? materialId : (part.material_id || materialId),
+                        process_id: userOverriddenProcess ? (processIds[0] || 'cnc_turning') : (part.process_id || processIds[0] || 'cnc_turning'),
+                        tolerance_id: userOverriddenTolerance ? toleranceId : (part.tolerance_id || toleranceId),
                         dimensions: pDim, qty: pQty, quantity: pQty,
-                        process: processes[part.process_id || processIds[0]]?.name || 'Machining',
+                        process: userOverriddenProcess ? (processes[processIds[0]]?.name || 'Machining') : (processes[part.process_id || processIds[0]]?.name || 'Machining'),
                         machining_cost: qData.breakdown?.machining_cost || 0,
                         material_cost: qData.breakdown?.material_cost || 0,
                         cycle_time: qData.machining_hours || 0,

@@ -361,7 +361,17 @@ export default function AdminPanel() {
 
                     </form>
                 </div>
-                
+
+            </div>
+
+            {/* TechNewity Labs Branding */}
+            <div className="mt-8 text-center border-t border-white/[0.04] pt-4 pb-2">
+                <p className="text-[9px] uppercase tracking-[0.2em] font-semibold text-gray-500 font-sans">
+                    developed by{" "}
+                    <span className="font-extrabold bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(34,211,238,0.15)]">
+                        TechNewity Labs
+                    </span>
+                </p>
             </div>
         </div>
     );

@@ -92,6 +92,13 @@ PROCESS_RATES = {
         "axes":       2,
         "category":   "subtractive"
     },
+    "drilling_dro": {
+        "name":       "Drilling/DRO",
+        "rate_hr":    39.0,        # Exactly 50% of CNC Milling 3-Axis rate (78.0)
+        "setup_usd":  75.0,        # Exactly 50% of CNC Milling 3-Axis setup (150.0)
+        "axes":       2,
+        "category":   "subtractive"
+    },
     "laser_cutting": {
         "name":       "Laser Cutting",
         "rate_hr":    14.0,       # ~₹180/hr

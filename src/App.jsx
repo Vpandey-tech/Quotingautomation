@@ -182,9 +182,10 @@ export default function App() {
     }
   }, []);
 
-  // Capture screenshot of 3D canvas for PDF isometric view
+  // Capture screenshot of 3D canvas for PDF front view
   const captureScreenshot = useCallback(() => {
     try {
+      window.dispatchEvent(new CustomEvent('reset-camera-front'));
       const canvas = document.querySelector('canvas');
       if (canvas) return canvas.toDataURL('image/png');
     } catch (e) {
@@ -880,6 +881,16 @@ export default function App() {
             {tab === 'admin' && (
               <AdminPanel />
             )}
+          </div>
+
+          {/* Sidebar Footer */}
+          <div className="py-3 px-4 border-t border-white/[0.04] text-center bg-gray-950/40 flex-shrink-0 backdrop-blur-md">
+            <span className="text-[9px] text-gray-500 uppercase tracking-[0.18em] font-bold">
+              developed by{" "}
+              <span className="font-extrabold bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(34,211,238,0.15)]">
+                TechNewity Labs
+              </span>
+            </span>
           </div>
         </aside>
 
