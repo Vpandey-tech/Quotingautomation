@@ -133,6 +133,42 @@ export default function DesignSession() {
     }
   }, [session?.component_type]);
 
+  const handleCustomOptionClick = async (optionValue) => {
+    if (submitting) return;
+    setSubmitting(true);
+    setChatMessages(prev => [...prev, { role: 'user', text: optionValue }]);
+    
+    try {
+      const res = await fetch(`/api/design/sessions/${id}/chat`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: optionValue }),
+      });
+      
+      const data = await res.json();
+      if (data.error) {
+        setChatMessages(prev => [...prev, { role: 'error', text: data.error }]);
+      } else if (data.all_done) {
+        setChatMessages(prev => [...prev, { role: 'assistant', text: data.message }]);
+        setCustomQuestion(null);
+        await fetchSession();
+      } else if (data.next_question) {
+        setCustomQuestion(data.next_question);
+        setCustomProgress(data.progress || '');
+        setChatMessages(prev => {
+          const msgs = [...prev];
+          if (data.extracted_val !== undefined && data.extracted_val !== null) {
+            msgs.push({ role: 'assistant', text: `Got it. Extracted: **${data.extracted_val}**` });
+          }
+          msgs.push({ role: 'assistant', text: data.next_question.q });
+          return msgs;
+        });
+      }
+    } catch (e) {
+      setChatMessages(prev => [...prev, { role: 'error', text: 'Network error' }]);
+    }
+    setSubmitting(false);
+  };
+
   const handleCustomSubmit = async (e) => {
     e.preventDefault();
     if ((!inputValue.trim() && !chatAttachment) || submitting) return;
@@ -463,25 +499,49 @@ export default function DesignSession() {
           {/* Input */}
           <div className="p-3 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.015)' }}>
             {isCustom && isCollecting ? (
-              <form onSubmit={handleCustomSubmit} className="flex gap-2 relative">
-                <label className="absolute left-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-cyan-400 cursor-pointer">
-                    <input type="file" className="hidden" onChange={handleChatFileSelect} accept=".pdf,.step,.stp,.png,.jpg,.jpeg" />
-                    <Layers size={14} />
-                </label>
-                <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)}
-                  placeholder={chatAttachment ? `Attached: ${chatAttachment.name}` : "Type your answer or upload..."}
-                  className="flex-1 pl-9 pr-3 py-2 text-[10pt] font-mono text-white rounded-lg outline-none
-                    focus:ring-1 focus:ring-violet-400/40 placeholder:text-gray-600"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-                  disabled={submitting} autoComplete="off" />
-                <button type="submit" disabled={submitting || (!inputValue.trim() && !chatAttachment)}
-                  className="px-3 py-2 rounded-lg transition-all disabled:opacity-30"
-                  style={{ background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)' }}>
-                  {submitting ? <Loader2 size={14} className="animate-spin text-violet-400" /> : <Send size={14} className="text-violet-400" />}
-                </button>
-              </form>
+              <div className="space-y-2">
+                {customQuestion?.options && (
+                  <div className="flex flex-wrap gap-1.5 pb-1">
+                    {customQuestion.options.map(opt => (
+                      <button key={opt.value} type="button" onClick={() => handleCustomOptionClick(opt.value)}
+                        disabled={submitting}
+                        className="px-2 py-1 text-[8.5pt] font-mono rounded-full border bg-violet-400/5 border-violet-400/20 text-violet-300 hover:bg-violet-400/10 hover:border-violet-400/40 transition-all">
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <form onSubmit={handleCustomSubmit} className="flex gap-2 relative">
+                  <label className="absolute left-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-cyan-400 cursor-pointer">
+                      <input type="file" className="hidden" onChange={handleChatFileSelect} accept=".pdf,.step,.stp,.png,.jpg,.jpeg" />
+                      <Layers size={14} />
+                  </label>
+                  <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)}
+                    placeholder={chatAttachment ? `Attached: ${chatAttachment.name}` : "Type your answer or upload..."}
+                    className="flex-1 pl-9 pr-3 py-2 text-[10pt] font-mono text-white rounded-lg outline-none
+                      focus:ring-1 focus:ring-violet-400/40 placeholder:text-gray-600"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    disabled={submitting} autoComplete="off" />
+                  <button type="submit" disabled={submitting || (!inputValue.trim() && !chatAttachment)}
+                    className="px-3 py-2 rounded-lg transition-all disabled:opacity-30"
+                    style={{ background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)' }}>
+                    {submitting ? <Loader2 size={14} className="animate-spin text-violet-400" /> : <Send size={14} className="text-violet-400" />}
+                  </button>
+                </form>
+              </div>
             ) : isCollecting && np ? (
               <div className="space-y-2">
+                {np.type !== 'select' && np.options && (
+                  <div className="flex flex-wrap gap-1.5 pb-1">
+                    {np.options.map(opt => (
+                      <button key={opt.value} type="button" onClick={() => handleOptionClick(opt.value)}
+                        disabled={submitting}
+                        className="px-2 py-1 text-[8.5pt] font-mono rounded-full border bg-cyan-400/5 border-cyan-400/20 text-cyan-300 hover:bg-cyan-400/10 hover:border-cyan-400/40 transition-all">
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {np.type === 'select' ? (
                   <div className="space-y-1.5">
                     {np.options?.map(opt => (

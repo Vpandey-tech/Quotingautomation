@@ -242,7 +242,13 @@ async def edit_param(session_id: str, body: EditParamBody):
         raise HTTPException(422, err)
 
     if param_def["type"] == "number":
-        session["params"][body.key] = float(body.value)
+        import re
+        val_str = str(body.value).strip()
+        match = re.search(r"[-+]?\d*\.?\d+", val_str)
+        if match:
+            session["params"][body.key] = float(match.group(0))
+        else:
+            session["params"][body.key] = float(body.value)
     else:
         session["params"][body.key] = str(body.value)
 
@@ -265,31 +271,236 @@ async def edit_param(session_id: str, body: EditParamBody):
 # ── Custom Part Free-Form Chat ────────────────────────────────────────────────
 # Iterative question loop for custom/unknown parts
 CUSTOM_QUESTIONS = [
-    {"key": "part_name", "q": "What is the name of the part you want to design?"},
-    {"key": "part_purpose", "q": "What is its primary function/purpose?"},
-    {"key": "overall_shape", "q": "Describe the overall shape (cylindrical, rectangular, L-bracket, disc, etc.):"},
-    {"key": "length_mm", "q": "What is the overall length/height in mm?", "type": "number"},
-    {"key": "width_mm", "q": "What is the overall width in mm?", "type": "number"},
-    {"key": "height_mm", "q": "What is the overall height/thickness in mm?", "type": "number"},
-    {"key": "material_type", "q": "What material? (steel, aluminum, cast iron, stainless steel, brass, plastic):"},
-    {"key": "has_holes", "q": "Does it have any holes? If yes, how many and what diameter (mm)?"},
-    {"key": "has_slots", "q": "Does it have any slots or grooves? Describe dimensions if yes:"},
-    {"key": "has_chamfers", "q": "Does it need chamfers or fillets on edges? (yes/no, and radius in mm):"},
-    {"key": "tolerance", "q": "What tolerance class? (general ±0.5mm, precision ±0.1mm, tight ±0.05mm):"},
-    {"key": "surface_finish", "q": "Required surface finish? (as-machined, ground, polished):"},
-    {"key": "additional_features", "q": "Any additional features? (threads, counterbores, pockets, etc.) Describe or type 'none':"},
-    {"key": "load_conditions", "q": "What loads will this part experience? (static, dynamic, impact — describe forces if known):"},
-    {"key": "quantity", "q": "How many units do you need manufactured?", "type": "number"},
+    {"key": "part_name", "q": "What is the name of the part you want to design?",
+     "options": [
+         {"value": "Shaft Adapter", "label": "Shaft Adapter"},
+         {"value": "Mounting Bracket", "label": "Mounting Bracket"},
+         {"value": "Coupling Flange", "label": "Coupling Flange"},
+         {"value": "Spacer Ring", "label": "Spacer Ring"},
+     ]},
+    {"key": "part_purpose", "q": "What is its primary function/purpose?",
+     "options": [
+         {"value": "Mounting / support", "label": "Mounting / support"},
+         {"value": "Power transmission", "label": "Power transmission"},
+         {"value": "Alignment / spacing", "label": "Alignment / spacing"},
+     ]},
+    {"key": "overall_shape", "q": "Describe the overall shape (cylindrical, rectangular, L-bracket, disc, etc.):",
+     "options": [
+         {"value": "cylindrical", "label": "Cylindrical (rod/tube)"},
+         {"value": "rectangular", "label": "Rectangular (plate/block)"},
+         {"value": "L-bracket", "label": "L-Bracket"},
+         {"value": "disc", "label": "Disc / Ring"},
+     ]},
+    {"key": "length_mm", "q": "What is the overall length/height in mm?", "type": "number",
+     "options": [
+         {"value": "50", "label": "50 mm"},
+         {"value": "100", "label": "100 mm"},
+         {"value": "200", "label": "200 mm"},
+         {"value": "500", "label": "500 mm"},
+     ]},
+    {"key": "width_mm", "q": "What is the overall width in mm?", "type": "number",
+     "options": [
+         {"value": "30", "label": "30 mm"},
+         {"value": "50", "label": "50 mm"},
+         {"value": "80", "label": "80 mm"},
+         {"value": "100", "label": "100 mm"},
+     ]},
+    {"key": "height_mm", "q": "What is the overall height/thickness in mm?", "type": "number",
+     "options": [
+         {"value": "10", "label": "10 mm"},
+         {"value": "20", "label": "20 mm"},
+         {"value": "30", "label": "30 mm"},
+         {"value": "50", "label": "50 mm"},
+     ]},
+    {"key": "material_type", "q": "What material? (steel, aluminum, cast iron, stainless steel, brass, plastic):",
+     "options": [
+         {"value": "steel", "label": "Medium Carbon Steel"},
+         {"value": "aluminum", "label": "Aluminum (6061-T6)"},
+         {"value": "stainless steel", "label": "Stainless Steel (304/316)"},
+         {"value": "brass", "label": "Brass"},
+         {"value": "plastic", "label": "Delrin / Plastic"},
+     ]},
+    {"key": "has_holes", "q": "Does it have any holes? If yes, how many and what diameter (mm)?",
+     "options": [
+         {"value": "no", "label": "No holes"},
+         {"value": "2 holes, 10mm diameter", "label": "2 holes (10mm)"},
+         {"value": "4 holes, 12mm diameter", "label": "4 holes (12mm)"},
+         {"value": "6 holes, 16mm diameter", "label": "6 holes (16mm)"},
+     ]},
+    {"key": "has_slots", "q": "Does it have any slots or grooves? Describe dimensions if yes:",
+     "options": [
+         {"value": "no", "label": "No slots"},
+         {"value": "1 slot, 10mm wide", "label": "1 slot (10mm wide)"},
+     ]},
+    {"key": "has_chamfers", "q": "Does it need chamfers or fillets on edges? (yes/no, and radius in mm):",
+     "options": [
+         {"value": "no", "label": "No"},
+         {"value": "1mm chamfer", "label": "1mm chamfer"},
+         {"value": "2mm fillet", "label": "2mm fillet"},
+     ]},
+    {"key": "tolerance", "q": "What tolerance class? (general ±0.5mm, precision ±0.1mm, tight ±0.05mm):",
+     "options": [
+         {"value": "general \u00b10.5mm", "label": "General (\u00b10.5mm)"},
+         {"value": "precision \u00b10.1mm", "label": "Precision (\u00b10.1mm)"},
+         {"value": "tight \u00b10.05mm", "label": "Tight (\u00b10.05mm)"},
+     ]},
+    {"key": "surface_finish", "q": "Required surface finish? (as-machined, ground, polished):",
+     "options": [
+         {"value": "as-machined", "label": "As-Machined (standard)"},
+         {"value": "ground", "label": "Ground finish"},
+         {"value": "polished", "label": "Polished finish"},
+     ]},
+    {"key": "additional_features", "q": "Any additional features? (threads, counterbores, pockets, etc.) Describe or type 'none':",
+     "options": [
+         {"value": "none", "label": "None"},
+         {"value": "M10 threads", "label": "M10 Threads"},
+     ]},
+    {"key": "load_conditions", "q": "What loads will this part experience? (static, dynamic, impact — describe forces if known):",
+     "options": [
+         {"value": "static", "label": "Static load only"},
+         {"value": "dynamic", "label": "Dynamic / fluctuating load"},
+         {"value": "impact", "label": "Impact / shock load"},
+         {"value": "none", "label": "Negligible / None"},
+     ]},
+    {"key": "quantity", "q": "How many units do you need manufactured?", "type": "number",
+     "options": [
+         {"value": "1", "label": "1 pc (prototype)"},
+         {"value": "10", "label": "10 pcs"},
+         {"value": "50", "label": "50 pcs"},
+         {"value": "100", "label": "100 pcs"},
+     ]},
 ]
 
 
 def _get_next_custom_question(session):
     """Find the next unanswered custom question."""
     params = session.get("params", {})
+    shape = str(params.get("overall_shape", "")).lower()
+    is_cylindrical = "cylind" in shape or "round" in shape or "disc" in shape or "ring" in shape or "flange" in shape
+    if is_cylindrical and params.get("length_mm") is not None:
+        params["width_mm"] = params["length_mm"]
+
     for q in CUSTOM_QUESTIONS:
         if q["key"] not in params or params[q["key"]] is None:
+            if is_cylindrical and q["key"] == "width_mm":
+                continue
             return q
     return None
+
+
+async def extract_params_from_text(text: str, unanswered_qs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    import re
+    extracted = {}
+    text_lower = text.lower()
+
+    # 1. Regex fallback parsing (very fast and robust)
+    dim_matches = re.findall(r"(\d+(?:\.\d+)?)\s*(?:x|\*)\s*(\d+(?:\.\d+)?)\s*(?:x|\*)\s*(\d+(?:\.\d+)?)", text_lower)
+    if dim_matches:
+        extracted["length_mm"] = float(dim_matches[0][0])
+        extracted["width_mm"] = float(dim_matches[0][1])
+        extracted["height_mm"] = float(dim_matches[0][2])
+    else:
+        len_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:long|length)", text_lower)
+        if len_match:
+            extracted["length_mm"] = float(len_match.group(1))
+        wid_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:wide|width)", text_lower)
+        if wid_match:
+            extracted["width_mm"] = float(wid_match.group(1))
+        hei_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:thick|thickness|height)", text_lower)
+        if hei_match:
+            extracted["height_mm"] = float(hei_match.group(1))
+
+    od_match = re.search(r"(?:outer diameter|od)\s*(\d+(?:\.\d+)?)", text_lower)
+    id_match = re.search(r"(?:inner diameter|inner bore|id)\s*(\d+(?:\.\d+)?)", text_lower)
+    thick_match = re.search(r"(?:thickness|height|thick)\s*(\d+(?:\.\d+)?)", text_lower)
+    if od_match:
+        extracted["length_mm"] = float(od_match.group(1))
+        extracted["width_mm"] = float(od_match.group(1))
+    if id_match:
+        extracted["has_holes"] = f"Yes, inner bore {id_match.group(1)}mm"
+    if thick_match:
+        extracted["height_mm"] = float(thick_match.group(1))
+
+    qty_match = re.search(r"(\d+)\s*(?:pcs|pcs\.|pieces|units|quantity|qty)", text_lower)
+    if qty_match:
+        extracted["quantity"] = float(qty_match.group(1))
+
+    materials = ["steel", "aluminum", "cast iron", "stainless steel", "brass", "plastic"]
+    for mat in materials:
+        if mat in text_lower:
+            extracted["material_type"] = mat
+            break
+
+    # 2. Try Gemini AI extraction if api key is configured
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if api_key:
+        try:
+            import google.generativeai as genai
+            import json
+            genai.configure(api_key=api_key)
+            
+            prompt = f"""Analyze this user message about a custom mechanical part: "{text}"
+We need to extract answers for these parameters:
+{json.dumps(unanswered_qs, indent=2)}
+
+CRITICAL RULE: Only extract parameters that are EXPLICITLY mentioned or clearly detailed in the user's message.
+DO NOT assume, default, or guess values for parameters that are not mentioned. For example, if the user does not explicitly talk about holes, slots, chamfers, tolerances, quantities, or loads, DO NOT include those keys in the "extracted" dictionary at all (omit them entirely).
+
+Return ONLY valid JSON in this exact format:
+{{
+  "extracted": {{
+    "key1": "value",
+    "key2": 123
+  }}
+}}
+Do not include any markdown styling. Only output the raw JSON."""
+            
+            models_to_try = [
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-2.5-pro",
+                "gemini-2.0-flash-001",
+            ]
+            
+            for model_name in models_to_try:
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    response = await run_in_threadpool(
+                        model.generate_content,
+                        [prompt],
+                        generation_config=genai.types.GenerationConfig(temperature=0.0)
+                    )
+                    resp_text = response.text.strip()
+                    if "```json" in resp_text:
+                        resp_text = resp_text.split("```json", 1)[1].split("```", 1)[0]
+                    elif "```" in resp_text:
+                        resp_text = resp_text.split("```", 1)[1].split("```", 1)[0]
+                    resp_text = resp_text.strip()
+                    start = resp_text.find("{")
+                    end = resp_text.rfind("}")
+                    if start != -1 and end != -1:
+                        data = json.loads(resp_text[start:end+1])
+                        ai_extracted = data.get("extracted", {})
+                        for k, v in ai_extracted.items():
+                            if v is not None and v != "":
+                                q_def = next((q for q in unanswered_qs if q["key"] == k), None)
+                                if q_def and q_def.get("type") == "number":
+                                    try:
+                                        import re
+                                        nums = re.findall(r"[-+]?\d*\.\d+|\d+", str(v))
+                                        if nums:
+                                            extracted[k] = float(nums[0])
+                                    except ValueError:
+                                        continue
+                                else:
+                                    extracted[k] = str(v)
+                        break
+                except Exception:
+                    continue
+        except Exception:
+            pass
+            
+    return extracted
 
 
 @router.post("/sessions/{session_id}/chat")
@@ -299,20 +510,51 @@ async def custom_chat(session_id: str, body: CustomChatBody):
     if session["component_type"] != "custom":
         raise HTTPException(400, "Chat endpoint is for custom parts only.")
 
-    # Find current question and store the answer
+    message_text = body.message.strip()
+    
+    # Initial start trigger message should not be stored as an answer
+    if message_text.lower() == "start":
+        next_q = _get_next_custom_question(session)
+        return {
+            "all_done": False,
+            "answered": None,
+            "next_question": next_q,
+            "params_so_far": session["params"],
+            "progress": f"{len(session['params'])}/{len(CUSTOM_QUESTIONS)}",
+        }
+
+    unanswered_qs = [q for q in CUSTOM_QUESTIONS if q["key"] not in session["params"] or session["params"][q["key"]] is None]
     current_q = _get_next_custom_question(session)
-    if current_q:
-        val = body.message.strip()
+
+    extracted_dict = await extract_params_from_text(message_text, unanswered_qs)
+    extracted_summary = []
+
+    # 1. Apply any extracted parameters
+    if extracted_dict:
+        for k, v in extracted_dict.items():
+            session["params"][k] = v
+            extracted_summary.append(f"{k}: {v}")
+
+    # 2. If the current question was not filled by extraction, fill it with the raw message text
+    if current_q and (current_q["key"] not in session["params"] or session["params"][current_q["key"]] is None):
+        val = message_text
         if current_q.get("type") == "number":
             try:
-                val = float(val)
+                import re
+                nums = re.findall(r"[-+]?\d*\.?\d+", val)
+                if nums:
+                    val = float(nums[0])
+                else:
+                    val = float(val)
             except ValueError:
                 return {
-                    "error": f"Please enter a valid number for {current_q['key']}.",
+                    "error": f"Please enter a valid number for {current_q.get('label', current_q['key'])}.",
                     "current_question": current_q,
                 }
         session["params"][current_q["key"]] = val
-        session["updated_at"] = time.time()
+        extracted_summary.append(f"{current_q['key']}: {val}")
+
+    session["updated_at"] = time.time()
 
     # Get next question
     next_q = _get_next_custom_question(session)
@@ -327,7 +569,8 @@ async def custom_chat(session_id: str, body: CustomChatBody):
 
     return {
         "all_done": False,
-        "answered": current_q["key"] if current_q else None,
+        "answered": current_q["key"] if current_q else "multiple",
+        "extracted_val": ", ".join(extracted_summary) if extracted_summary else None,
         "next_question": next_q,
         "params_so_far": session["params"],
         "progress": f"{len(session['params'])}/{len(CUSTOM_QUESTIONS)}",
@@ -350,7 +593,13 @@ async def submit_param(session_id: str, body: SubmitParamBody):
         raise HTTPException(422, err)
 
     if param_def["type"] == "number":
-        session["params"][body.key] = float(body.value)
+        import re
+        val_str = str(body.value).strip()
+        match = re.search(r"[-+]?\d*\.?\d+", val_str)
+        if match:
+            session["params"][body.key] = float(match.group(0))
+        else:
+            session["params"][body.key] = float(body.value)
     else:
         session["params"][body.key] = str(body.value)
     session["updated_at"] = time.time()
@@ -403,7 +652,9 @@ async def custom_chat_multimodal(
 We need to collect the following missing information for their custom part:
 {json.dumps(unanswered_qs, indent=2)}
 
-Extract as many answers as you can find from the uploaded file and message.
+CRITICAL RULE: Only extract parameters that are EXPLICITLY mentioned or clearly detailed in the user's message or file content.
+DO NOT assume, default, or guess values for parameters that are not mentioned. For example, if the user does not explicitly talk about holes, slots, chamfers, tolerances, quantities, or loads, DO NOT include those keys in the "extracted" dictionary at all (omit them entirely).
+
 Return ONLY valid JSON in this exact format, with no markdown, just the raw braces:
 {{
   "extracted": {{
@@ -615,6 +866,243 @@ async def submit_param_multimodal(
         "params": session["params"], "status": session["status"],
     }
 
+async def call_groq_api(prompt: str, response_json: bool = True) -> Optional[str]:
+    import httpx, os, logging
+    logger = logging.getLogger("uvicorn.error")
+    
+    groq_api_key = os.getenv("GROQ_API_KEY", "")
+    if not groq_api_key:
+        return None
+        
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {groq_api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.0,
+    }
+    if response_json:
+        payload["response_format"] = {"type": "json_object"}
+        
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload, timeout=15.0)
+            if response.status_code == 200:
+                res_data = response.json()
+                return res_data["choices"][0]["message"]["content"].strip()
+            else:
+                logger.warning(f"Groq API returned status code {response.status_code}: {response.text}")
+    except Exception as e:
+        logger.warning(f"Groq API call failed: {e}")
+        
+    return None
+
+async def generate_custom_operations(params: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Use Groq or Gemini to synthesize a list of build123d advanced operations (JSON)
+    based on the user's free-form chat descriptions.
+    """
+    import os, json
+
+    prompt = f"""We are building a 3D CAD model using a list of parametric operations.
+Here is the description of the custom part:
+- Name: {params.get("part_name")}
+- Purpose: {params.get("part_purpose")}
+- Overall Shape: {params.get("overall_shape")}
+- Length/Outer Diameter: {params.get("length_mm")} mm
+- Width: {params.get("width_mm")} mm
+- Height/Thickness: {params.get("height_mm")} mm
+- Material: {params.get("material_type")}
+- Holes/Bores: {params.get("has_holes")}
+- Slots/Grooves: {params.get("has_slots")}
+- Chamfers/Fillets: {params.get("has_chamfers")}
+- Special Requirements: {params.get("additional_features")}
+
+Your task is to generate a list of advanced CAD operations to build this part.
+Supported operations:
+1. {{"type": "box", "action": "add"|"cut", "l": float, "w": float, "h": float, "x": float, "y": float, "z": float, "rx": float, "ry": float, "rz": float}}
+2. {{"type": "cylinder", "action": "add"|"cut", "r": float, "h": float, "x": float, "y": float, "z": float, "rx": float, "ry": float, "rz": float}}
+3. {{"type": "sphere", "action": "add"|"cut", "r": float, "x": float, "y": float, "z": float}}
+4. {{"type": "hole_pattern", "action": "cut", "pattern": "linear"|"circular", "count": int, "diameter": float, "depth": float}}
+   - If pattern is "linear": needs "spacing": float, "direction": [x,y,z], "start": [x,y,z]
+   - If pattern is "circular": needs "pcd_radius": float, "center": [x,y,z], "start_angle": float
+5. {{"type": "fillet"|"chamfer", "target": "top"|"bottom"|"all", "radius"|"length": float}}
+
+STRICT MAPPING RULES:
+1. CYLINDRICAL/ROUND PARTS (e.g. flange, disc, ring, cylinder, tube):
+   - The first operation MUST be a "cylinder" with action="add".
+   - Use the outer diameter as the cylinder diameter (radius r = Length/Outer Diameter / 2).
+   - Use the height/thickness as the cylinder height (h = Height/Thickness).
+   - Centered at x=0, y=0, z=0.
+   - Do NOT use a "box" operation anywhere for a cylindrical part.
+
+2. INNER BORE / CONCENTRIC HOLES:
+   - If the part is a ring or flange with a central inner bore or hole, add a "cylinder" operation with action="cut".
+   - Set r = inner_bore_diameter / 2.
+   - Set h = Height/Thickness + 10 (to ensure a clean through-cut).
+   - Centered at x=0, y=0, z=0.
+
+3. circular BOLT HOLE PATTERNS:
+   - If there are multiple bolt holes arranged on a circle (e.g. "6 bolt holes on a 104mm PCD" or "symmetrical pattern"), use a circular "hole_pattern" with action="cut".
+   - Set pattern = "circular".
+   - Set count = number of bolt holes (e.g. 6).
+   - Set diameter = bolt hole diameter (e.g. 12).
+   - Set depth = Height/Thickness + 10 (for through-cut).
+   - Set pcd_radius = PCD / 2 (e.g. 104 / 2 = 52).
+   - Set center = [0, 0, 0] and start_angle = 0.
+
+4. CHAMFERS / FILLETS:
+   - If chamfers or fillets on edges are requested, add a "chamfer" or "fillet" operation.
+   - Set target = "all" or "top" or "bottom".
+   - Set length/radius to the requested value (e.g. 2.0).
+
+Return ONLY valid JSON containing a list of operations. E.g.:
+[
+  {{"type": "cylinder", "action": "add", "r": 60, "h": 30, "x": 0, "y": 0, "z": 0}},
+  ...
+]
+Do not include any markdown formatting. Only output the raw JSON list."""
+
+    # 1. Try Groq first (extremely fast and separate quota limits)
+    import logging
+    logger = logging.getLogger("uvicorn.error")
+    
+    try:
+        groq_res = await call_groq_api(prompt, response_json=True)
+        if groq_res:
+            ops = json.loads(groq_res)
+            # Support both root list and wrapper dict formats
+            if isinstance(ops, dict) and "operations" in ops:
+                ops = ops["operations"]
+            if isinstance(ops, list) and len(ops) > 0:
+                logger.info("✓ Successfully generated custom operations using Groq (Llama-3.3-70B)")
+                return ops
+    except Exception as e:
+        logger.warning(f"Groq custom operations extraction failed: {e}. Falling back to Gemini.")
+
+    # 2. Fallback to Gemini Key 1 then Key 2
+    import google.generativeai as genai
+    models_to_try = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.5-pro",
+        "gemini-2.0-flash-001",
+    ]
+
+    for key_idx in [1, 2]:
+        api_key = os.getenv("GEMINI_API_KEY_2" if key_idx == 2 else "GEMINI_API_KEY", "")
+        if not api_key:
+            continue
+        genai.configure(api_key=api_key)
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = await run_in_threadpool(
+                    model.generate_content,
+                    [prompt],
+                    generation_config=genai.types.GenerationConfig(temperature=0.0)
+                )
+                text = response.text.strip()
+                if "```json" in text:
+                    text = text.split("```json", 1)[1].split("```", 1)[0]
+                elif "```" in text:
+                    text = text.split("```", 1)[1].split("```", 1)[0]
+                text = text.strip()
+                ops = json.loads(text)
+                if isinstance(ops, list) and len(ops) > 0:
+                    logger.info(f"✓ Successfully generated custom operations using Gemini Key {key_idx}")
+                    return ops
+            except Exception as e:
+                err_msg = str(e).lower()
+                if "429" in err_msg or "quota" in err_msg or "resource" in err_msg:
+                    logger.warning(f"Gemini API key {key_idx} is rate-limited or out of quota (429). Skipping other models for this key.")
+                    break
+                continue
+
+    # Heuristic Programmatic Fallback if Gemini quota is exceeded (429)
+    shape = str(params.get("overall_shape", "")).lower()
+    is_cylindrical = "cylind" in shape or "round" in shape or "disc" in shape or "ring" in shape or "flange" in shape
+    
+    L = float(params.get("length_mm", 100))
+    W = float(params.get("width_mm", 50))
+    H = float(params.get("height_mm", 25))
+    
+    fallback_ops = []
+    import re
+    if is_cylindrical:
+        r_outer = L / 2
+        fallback_ops.append({"type": "cylinder", "action": "add", "r": r_outer, "h": H, "x": 0.0, "y": 0.0, "z": 0.0})
+        
+        holes_desc = str(params.get("has_holes", "")).lower()
+        # Match "80mm inner bore" (number first)
+        bore_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:inner bore|bore|inner diameter|id|inner dia)", holes_desc)
+        if not bore_match:
+            # Match "inner bore 80mm" (words first)
+            bore_match = re.search(r"(?:inner bore|bore|inner diameter|id|inner dia)\s*(?:of|is|:)?\s*(\d+(?:\.\d+)?)", holes_desc)
+            
+        r_inner = 0.0
+        if bore_match:
+            r_inner = float(bore_match.group(1)) / 2
+            fallback_ops.append({"type": "cylinder", "action": "cut", "r": r_inner, "h": H + 10, "x": 0.0, "y": 0.0, "z": 0.0})
+            
+        qty_match = re.search(r"(\d+)\s*(?:bolt)?\s*holes", holes_desc)
+        dia_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:diameter|dia|size)", holes_desc)
+        pcd_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:bolt circle|pcd|circle|diameter circle)", holes_desc)
+        
+        if qty_match and dia_match:
+            count = int(qty_match.group(1))
+            dia = float(dia_match.group(1))
+            pcd_r = float(pcd_match.group(1)) / 2 if pcd_match else (r_outer + r_inner) / 2
+            
+            fallback_ops.append({
+                "type": "hole_pattern",
+                "action": "cut",
+                "pattern": "circular",
+                "count": count,
+                "diameter": dia,
+                "depth": H + 10,
+                "pcd_radius": pcd_r,
+                "center": [0.0, 0.0, 0.0],
+                "start_angle": 0.0
+            })
+            
+        chamfers_desc = str(params.get("has_chamfers", "")).lower()
+        if "chamfer" in chamfers_desc and "no" not in chamfers_desc:
+            ch_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*chamfer", chamfers_desc)
+            ch_len = float(ch_match.group(1)) if ch_match else 1.0
+            fallback_ops.append({"type": "chamfer", "target": "all", "length": ch_len})
+        elif "fillet" in chamfers_desc and "no" not in chamfers_desc:
+            fi_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*fillet", chamfers_desc)
+            fi_rad = float(fi_match.group(1)) if fi_match else 1.0
+            fallback_ops.append({"type": "fillet", "target": "all", "radius": fi_rad})
+    else:
+        fallback_ops.append({"type": "box", "action": "add", "l": L, "w": W, "h": H, "x": 0.0, "y": 0.0, "z": 0.0})
+        
+        holes_desc = str(params.get("has_holes", "")).lower()
+        qty_match = re.search(r"(\d+)\s*holes", holes_desc)
+        dia_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:diameter|dia)", holes_desc)
+        if qty_match and dia_match:
+            count = int(qty_match.group(1))
+            dia = float(dia_match.group(1))
+            spacing = L / (count + 1)
+            fallback_ops.append({
+                "type": "hole_pattern",
+                "action": "cut",
+                "pattern": "linear",
+                "count": count,
+                "diameter": dia,
+                "depth": H + 10,
+                "spacing": spacing,
+                "direction": [1.0, 0.0, 0.0],
+                "start": [-L/2 + spacing, 0.0, 0.0]
+            })
+
+    return fallback_ops
+
 
 @router.post("/sessions/{session_id}/generate-report")
 async def generate_report(session_id: str):
@@ -622,6 +1110,17 @@ async def generate_report(session_id: str):
     if session["status"] == "collecting_params":
         raise HTTPException(400, "Complete parameter intake first.")
         
+    # Generate custom CAD operations before calculations
+    if session["component_type"] == "custom" and not session["params"].get("operations"):
+        try:
+            ops = await generate_custom_operations(session["params"])
+            if ops:
+                session["params"]["operations"] = ops
+        except Exception as oe:
+            import logging
+            logger = logging.getLogger("uvicorn.error")
+            logger.error(f"Failed to generate custom operations: {oe}")
+
     # Auto-fill missing assumptions with their defaults before calculating
     assumptions = compute_smart_defaults(session["component_type"], session["params"])
     for a in assumptions:
@@ -744,84 +1243,93 @@ Return ONLY valid JSON (no markdown, no code blocks) in this exact format:
 
     import google.generativeai as genai
     import logging
-    logger = logging.getLogger(__name__)
-    
-    genai.configure(api_key=api_key)
-    
-    models_to_try = [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-2.5-pro",
-        "gemini-2.0-flash-001",
-    ]
+    logger = logging.getLogger("uvicorn.error")
 
     validation = None
     last_error = None
 
-    for model_name in models_to_try:
-        model_succeeded = False
-        
-        for attempt in range(3):
-            try:
-                model = genai.GenerativeModel(model_name)
-                
-                # run_in_threadpool because we are in an async route
-                response = await run_in_threadpool(
-                    model.generate_content, 
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(temperature=0.0)
-                )
+    # 1. Try Groq first for calculation validation
+    try:
+        groq_res = await call_groq_api(prompt, response_json=True)
+        if groq_res:
+            validation = json.loads(groq_res)
+            logger.info("✓ Successfully validated report calculations using Groq (Llama-3.3-70B)")
+    except Exception as e:
+        logger.warning(f"Groq report validation failed: {e}. Falling back to Gemini.")
 
-                # Safely extract text — response.text can throw on blocked responses
-                text = ""
-                try:
-                    text = response.text or ""
-                except Exception:
-                    # Try to get from candidates
-                    if response.candidates:
-                        for part in response.candidates[0].content.parts:
-                            text += part.text
-                    if not text:
-                        raise ValueError("AI response was blocked or empty.")
+    # 2. Fallback to Gemini Key 1 and Key 2
+    if not validation:
+        models_to_try = [
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-2.5-pro",
+            "gemini-2.0-flash-001",
+        ]
 
-                # Parse JSON from response
-                if "```json" in text:
-                    text = text.split("```json")[1].split("```")[0]
-                elif "```" in text:
-                    text = text.split("```")[1].split("```")[0]
-
-                validation = json.loads(text.strip())
-                model_succeeded = True
-                logger.info(f"✓ {model_name} succeeded (attempt {attempt + 1})")
-                break  # Break retry loop on success
-
-            except json.JSONDecodeError as e:
-                last_error = e
-                logger.warning(f"{model_name} malformed JSON (attempt {attempt + 1}): {e}")
+        # Rotate through Key 1 and Key 2 to bypass 429 errors
+        for key_idx in [1, 2]:
+            current_api_key = os.getenv("GEMINI_API_KEY_2" if key_idx == 2 else "GEMINI_API_KEY", "")
+            if not current_api_key:
                 continue
-
-            except Exception as e:
-                import asyncio
-                last_error = e
-                error_str = str(e)
-                if (
-                    "429" in error_str
-                    or "ResourceExhausted" in error_str
-                    or "quota" in error_str.lower()
-                ):
-                    wait_time = min(10 * (attempt + 1), 35)
-                    logger.warning(
-                        f"Rate limited on {model_name}, "
-                        f"waiting {wait_time}s... (attempt {attempt + 1})"
+            
+            genai.configure(api_key=current_api_key)
+            key_failed = False
+            
+            for model_name in models_to_try:
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    
+                    # run_in_threadpool because we are in an async route
+                    response = await run_in_threadpool(
+                        model.generate_content, 
+                        prompt,
+                        generation_config=genai.types.GenerationConfig(temperature=0.0)
                     )
-                    await asyncio.sleep(wait_time)
+
+                    # Safely extract text — response.text can throw on blocked responses
+                    text = ""
+                    try:
+                        text = response.text or ""
+                    except Exception:
+                        # Try to get from candidates
+                        if response.candidates:
+                            for part in response.candidates[0].content.parts:
+                                text += part.text
+                        if not text:
+                            raise ValueError("AI response was blocked or empty.")
+
+                    # Parse JSON from response
+                    if "```json" in text:
+                        text = text.split("```json")[1].split("```")[0]
+                    elif "```" in text:
+                        text = text.split("```")[1].split("```")[0]
+
+                    validation = json.loads(text.strip())
+                    logger.info(f"✓ {model_name} succeeded with Gemini Key {key_idx}")
+                    break  # Break models loop on success
+
+                except json.JSONDecodeError as e:
+                    last_error = e
+                    logger.warning(f"{model_name} malformed JSON with Key {key_idx}: {e}")
                     continue
-                else:
-                    logger.error(f"Non-retryable error on {model_name}: {e}")
-                    break
-                
-        if model_succeeded:
-            break  # Break model fallback loop on success
+
+                except Exception as e:
+                    last_error = e
+                    error_str = str(e)
+                    if (
+                        "429" in error_str
+                        or "ResourceExhausted" in error_str
+                        or "quota" in error_str.lower()
+                    ):
+                        logger.warning(f"Gemini Key {key_idx} is rate-limited or out of quota (429) on {model_name}. Skipping this key.")
+                        key_failed = True
+                        break  # Break models loop immediately to rotate key
+                    else:
+                        logger.warning(f"Error on {model_name} with Key {key_idx}: {e}")
+                        continue
+                        
+            if validation:
+                break  # Break keys loop on success
 
     if not validation:
         # Graceful fallback if all models/retries fail
@@ -864,8 +1372,10 @@ async def generate_cad_endpoint(session_id: str):
         cad_result = cad_generate(ctype, dims, session["params"])
         step_path = cad_result.get("step_file")
 
-        if step_path:
-            session["cad_file_path"] = step_path
+        if not step_path:
+            raise HTTPException(500, f"CAD generation failed verification check: {cad_result.get('note', 'Unknown error')}")
+
+        session["cad_file_path"] = step_path
         session["status"] = "cad_ready"
         session["updated_at"] = time.time()
 
@@ -874,7 +1384,7 @@ async def generate_cad_endpoint(session_id: str):
             "session_id": session_id,
             "engine": cad_result.get("engine", "none"),
             "step_file": step_path,
-            "download_url": f"/api/design/sessions/{session_id}/download-cad" if step_path else None,
+            "download_url": f"/api/design/sessions/{session_id}/download-cad",
             "dimensions": dims,
             "note": cad_result.get("note"),
         }

@@ -19,7 +19,7 @@ const API = '/api';
  * - "New File" resets everything (starts fresh quotation)
  * - "Add Part" appends a new part to the current quotation
  */
-export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false, activePart = null }) {
+export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false, activePart = null, onUpdatePartData = null }) {
     const [file, setFile] = useState(null);
     const [fileType, setFileType] = useState(null);    // 'step' | 'pdf'
     const [status, setStatus] = useState('idle');       // idle|loading|loaded|error|pdf_loaded
@@ -223,6 +223,45 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
         input.click();
     }, [processFile]);
 
+    const loadCadFromSession = useCallback(async (sessionId, fileName) => {
+        setStatus('loading');
+        setErrorMsg('');
+        try {
+            const downloadUrl = `/api/design/sessions/${sessionId}/download-cad`;
+            const resp = await fetch(downloadUrl);
+            if (!resp.ok) {
+                throw new Error(`Failed to download CAD from server (status ${resp.status})`);
+            }
+            const blob = await resp.blob();
+            const f = new File([blob], fileName || 'model.step', { type: 'model/step' });
+            
+            const result = await parseStepFile(f);
+            if (!result || !result.meshes || result.meshes.length === 0) {
+                throw new Error('No geometry found in downloaded file.');
+            }
+            
+            setFile(f);
+            setFileType('step');
+            setOcctResult(result);
+            setStatus('loaded');
+            
+            const metrics = computeMetrics(result, f);
+            setViewerMetrics(metrics);
+            
+            if (onUpdatePartData && activePart) {
+                onUpdatePartData(activePart.id, {
+                    file: f,
+                    occtResult: result,
+                    brepStatus: 'ready'
+                });
+            }
+        } catch (err) {
+            console.error('[Viewer] Failed to load CAD from session:', err);
+            setStatus('error');
+            setErrorMsg(err.message || 'Failed to download the generated CAD file from the server.');
+        }
+    }, [activePart, onUpdatePartData]);
+
     // ── Restore state when activePart changes (Switching Context) ─────────
     useEffect(() => {
         if (activePart && activePart.file) {
@@ -256,8 +295,13 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
                     processStepFile(f, false);
                 }
             }
+        } else if (activePart && !activePart.file && activePart.metrics?.designSession) {
+            // Avoid triggering if already loading or in error state
+            if (status === 'loading' || status === 'error') return;
+            
+            loadCadFromSession(activePart.metrics.designSession, activePart.fileName);
         }
-    }, [activePart]);
+    }, [activePart, loadCadFromSession, status, file, pdfUrl]);
 
     return (
         <div className="w-full h-full relative bg-[#080c14]" {...getRootProps()}>
@@ -455,13 +499,23 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
                             </p>
                             <p className="text-red-400/80 text-sm leading-relaxed">{errorMsg}</p>
                         </div>
-                        <button
-                            onClick={open}
-                            className="mt-1 px-6 py-2.5 rounded-xl bg-gray-800 border border-gray-700
-                                text-gray-300 hover:bg-gray-700 hover:text-white transition-all text-sm font-medium"
-                        >
-                            Try another file
-                        </button>
+                        {activePart?.metrics?.designSession ? (
+                            <button
+                                onClick={() => loadCadFromSession(activePart.metrics.designSession, activePart.fileName)}
+                                className="mt-1 px-6 py-2.5 rounded-xl bg-cyan-900/40 border border-cyan-500/50
+                                    text-cyan-300 hover:bg-cyan-800/60 hover:text-white transition-all text-sm font-semibold"
+                            >
+                                Reload from Server
+                            </button>
+                        ) : (
+                            <button
+                                onClick={open}
+                                className="mt-1 px-6 py-2.5 rounded-xl bg-gray-800 border border-gray-700
+                                    text-gray-300 hover:bg-gray-700 hover:text-white transition-all text-sm font-medium"
+                            >
+                                Try another file
+                            </button>
+                        )}
                     </div>
                 </div>
             )}

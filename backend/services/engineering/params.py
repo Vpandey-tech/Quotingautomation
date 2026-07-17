@@ -140,6 +140,11 @@ SHAFT_PARAMS: List[Dict[str, Any]] = [
     {"key": "inner_diameter_ratio", "label": "Inner/Outer Diameter Ratio (K)",
      "unit": "", "type": "number", "min": 0.1, "max": 0.9, "required": False,
      "question": "Enter the inner-to-outer diameter ratio K (e.g. 0.5):",
+     "options": [
+         {"value": "0.3", "label": "0.3 (Thick-walled)"},
+         {"value": "0.5", "label": "0.5 (Standard hollow)"},
+         {"value": "0.7", "label": "0.7 (Thin-walled)"},
+     ],
      "condition": {"key": "shaft_type", "equals": "hollow"}},
     {"key": "keyway", "label": "Keyway Present", "unit": "",
      "type": "select", "required": True,
@@ -151,10 +156,21 @@ SHAFT_PARAMS: List[Dict[str, Any]] = [
     {"key": "num_keyways", "label": "Number of Keyways", "unit": "",
      "type": "number", "min": 1, "max": 3, "required": True,
      "question": "How many keyways throughout the shaft? (maximum 3)",
+     "options": [
+         {"value": "1", "label": "1 keyway"},
+         {"value": "2", "label": "2 keyways (180°)"},
+         {"value": "3", "label": "3 keyways (120°)"},
+     ],
      "condition": {"key": "keyway", "equals": "yes"}},
     {"key": "fos", "label": "Factor of Safety", "unit": "",
      "type": "number", "min": 1.5, "max": 10, "required": True,
-     "question": "Enter the Factor of Safety (min 1.5):"},
+     "question": "Enter the Factor of Safety (min 1.5):",
+     "options": [
+         {"value": "1.5", "label": "1.5 (Steady Load)"},
+         {"value": "2.0", "label": "2.0 (Moderate Shock)"},
+         {"value": "2.5", "label": "2.5 (Heavy Shock)"},
+         {"value": "3.0", "label": "3.0 (Extreme Load)"},
+     ]},
 ]
 
 GEARBOX_PARAMS: List[Dict[str, Any]] = [
@@ -506,8 +522,13 @@ def get_next_missing_param(component_type: str, collected: Dict[str, Any]) -> Op
 def validate_param(param_def: Dict[str, Any], value: Any) -> Optional[str]:
     """Validate a single parameter value. Returns error message or None."""
     if param_def["type"] == "number":
+        cleaned_val = value
+        if isinstance(value, str):
+            match = re.search(r"[-+]?\d*\.?\d+", value)
+            if match:
+                cleaned_val = match.group(0)
         try:
-            v = float(value)
+            v = float(cleaned_val)
         except (ValueError, TypeError):
             return f"{param_def['label']} must be a number."
         if "min" in param_def and v < param_def["min"]:

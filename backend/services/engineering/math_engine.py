@@ -653,39 +653,59 @@ def calculate_custom(params: Dict[str, Any]) -> Dict[str, Any]:
     }
     density = density_map.get(mat_type, 7850)
 
-    # Basic volume
-    vol_mm3 = L * W * H
-    vol_m3 = vol_mm3 * 1e-9
-    mass_kg = vol_m3 * density
-    calcs.append(_calc("Bounding Volume", "V = L × W × H",
-                        vol_mm3, "mm³", f"{L}×{W}×{H}"))
-    calcs.append(_calc("Estimated Mass", "m = V × ρ",
-                        mass_kg, "kg", f"Density = {density} kg/m³ ({mat_type})"))
+    # Bounding volume and Net volume
+    from .cad_engine import compute_expected_properties
+    expected = compute_expected_properties("custom", {"length_mm": L, "width_mm": W, "height_mm": H}, params)
+    
+    if expected and expected.get("volume", 0) > 0:
+        net_vol = expected["volume"]
+        vol_mm3 = L * W * H
+        vol_m3 = vol_mm3 * 1e-9
+        mass_kg = vol_m3 * density
+        calcs.append(_calc("Bounding Volume", "V = L × W × H",
+                            vol_mm3, "mm³", f"{L}×{W}×{H}"))
+        calcs.append(_calc("Estimated Mass", "m = V × ρ",
+                            mass_kg, "kg", f"Density = {density} kg/m³ ({mat_type})"))
+        
+        net_mass = net_vol * 1e-9 * density
+        calcs.append(_calc("Net Volume (Custom Operations)", "V_net = V_cad",
+                            net_vol, "mm³", "Volume calculated from CAD operations"))
+        calcs.append(_calc("Net Mass", "m_net = V_net × ρ",
+                            net_mass, "kg", "Final estimated mass"))
+    else:
+        # Basic volume
+        vol_mm3 = L * W * H
+        vol_m3 = vol_mm3 * 1e-9
+        mass_kg = vol_m3 * density
+        calcs.append(_calc("Bounding Volume", "V = L × W × H",
+                            vol_mm3, "mm³", f"{L}×{W}×{H}"))
+        calcs.append(_calc("Estimated Mass", "m = V × ρ",
+                            mass_kg, "kg", f"Density = {density} kg/m³ ({mat_type})"))
 
-    # Hole deductions
-    holes_desc = str(params.get("has_holes", "no"))
-    hole_vol = 0
-    if holes_desc.lower() not in ("no", "none", ""):
-        # Try to parse "3 holes, 10mm diameter" or similar
-        import re
-        nums = re.findall(r'(\d+\.?\d*)', holes_desc)
-        if len(nums) >= 2:
-            n_holes = int(float(nums[0]))
-            d_hole = float(nums[1])
-            hole_depth = min(H, 25)  # assume through-hole up to thickness
-            single_hole = math.pi * (d_hole/2)**2 * hole_depth
-            hole_vol = single_hole * n_holes
-            calcs.append(_calc("Hole Volume Deduction",
-                                f"{n_holes} holes × π(d/2)²×h",
-                                hole_vol, "mm³",
-                                f"d={d_hole}mm, depth={hole_depth}mm"))
+        # Hole deductions
+        holes_desc = str(params.get("has_holes", "no"))
+        hole_vol = 0
+        if holes_desc.lower() not in ("no", "none", ""):
+            # Try to parse "3 holes, 10mm diameter" or similar
+            import re
+            nums = re.findall(r'(\d+\.?\d*)', holes_desc)
+            if len(nums) >= 2:
+                n_holes = int(float(nums[0]))
+                d_hole = float(nums[1])
+                hole_depth = min(H, 25)  # assume through-hole up to thickness
+                single_hole = math.pi * (d_hole/2)**2 * hole_depth
+                hole_vol = single_hole * n_holes
+                calcs.append(_calc("Hole Volume Deduction",
+                                    f"{n_holes} holes × π(d/2)²×h",
+                                    hole_vol, "mm³",
+                                    f"d={d_hole}mm, depth={hole_depth}mm"))
 
-    net_vol = vol_mm3 - hole_vol
-    net_mass = net_vol * 1e-9 * density
-    calcs.append(_calc("Net Volume", "V_net = V_bound - V_holes",
-                        net_vol, "mm³", "After subtracting holes"))
-    calcs.append(_calc("Net Mass", "m_net = V_net × ρ",
-                        net_mass, "kg", "Final estimated mass"))
+        net_vol = vol_mm3 - hole_vol
+        net_mass = net_vol * 1e-9 * density
+        calcs.append(_calc("Net Volume", "V_net = V_bound - V_holes",
+                            net_vol, "mm³", "After subtracting holes"))
+        calcs.append(_calc("Net Mass", "m_net = V_net × ρ",
+                            net_mass, "kg", "Final estimated mass"))
 
     # Tolerance info
     tol = str(params.get("tolerance", "general"))
