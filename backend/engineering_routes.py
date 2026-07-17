@@ -181,24 +181,26 @@ async def create_session(body: CreateSessionBody):
         session["custom_chat"] = [
             {"role": "system", "text": f"User wants to design: {body.custom_description}"},
         ]
-    next_param = get_next_missing_param(session["component_type"], session["params"])
+    archetype = session["params"].get("archetype") if session["component_type"] == "custom" else None
+    next_param = get_next_missing_param(session["component_type"], session["params"], archetype)
     return {**_session_summary(session), "next_param": next_param}
 
 
 @router.get("/sessions/{session_id}")
 async def get_session(session_id: str):
     session = _get_session(session_id)
-    next_param = get_next_missing_param(session["component_type"], session["params"])
+    archetype = session["params"].get("archetype") if session["component_type"] == "custom" else None
+    next_param = get_next_missing_param(session["component_type"], session["params"], archetype)
     assumptions = []
     if next_param is None:
-        assumptions = compute_smart_defaults(session["component_type"], session["params"])
+        assumptions = compute_smart_defaults(session["component_type"], session["params"], archetype)
 
     return {
         **_session_summary(session),
         "messages": session["messages"],
         "next_param": next_param,
         "assumptions": assumptions,
-        "all_params_collected": are_all_params_collected(session["component_type"], session["params"]),
+        "all_params_collected": are_all_params_collected(session["component_type"], session["params"], archetype),
     }
 
 
@@ -269,182 +271,136 @@ async def edit_param(session_id: str, body: EditParamBody):
 
 
 # ── Custom Part Free-Form Chat ────────────────────────────────────────────────
-# Iterative question loop for custom/unknown parts
-CUSTOM_QUESTIONS = [
-    {"key": "part_name", "q": "What is the name of the part you want to design?",
-     "options": [
-         {"value": "Shaft Adapter", "label": "Shaft Adapter"},
-         {"value": "Mounting Bracket", "label": "Mounting Bracket"},
-         {"value": "Coupling Flange", "label": "Coupling Flange"},
-         {"value": "Spacer Ring", "label": "Spacer Ring"},
-     ]},
-    {"key": "part_purpose", "q": "What is its primary function/purpose?",
-     "options": [
-         {"value": "Mounting / support", "label": "Mounting / support"},
-         {"value": "Power transmission", "label": "Power transmission"},
-         {"value": "Alignment / spacing", "label": "Alignment / spacing"},
-     ]},
-    {"key": "overall_shape", "q": "Describe the overall shape (cylindrical, rectangular, L-bracket, disc, etc.):",
-     "options": [
-         {"value": "cylindrical", "label": "Cylindrical (rod/tube)"},
-         {"value": "rectangular", "label": "Rectangular (plate/block)"},
-         {"value": "L-bracket", "label": "L-Bracket"},
-         {"value": "disc", "label": "Disc / Ring"},
-     ]},
-    {"key": "length_mm", "q": "What is the overall length/height in mm?", "type": "number",
-     "options": [
-         {"value": "50", "label": "50 mm"},
-         {"value": "100", "label": "100 mm"},
-         {"value": "200", "label": "200 mm"},
-         {"value": "500", "label": "500 mm"},
-     ]},
-    {"key": "width_mm", "q": "What is the overall width in mm?", "type": "number",
-     "options": [
-         {"value": "30", "label": "30 mm"},
-         {"value": "50", "label": "50 mm"},
-         {"value": "80", "label": "80 mm"},
-         {"value": "100", "label": "100 mm"},
-     ]},
-    {"key": "height_mm", "q": "What is the overall height/thickness in mm?", "type": "number",
-     "options": [
-         {"value": "10", "label": "10 mm"},
-         {"value": "20", "label": "20 mm"},
-         {"value": "30", "label": "30 mm"},
-         {"value": "50", "label": "50 mm"},
-     ]},
-    {"key": "material_type", "q": "What material? (steel, aluminum, cast iron, stainless steel, brass, plastic):",
-     "options": [
-         {"value": "steel", "label": "Medium Carbon Steel"},
-         {"value": "aluminum", "label": "Aluminum (6061-T6)"},
-         {"value": "stainless steel", "label": "Stainless Steel (304/316)"},
-         {"value": "brass", "label": "Brass"},
-         {"value": "plastic", "label": "Delrin / Plastic"},
-     ]},
-    {"key": "has_holes", "q": "Does it have any holes? If yes, how many and what diameter (mm)?",
-     "options": [
-         {"value": "no", "label": "No holes"},
-         {"value": "2 holes, 10mm diameter", "label": "2 holes (10mm)"},
-         {"value": "4 holes, 12mm diameter", "label": "4 holes (12mm)"},
-         {"value": "6 holes, 16mm diameter", "label": "6 holes (16mm)"},
-     ]},
-    {"key": "has_slots", "q": "Does it have any slots or grooves? Describe dimensions if yes:",
-     "options": [
-         {"value": "no", "label": "No slots"},
-         {"value": "1 slot, 10mm wide", "label": "1 slot (10mm wide)"},
-     ]},
-    {"key": "has_chamfers", "q": "Does it need chamfers or fillets on edges? (yes/no, and radius in mm):",
-     "options": [
-         {"value": "no", "label": "No"},
-         {"value": "1mm chamfer", "label": "1mm chamfer"},
-         {"value": "2mm fillet", "label": "2mm fillet"},
-     ]},
-    {"key": "tolerance", "q": "What tolerance class? (general ±0.5mm, precision ±0.1mm, tight ±0.05mm):",
-     "options": [
-         {"value": "general \u00b10.5mm", "label": "General (\u00b10.5mm)"},
-         {"value": "precision \u00b10.1mm", "label": "Precision (\u00b10.1mm)"},
-         {"value": "tight \u00b10.05mm", "label": "Tight (\u00b10.05mm)"},
-     ]},
-    {"key": "surface_finish", "q": "Required surface finish? (as-machined, ground, polished):",
-     "options": [
-         {"value": "as-machined", "label": "As-Machined (standard)"},
-         {"value": "ground", "label": "Ground finish"},
-         {"value": "polished", "label": "Polished finish"},
-     ]},
-    {"key": "additional_features", "q": "Any additional features? (threads, counterbores, pockets, etc.) Describe or type 'none':",
-     "options": [
-         {"value": "none", "label": "None"},
-         {"value": "M10 threads", "label": "M10 Threads"},
-     ]},
-    {"key": "load_conditions", "q": "What loads will this part experience? (static, dynamic, impact — describe forces if known):",
-     "options": [
-         {"value": "static", "label": "Static load only"},
-         {"value": "dynamic", "label": "Dynamic / fluctuating load"},
-         {"value": "impact", "label": "Impact / shock load"},
-         {"value": "none", "label": "Negligible / None"},
-     ]},
-    {"key": "quantity", "q": "How many units do you need manufactured?", "type": "number",
-     "options": [
-         {"value": "1", "label": "1 pc (prototype)"},
-         {"value": "10", "label": "10 pcs"},
-         {"value": "50", "label": "50 pcs"},
-         {"value": "100", "label": "100 pcs"},
-     ]},
-]
+# Classify-then-branch question loop for custom/unknown parts
+
+async def classify_custom_part(params: Dict[str, Any], session_desc: Optional[str] = None) -> str:
+    """Classify the custom part description into one of our standard archetypes."""
+    import json, logging
+    logger = logging.getLogger("uvicorn.error")
+    
+    desc_str = f"Part Name: {params.get('part_name')}\nPurpose: {params.get('part_purpose')}\nOverall Shape: {params.get('overall_shape')}"
+    if session_desc:
+        desc_str += f"\nInitial Description: {session_desc}"
+        
+    prompt = f"""You are an expert mechanical engineering assistant.
+We need to classify a user's custom part request into one of the following standard mechanical geometry archetypes:
+1. "flange": Circular or ring-shaped parts with bolt holes, mounts, or matching surfaces (e.g. pipe flange, shaft flange, backing ring).
+2. "pulley": Pulleys, sheaves, or sprockets with grooves for belts (V-belt, flat belt, timing belt) or chains.
+3. "bracket": Mounting plates, L-brackets, U-brackets, or gusseted structural supports.
+4. "spacer": Spacers, bushings, collars, standoffs, or thick washers used to space or align components.
+5. "lever": Lever arms, linkages, crank arms, or pivot bars experiencing bending or pivoting loads.
+6. "housing": Gear casings, motor covers, housing blocks, lids, or protective enclosures.
+7. "plate_hole_pattern": Flat plates, baseplates, or sheet metal parts featuring rectangular or circular arrays of holes.
+8. "pin_dowel": Dowel pins, retaining pins, shafts, retaining axles, clevis pins, or groove pins.
+9. "generic": Any part that does not fit any of the above (e.g., custom gears, complex manifolds, highly irregular parts).
+
+User Part Details:
+{desc_str}
+
+Return ONLY a valid JSON object in this exact format, with no markdown, just the raw braces:
+{{
+  "archetype": "one_of_the_above_archetype_strings"
+}}"""
+
+    # 1. Try Groq first
+    try:
+        groq_res = await call_groq_api(prompt, response_json=True)
+        if groq_res:
+            data = json.loads(groq_res)
+            arch = data.get("archetype", "").strip().lower()
+            if arch in ["flange", "pulley", "bracket", "spacer", "lever", "housing", "plate_hole_pattern", "pin_dowel", "generic"]:
+                logger.info(f"✓ Classified custom part as '{arch}' using Groq")
+                return arch
+    except Exception as e:
+        logger.warning(f"Groq classification failed: {e}")
+        
+    models_to_try = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.5-pro",
+        "gemini-2.0-flash-001",
+    ]
+    for key_idx in [1, 2]:
+        api_key = os.getenv("GEMINI_API_KEY_2" if key_idx == 2 else "GEMINI_API_KEY", "")
+        if not api_key:
+            continue
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = await run_in_threadpool(
+                    model.generate_content,
+                    [prompt],
+                    generation_config=genai.types.GenerationConfig(temperature=0.0)
+                )
+                text = response.text.strip()
+                if "```json" in text:
+                    text = text.split("```json", 1)[1].split("```", 1)[0]
+                elif "```" in text:
+                    text = text.split("```", 1)[1].split("```", 1)[0]
+                text = text.strip()
+                start = text.find("{")
+                end = text.rfind("}")
+                if start != -1 and end != -1:
+                    text = text[start:end+1]
+                  
+                data = json.loads(text)
+                arch = data.get("archetype", "").strip().lower()
+                if arch in ["flange", "pulley", "bracket", "spacer", "lever", "housing", "plate_hole_pattern", "pin_dowel", "generic"]:
+                    logger.info(f"✓ Classified custom part as '{arch}' using Gemini ({model_name})")
+                    return arch
+            except Exception:
+                continue
+                
+    logger.warning("Classification failed. Falling back to generic.")
+    return "generic"
 
 
 def _get_next_custom_question(session):
-    """Find the next unanswered custom question."""
+    """Find the next unanswered custom question, branching based on archetype."""
+    from services.engineering.params import get_params_for_component, BASE_CUSTOM_PARAMS
     params = session.get("params", {})
-    shape = str(params.get("overall_shape", "")).lower()
-    is_cylindrical = "cylind" in shape or "round" in shape or "disc" in shape or "ring" in shape or "flange" in shape
-    if is_cylindrical and params.get("length_mm") is not None:
-        params["width_mm"] = params["length_mm"]
-
-    for q in CUSTOM_QUESTIONS:
-        if q["key"] not in params or params[q["key"]] is None:
-            if is_cylindrical and q["key"] == "width_mm":
-                continue
-            return q
+    archetype = params.get("archetype")
+    
+    # 1. If archetype is not yet classified, get missing params from BASE_CUSTOM_PARAMS
+    if not archetype:
+        for p in BASE_CUSTOM_PARAMS:
+            if p["key"] not in params or params[p["key"]] is None:
+                return {"key": p["key"], "q": p["question"], "options": p.get("options"), "type": p.get("type")}
+        return None  # Ready for classification!
+        
+    # 2. If archetype is set, get missing params from archetype params
+    all_params = get_params_for_component("custom", archetype)
+    for p in all_params:
+        key = p["key"]
+        if key not in params or params[key] is None:
+            # Check condition visibility
+            cond = p.get("condition")
+            if cond:
+                dep_key = cond["key"]
+                dep_val = params.get(dep_key)
+                if "equals" in cond and dep_val != cond["equals"]:
+                    continue
+                if "not_equals" in cond and dep_val == cond["not_equals"]:
+                    continue
+            return {"key": key, "q": p["question"], "options": p.get("options"), "type": p.get("type")}
+            
     return None
 
 
 async def extract_params_from_text(text: str, unanswered_qs: List[Dict[str, Any]]) -> Dict[str, Any]:
-    import re
+    import json
     extracted = {}
-    text_lower = text.lower()
-
-    # 1. Regex fallback parsing (very fast and robust)
-    dim_matches = re.findall(r"(\d+(?:\.\d+)?)\s*(?:x|\*)\s*(\d+(?:\.\d+)?)\s*(?:x|\*)\s*(\d+(?:\.\d+)?)", text_lower)
-    if dim_matches:
-        extracted["length_mm"] = float(dim_matches[0][0])
-        extracted["width_mm"] = float(dim_matches[0][1])
-        extracted["height_mm"] = float(dim_matches[0][2])
-    else:
-        len_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:long|length)", text_lower)
-        if len_match:
-            extracted["length_mm"] = float(len_match.group(1))
-        wid_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:wide|width)", text_lower)
-        if wid_match:
-            extracted["width_mm"] = float(wid_match.group(1))
-        hei_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:thick|thickness|height)", text_lower)
-        if hei_match:
-            extracted["height_mm"] = float(hei_match.group(1))
-
-    od_match = re.search(r"(?:outer diameter|od)\s*(\d+(?:\.\d+)?)", text_lower)
-    id_match = re.search(r"(?:inner diameter|inner bore|id)\s*(\d+(?:\.\d+)?)", text_lower)
-    thick_match = re.search(r"(?:thickness|height|thick)\s*(\d+(?:\.\d+)?)", text_lower)
-    if od_match:
-        extracted["length_mm"] = float(od_match.group(1))
-        extracted["width_mm"] = float(od_match.group(1))
-    if id_match:
-        extracted["has_holes"] = f"Yes, inner bore {id_match.group(1)}mm"
-    if thick_match:
-        extracted["height_mm"] = float(thick_match.group(1))
-
-    qty_match = re.search(r"(\d+)\s*(?:pcs|pcs\.|pieces|units|quantity|qty)", text_lower)
-    if qty_match:
-        extracted["quantity"] = float(qty_match.group(1))
-
-    materials = ["steel", "aluminum", "cast iron", "stainless steel", "brass", "plastic"]
-    for mat in materials:
-        if mat in text_lower:
-            extracted["material_type"] = mat
-            break
-
-    # 2. Try Gemini AI extraction if api key is configured
-    api_key = os.getenv("GEMINI_API_KEY", "")
-    if api_key:
-        try:
-            import google.generativeai as genai
-            import json
-            genai.configure(api_key=api_key)
-            
-            prompt = f"""Analyze this user message about a custom mechanical part: "{text}"
+    if not unanswered_qs:
+        return extracted
+        
+    prompt = f"""Analyze this user message about a custom mechanical part: "{text}"
 We need to extract answers for these parameters:
 {json.dumps(unanswered_qs, indent=2)}
 
 CRITICAL RULE: Only extract parameters that are EXPLICITLY mentioned or clearly detailed in the user's message.
-DO NOT assume, default, or guess values for parameters that are not mentioned. For example, if the user does not explicitly talk about holes, slots, chamfers, tolerances, quantities, or loads, DO NOT include those keys in the "extracted" dictionary at all (omit them entirely).
+DO NOT assume, default, or guess values for parameters that are not mentioned. For example, if the user does not explicitly talk about a parameter, DO NOT include its key in the "extracted" dictionary at all (omit it entirely).
 
 Return ONLY valid JSON in this exact format:
 {{
@@ -454,53 +410,78 @@ Return ONLY valid JSON in this exact format:
   }}
 }}
 Do not include any markdown styling. Only output the raw JSON."""
-            
-            models_to_try = [
-                "gemini-2.5-flash",
-                "gemini-2.0-flash",
-                "gemini-2.5-pro",
-                "gemini-2.0-flash-001",
-            ]
-            
-            for model_name in models_to_try:
-                try:
-                    model = genai.GenerativeModel(model_name)
-                    response = await run_in_threadpool(
-                        model.generate_content,
-                        [prompt],
-                        generation_config=genai.types.GenerationConfig(temperature=0.0)
-                    )
-                    resp_text = response.text.strip()
-                    if "```json" in resp_text:
-                        resp_text = resp_text.split("```json", 1)[1].split("```", 1)[0]
-                    elif "```" in resp_text:
-                        resp_text = resp_text.split("```", 1)[1].split("```", 1)[0]
-                    resp_text = resp_text.strip()
-                    start = resp_text.find("{")
-                    end = resp_text.rfind("}")
-                    if start != -1 and end != -1:
-                        data = json.loads(resp_text[start:end+1])
-                        ai_extracted = data.get("extracted", {})
-                        for k, v in ai_extracted.items():
-                            if v is not None and v != "":
-                                q_def = next((q for q in unanswered_qs if q["key"] == k), None)
-                                if q_def and q_def.get("type") == "number":
-                                    try:
-                                        import re
-                                        nums = re.findall(r"[-+]?\d*\.\d+|\d+", str(v))
-                                        if nums:
-                                            extracted[k] = float(nums[0])
-                                    except ValueError:
-                                        continue
-                                else:
-                                    extracted[k] = str(v)
-                        break
-                except Exception:
-                    continue
-        except Exception:
-            pass
-            
+
+    # 1. Try Groq first
+    try:
+        groq_res = await call_groq_api(prompt, response_json=True)
+        if groq_res:
+            data = json.loads(groq_res)
+            ai_extracted = data.get("extracted", {})
+            for k, v in ai_extracted.items():
+                if v is not None and v != "":
+                    extracted[k] = v
+            return _format_extracted_values(extracted, unanswered_qs)
+    except Exception:
+        pass
+
+    # 2. Try Gemini fallback (Keys 1 and 2)
+    models_to_try = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.5-pro",
+        "gemini-2.0-flash-001",
+    ]
+    import google.generativeai as genai
+    for key_idx in [1, 2]:
+        api_key = os.getenv("GEMINI_API_KEY_2" if key_idx == 2 else "GEMINI_API_KEY", "")
+        if not api_key:
+            continue
+        genai.configure(api_key=api_key)
+        for model_name in models_to_try:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = await run_in_threadpool(
+                    model.generate_content,
+                    [prompt],
+                    generation_config=genai.types.GenerationConfig(temperature=0.0)
+                )
+                resp_text = response.text.strip()
+                if "```json" in resp_text:
+                    resp_text = resp_text.split("```json", 1)[1].split("```", 1)[0]
+                elif "```" in resp_text:
+                    resp_text = resp_text.split("```", 1)[1].split("```", 1)[0]
+                resp_text = resp_text.strip()
+                start = resp_text.find("{")
+                end = resp_text.rfind("}")
+                if start != -1 and end != -1:
+                    data = json.loads(resp_text[start:end+1])
+                    ai_extracted = data.get("extracted", {})
+                    for k, v in ai_extracted.items():
+                        if v is not None and v != "":
+                            extracted[k] = v
+                    return _format_extracted_values(extracted, unanswered_qs)
+            except Exception:
+                continue
+                
     return extracted
+
+
+def _format_extracted_values(extracted: Dict[str, Any], unanswered_qs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    formatted = {}
+    for k, v in extracted.items():
+        q_def = next((q for q in unanswered_qs if q["key"] == k), None)
+        if q_def:
+            if q_def.get("type") == "number":
+                try:
+                    import re
+                    nums = re.findall(r"[-+]?\d*\.\d+|\d+", str(v))
+                    if nums:
+                        formatted[k] = float(nums[0])
+                except ValueError:
+                    continue
+            else:
+                formatted[k] = str(v)
+    return formatted
 
 
 @router.post("/sessions/{session_id}/chat")
@@ -511,31 +492,50 @@ async def custom_chat(session_id: str, body: CustomChatBody):
         raise HTTPException(400, "Chat endpoint is for custom parts only.")
 
     message_text = body.message.strip()
+    from services.engineering.params import get_params_for_component
     
-    # Initial start trigger message should not be stored as an answer
+    # 1. Initialize custom chat if start command
     if message_text.lower() == "start":
         next_q = _get_next_custom_question(session)
+        all_params = get_params_for_component("custom", session["params"].get("archetype"))
         return {
             "all_done": False,
             "answered": None,
             "next_question": next_q,
             "params_so_far": session["params"],
-            "progress": f"{len(session['params'])}/{len(CUSTOM_QUESTIONS)}",
+            "progress": f"{len(session['params'])}/{len(all_params)}",
         }
 
-    unanswered_qs = [q for q in CUSTOM_QUESTIONS if q["key"] not in session["params"] or session["params"][q["key"]] is None]
+    # 2. Get currently unanswered params dynamically
+    archetype = session["params"].get("archetype")
+    all_params = get_params_for_component("custom", archetype)
+    
+    unanswered_qs = []
+    for p in all_params:
+        key = p["key"]
+        if key not in session["params"] or session["params"][key] is None:
+            # Check condition visibility
+            cond = p.get("condition")
+            if cond:
+                dep_key = cond["key"]
+                dep_val = session["params"].get(dep_key)
+                if "equals" in cond and dep_val != cond["equals"]:
+                    continue
+                if "not_equals" in cond and dep_val == cond["not_equals"]:
+                    continue
+            unanswered_qs.append({"key": key, "q": p["question"], "options": p.get("options"), "type": p.get("type"), "label": p.get("label")})
+
     current_q = _get_next_custom_question(session)
 
+    # 3. Try to extract any param in user's text
     extracted_dict = await extract_params_from_text(message_text, unanswered_qs)
     extracted_summary = []
-
-    # 1. Apply any extracted parameters
     if extracted_dict:
         for k, v in extracted_dict.items():
             session["params"][k] = v
             extracted_summary.append(f"{k}: {v}")
 
-    # 2. If the current question was not filled by extraction, fill it with the raw message text
+    # 4. Fallback: Apply Raw input to the specific current question if not already filled
     if current_q and (current_q["key"] not in session["params"] or session["params"][current_q["key"]] is None):
         val = message_text
         if current_q.get("type") == "number":
@@ -556,7 +556,19 @@ async def custom_chat(session_id: str, body: CustomChatBody):
 
     session["updated_at"] = time.time()
 
-    # Get next question
+    # 5. Handle LLM classification branch if base parameters are complete
+    if not session["params"].get("archetype"):
+        if (
+            session["params"].get("part_name")
+            and session["params"].get("part_purpose")
+            and session["params"].get("overall_shape")
+        ):
+            archetype = await classify_custom_part(session["params"], session.get("custom_description"))
+            session["params"]["archetype"] = archetype
+            # re-fetch all_params now that archetype is set
+            all_params = get_params_for_component("custom", archetype)
+
+    # 6. Retrieve next question
     next_q = _get_next_custom_question(session)
     if next_q is None:
         session["status"] = "params_complete"
@@ -573,7 +585,7 @@ async def custom_chat(session_id: str, body: CustomChatBody):
         "extracted_val": ", ".join(extracted_summary) if extracted_summary else None,
         "next_question": next_q,
         "params_so_far": session["params"],
-        "progress": f"{len(session['params'])}/{len(CUSTOM_QUESTIONS)}",
+        "progress": f"{len(session['params'])}/{len(all_params)}",
     }
 
 
@@ -583,7 +595,8 @@ async def submit_param(session_id: str, body: SubmitParamBody):
     if session["status"] != "collecting_params":
         raise HTTPException(400, "Parameters already collected.")
 
-    all_params = get_params_for_component(session["component_type"])
+    archetype = session["params"].get("archetype") if session["component_type"] == "custom" else None
+    all_params = get_params_for_component(session["component_type"], archetype)
     param_def = next((p for p in all_params if p["key"] == body.key), None)
     if not param_def:
         raise HTTPException(400, f"Unknown parameter key: {body.key}")
@@ -604,12 +617,12 @@ async def submit_param(session_id: str, body: SubmitParamBody):
         session["params"][body.key] = str(body.value)
     session["updated_at"] = time.time()
 
-    next_param = get_next_missing_param(session["component_type"], session["params"])
+    next_param = get_next_missing_param(session["component_type"], session["params"], archetype)
     assumptions = []
     if next_param is None:
         session["status"] = "params_complete"
         # Compute smart defaults to show to the user
-        assumptions = compute_smart_defaults(session["component_type"], session["params"])
+        assumptions = compute_smart_defaults(session["component_type"], session["params"], archetype)
 
     return {
         "param_accepted": True, "key": body.key, "value": body.value,
@@ -633,7 +646,26 @@ async def custom_chat_multimodal(
 
     current_q = _get_next_custom_question(session)
     val = message.strip()
+    from services.engineering.params import get_params_for_component
     
+    archetype = session["params"].get("archetype")
+    all_params = get_params_for_component("custom", archetype)
+    
+    unanswered_qs = []
+    for p in all_params:
+        key = p["key"]
+        if key not in session["params"] or session["params"][key] is None:
+            # Check condition visibility
+            cond = p.get("condition")
+            if cond:
+                dep_key = cond["key"]
+                dep_val = session["params"].get(dep_key)
+                if "equals" in cond and dep_val != cond["equals"]:
+                    continue
+                if "not_equals" in cond and dep_val == cond["not_equals"]:
+                    continue
+            unanswered_qs.append({"key": key, "q": p["question"], "options": p.get("options"), "type": p.get("type"), "label": p.get("label")})
+
     if file:
         import google.generativeai as genai
         import json
@@ -647,13 +679,13 @@ async def custom_chat_multimodal(
                 mime_type = "image/jpeg" if fname.endswith(('jpg', 'jpeg')) else "image/png"
             elif fname.endswith(('.step', '.stp')):
                 mime_type = "text/plain"
-            unanswered_qs = [q for q in CUSTOM_QUESTIONS if q["key"] not in session["params"] or session["params"][q["key"]] is None]
+            
             prompt = f"""The user uploaded '{fname}' and said: '{message}'.
 We need to collect the following missing information for their custom part:
 {json.dumps(unanswered_qs, indent=2)}
 
 CRITICAL RULE: Only extract parameters that are EXPLICITLY mentioned or clearly detailed in the user's message or file content.
-DO NOT assume, default, or guess values for parameters that are not mentioned. For example, if the user does not explicitly talk about holes, slots, chamfers, tolerances, quantities, or loads, DO NOT include those keys in the "extracted" dictionary at all (omit them entirely).
+DO NOT assume, default, or guess values for parameters that are not mentioned. For example, if the user does not explicitly talk about a parameter, DO NOT include its key in the "extracted" dictionary at all (omit it entirely).
 
 Return ONLY valid JSON in this exact format, with no markdown, just the raw braces:
 {{
@@ -677,7 +709,6 @@ If you cannot find the answer to a specific question, omit its key from the 'ext
                 "gemini-2.0-flash-001",
             ]
             
-            val = None
             extracted_dict = {}
             last_err = None
             for model_name in models_to_try:
@@ -748,6 +779,18 @@ If you cannot find the answer to a specific question, omit its key from the 'ext
         session["params"][current_q["key"]] = val
         session["updated_at"] = time.time()
 
+    # Handle LLM classification branch if base parameters are complete
+    if not session["params"].get("archetype"):
+        if (
+            session["params"].get("part_name")
+            and session["params"].get("part_purpose")
+            and session["params"].get("overall_shape")
+        ):
+            archetype = await classify_custom_part(session["params"], session.get("custom_description"))
+            session["params"]["archetype"] = archetype
+            # re-fetch all_params now that archetype is set
+            all_params = get_params_for_component("custom", archetype)
+
     next_q = _get_next_custom_question(session)
     if next_q is None:
         session["status"] = "params_complete"
@@ -764,7 +807,7 @@ If you cannot find the answer to a specific question, omit its key from the 'ext
         "extracted_val": val if current_q and val else None,
         "next_question": next_q,
         "params_so_far": session["params"],
-        "progress": f"{len(session['params'])}/{len(CUSTOM_QUESTIONS)}",
+        "progress": f"{len(session['params'])}/{len(all_params)}",
     }
 
 
@@ -1423,6 +1466,39 @@ async def get_report_markdown(session_id: str):
     if not md:
         raise HTTPException(404, "No Markdown report generated yet.")
     return {"session_id": session_id, "markdown": md}
+
+
+@router.get("/sessions/{session_id}/export-calculation")
+async def export_calculation(session_id: str):
+    """Get status and download links for calculations independent of CAD."""
+    session = _get_session(session_id)
+    if not session["result"]:
+        raise HTTPException(400, "Calculations not generated yet. Complete parameters first.")
+    return {
+        "session_id": session_id,
+        "component_type": session["component_type"],
+        "status": session["status"],
+        "download_txt_url": f"/api/design/sessions/{session_id}/export-txt",
+        "download_pdf_url": f"/api/design/sessions/{session_id}/download-pdf",
+        "result": session["result"],
+    }
+
+
+@router.get("/sessions/{session_id}/export-pdf")
+async def export_pdf(session_id: str):
+    """Export all design calculation parameters and results as a professional PDF report."""
+    from fastapi.responses import FileResponse
+    session = _get_session(session_id)
+    fpath = session.get("report_pdf_path")
+    if not fpath or not os.path.isfile(fpath):
+        if not session["result"]:
+            raise HTTPException(400, "Calculations not generated yet. Complete parameters first.")
+        from services.engineering.report_generator import generate_pdf_report
+        fpath = generate_pdf_report(session["component_type"], session["params"], session["result"], session_id)
+        session["report_pdf_path"] = fpath
+
+    return FileResponse(fpath, media_type="application/pdf",
+                        filename=f"AccuDesign_Calculation_Report_{session['component_type']}_{session_id}.pdf")
 
 
 # ── Auto-Transfer to Quoting Engine ─────────────────────────────────────────

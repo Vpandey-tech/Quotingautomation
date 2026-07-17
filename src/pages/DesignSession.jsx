@@ -712,28 +712,49 @@ export default function DesignSession() {
                   )}
 
                   {/* Action buttons */}
-                  {hasReport && !isApproved && (
-                    <div className="flex items-center justify-between">
+                  {hasReport && (
+                    <div className="flex items-center justify-between border-t border-white/[0.04] pt-4">
                       <div className="flex gap-2">
-                        <button onClick={handleValidate} disabled={validating}
-                          className="px-3 py-1.5 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
-                            text-violet-300 hover:text-white disabled:opacity-50"
-                          style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.3)' }}>
-                          {validating ? <><Loader2 size={12} className="inline animate-spin mr-1" />CHECKING</> : <><ShieldCheck size={12} className="inline mr-1" />SYSTEM CHECK</>}
-                        </button>
-                        <button onClick={handleGenerateReport} disabled={generatingReport}
-                          className="px-3 py-1.5 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
-                            text-amber-300 hover:text-white disabled:opacity-50"
-                          style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}>
-                          <RefreshCw size={12} className="inline mr-1" />RE-GENERATE
-                        </button>
+                        {!isApproved ? (
+                          <>
+                            <button onClick={handleValidate} disabled={validating}
+                              className="px-3 py-1.5 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
+                                text-violet-300 hover:text-white disabled:opacity-50"
+                              style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.3)' }}>
+                              {validating ? <><Loader2 size={12} className="inline animate-spin mr-1" />CHECKING</> : <><ShieldCheck size={12} className="inline mr-1" />SYSTEM CHECK</>}
+                            </button>
+                            <button onClick={handleGenerateReport} disabled={generatingReport}
+                              className="px-3 py-1.5 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
+                                text-amber-300 hover:text-white disabled:opacity-50"
+                              style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}>
+                              <RefreshCw size={12} className="inline mr-1" />RE-GENERATE
+                            </button>
+                          </>
+                        ) : (
+                          <div className="text-[10pt] font-mono text-emerald-400 flex items-center gap-1.5">
+                            <CheckCircle2 size={14} /> Approved
+                          </div>
+                        )}
                       </div>
-                      <button onClick={handleApprove} disabled={approvingReport}
-                        className="px-4 py-2 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
-                          text-emerald-300 hover:text-white disabled:opacity-50"
-                        style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.3)' }}>
-                        {approvingReport ? <><Loader2 size={12} className="inline animate-spin mr-1" />APPROVING</> : <><CheckCircle2 size={12} className="inline mr-1" />APPROVE REPORT</>}
-                      </button>
+                      <div className="flex gap-2">
+                        <a href={`/api/design/sessions/${id}/export-pdf`} download>
+                          <button
+                            className="px-3 py-1.5 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
+                              text-cyan-300 hover:text-white"
+                            style={{ background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.3)' }}
+                          >
+                            <Download size={12} className="inline mr-1" /> EXPORT CALCULATION
+                          </button>
+                        </a>
+                        {!isApproved && (
+                          <button onClick={handleApprove} disabled={approvingReport}
+                            className="px-4 py-2 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
+                              text-emerald-300 hover:text-white disabled:opacity-50"
+                            style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.3)' }}>
+                            {approvingReport ? <><Loader2 size={12} className="inline animate-spin mr-1" />APPROVING</> : <><CheckCircle2 size={12} className="inline mr-1" />APPROVE REPORT</>}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

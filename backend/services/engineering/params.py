@@ -403,6 +403,239 @@ CAM_ASSUMPTIONS: List[Dict[str, Any]] = []
 
 
 # ── Registry ──────────────────────────────────────────────────────────────────
+
+BASE_CUSTOM_PARAMS: List[Dict[str, Any]] = [
+    {"key": "part_name", "label": "Part Name", "type": "text", "required": True,
+     "question": "What is the name of the part you want to design?"},
+    {"key": "part_purpose", "label": "Primary Purpose", "type": "text", "required": True,
+     "question": "What is its primary function/purpose?"},
+    {"key": "overall_shape", "label": "Overall Shape", "type": "select", "required": True,
+     "options": [
+         {"value": "cylindrical", "label": "Cylindrical (disc, ring, flange, rod)"},
+         {"value": "rectangular", "label": "Rectangular (plate, block)"},
+         {"value": "L-bracket", "label": "L-Bracket / Angle bracket"},
+         {"value": "other", "label": "Other / Complex Shape"},
+     ],
+     "question": "Describe the overall shape:"},
+]
+
+CUSTOM_ARCHETYPE_PARAMS: Dict[str, List[Dict[str, Any]]] = {
+    "flange": [
+        {"key": "outer_diameter_mm", "label": "Outer Diameter", "unit": "mm", "type": "number", "min": 10.0, "max": 2000.0, "required": True, "question": "Enter the outer diameter of the flange in mm:"},
+        {"key": "inner_bore_diameter_mm", "label": "Inner Bore Diameter", "unit": "mm", "type": "number", "min": 0.0, "max": 1800.0, "required": True, "question": "Enter the inner bore/hole diameter in mm (0 if none):"},
+        {"key": "thickness_mm", "label": "Thickness", "unit": "mm", "type": "number", "min": 1.0, "max": 500.0, "required": True, "question": "Enter the thickness of the flange in mm:"},
+        {"key": "bolt_circle_diameter_mm", "label": "Bolt Circle Diameter (PCD)", "unit": "mm", "type": "number", "min": 5.0, "max": 1900.0, "required": True, "question": "Enter the Bolt Circle Diameter (PCD) in mm:"},
+        {"key": "num_bolts", "label": "Number of Bolts", "unit": "", "type": "number", "min": 0.0, "max": 64.0, "required": True, "question": "Enter the number of bolts/holes in the flange:"},
+        {"key": "bolt_size", "label": "Bolt Size", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "M4", "label": "M4"},
+             {"value": "M5", "label": "M5"},
+             {"value": "M6", "label": "M6"},
+             {"value": "M8", "label": "M8"},
+             {"value": "M10", "label": "M10"},
+             {"value": "M12", "label": "M12"},
+             {"value": "M16", "label": "M16"},
+             {"value": "M20", "label": "M20"},
+             {"value": "M24", "label": "M24"},
+         ],
+         "question": "Select the bolt size:"},
+        {"key": "face_type", "label": "Flange Face Type", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "flat_face", "label": "Flat Face (FF)"},
+             {"value": "raised_face", "label": "Raised Face (RF)"},
+         ],
+         "question": "Select the flange face type:"},
+        {"key": "material_id", "label": "Material Grade", "unit": "", "type": "select", "required": True, "options": _material_options(), "question": "Select the material grade:"},
+    ],
+    "pulley": [
+        {"key": "pitch_diameter_mm", "label": "Pitch Diameter", "unit": "mm", "type": "number", "min": 10.0, "max": 1000.0, "required": True, "question": "Enter the pulley pitch diameter in mm:"},
+        {"key": "groove_profile", "label": "Groove Profile", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "v_belt", "label": "V-Belt Profile"},
+             {"value": "flat", "label": "Flat Belt Profile"},
+             {"value": "timing", "label": "Timing Belt Profile"},
+         ],
+         "question": "Select the pulley groove profile:"},
+        {"key": "belt_width_mm", "label": "Belt Width", "unit": "mm", "type": "number", "min": 5.0, "max": 500.0, "required": True, "question": "Enter the belt width in mm:"},
+        {"key": "hub_bore_diameter_mm", "label": "Hub Bore Diameter", "unit": "mm", "type": "number", "min": 5.0, "max": 200.0, "required": True, "question": "Enter the hub bore diameter in mm:"},
+        {"key": "keyway", "label": "Keyway Present", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "yes", "label": "Yes — Keyway"},
+             {"value": "no", "label": "No Keyway"},
+         ],
+         "question": "Does the hub bore have a keyway?"},
+        {"key": "num_keyways", "label": "Number of Keyways", "unit": "", "type": "number", "min": 1.0, "max": 3.0, "required": True,
+         "condition": {"key": "keyway", "equals": "yes"}, "question": "How many keyways (1-3)?"},
+        {"key": "material_id", "label": "Material Grade", "unit": "", "type": "select", "required": True, "options": _material_options(), "question": "Select the material grade:"},
+    ],
+    "bracket": [
+        {"key": "bracket_type", "label": "Bracket Type", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "l_shape", "label": "L-Shape Bracket"},
+             {"value": "flat_plate", "label": "Flat Plate Bracket"},
+             {"value": "u_shape", "label": "U-Shape Bracket"},
+         ],
+         "question": "Select the bracket type:"},
+        {"key": "wall_thickness_mm", "label": "Wall Thickness", "unit": "mm", "type": "number", "min": 1.0, "max": 100.0, "required": True, "question": "Enter the bracket wall thickness in mm:"},
+        {"key": "hole_count", "label": "Mounting Hole Count", "unit": "", "type": "number", "min": 0.0, "max": 20.0, "required": True, "question": "Enter the number of mounting holes (0 if none):"},
+        {"key": "hole_spacing_mm", "label": "Hole Spacing", "unit": "mm", "type": "number", "min": 5.0, "max": 1000.0, "required": True,
+         "condition": {"key": "hole_count", "not_equals": 0}, "question": "Enter the distance between mounting holes in mm:"},
+        {"key": "load_direction", "label": "Load Direction", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "axial", "label": "Axial / Tension"},
+             {"value": "radial", "label": "Radial / Shear"},
+             {"value": "combined", "label": "Combined Loads"},
+         ],
+         "question": "What is the primary load direction on the bracket?"},
+        {"key": "gusset_needed", "label": "Gusset/Rib Required", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "yes", "label": "Yes — reinforce with gusset/ribs"},
+             {"value": "no", "label": "No reinforcement"},
+         ],
+         "question": "Does the bracket need an stabilizing gusset/reinforcement rib?"},
+        {"key": "material_id", "label": "Material Grade", "unit": "", "type": "select", "required": True, "options": _material_options(), "question": "Select the material grade:"},
+    ],
+    "spacer": [
+        {"key": "outer_diameter_mm", "label": "Outer Diameter", "unit": "mm", "type": "number", "min": 2.0, "max": 500.0, "required": True, "question": "Enter the spacer outer diameter in mm:"},
+        {"key": "inner_bore_diameter_mm", "label": "Inner Bore Diameter", "unit": "mm", "type": "number", "min": 1.0, "max": 480.0, "required": True, "question": "Enter the inner bore diameter in mm:"},
+        {"key": "length_mm", "label": "Length/Height", "unit": "mm", "type": "number", "min": 1.0, "max": 1000.0, "required": True, "question": "Enter the spacer length in mm:"},
+        {"key": "material_id", "label": "Material Grade", "unit": "", "type": "select", "required": True, "options": _material_options(), "question": "Select the material grade:"},
+    ],
+    "lever": [
+        {"key": "length_mm", "label": "Lever Length", "unit": "mm", "type": "number", "min": 10.0, "max": 2000.0, "required": True, "question": "Enter the length of the lever arm (pivot to end) in mm:"},
+        {"key": "thickness_mm", "label": "Lever Thickness", "unit": "mm", "type": "number", "min": 2.0, "max": 100.0, "required": True, "question": "Enter the thickness of the lever in mm:"},
+        {"key": "width_mm", "label": "Lever Width/Height", "unit": "mm", "type": "number", "min": 5.0, "max": 500.0, "required": True, "question": "Enter the average width of the lever section in mm:"},
+        {"key": "pivot_bore_diameter_mm", "label": "Pivot Bore Diameter", "unit": "mm", "type": "number", "min": 2.0, "max": 200.0, "required": True, "question": "Enter the pivot bore diameter in mm:"},
+        {"key": "load_end_bore_diameter_mm", "label": "Load End Bore Diameter", "unit": "mm", "type": "number", "min": 2.0, "max": 200.0, "required": True, "question": "Enter the load connection bore diameter in mm:"},
+        {"key": "material_id", "label": "Material Grade", "unit": "", "type": "select", "required": True, "options": _material_options(), "question": "Select the material grade:"},
+    ],
+    "housing": [
+        {"key": "outer_length_mm", "label": "Outer Length", "unit": "mm", "type": "number", "min": 10.0, "max": 2000.0, "required": True, "question": "Enter the outer length of the housing in mm:"},
+        {"key": "outer_width_mm", "label": "Outer Width", "unit": "mm", "type": "number", "min": 10.0, "max": 2000.0, "required": True, "question": "Enter the outer width of the housing in mm:"},
+        {"key": "outer_height_mm", "label": "Outer Height", "unit": "mm", "type": "number", "min": 5.0, "max": 1000.0, "required": True, "question": "Enter the outer height of the housing in mm:"},
+        {"key": "wall_thickness_mm", "label": "Wall Thickness", "unit": "mm", "type": "number", "min": 1.0, "max": 50.0, "required": True, "question": "Enter the wall thickness of the casing in mm:"},
+        {"key": "is_hollow", "label": "Is Hollow Casing", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "yes", "label": "Yes — hollow inside"},
+             {"value": "no", "label": "No — solid block"},
+         ],
+         "question": "Is this a hollow housing cover/casing?"},
+        {"key": "material_id", "label": "Material Grade", "unit": "", "type": "select", "required": True, "options": _material_options(), "question": "Select the material grade:"},
+    ],
+    "plate_hole_pattern": [
+        {"key": "length_mm", "label": "Plate Length", "unit": "mm", "type": "number", "min": 10.0, "max": 3000.0, "required": True, "question": "Enter the plate length in mm:"},
+        {"key": "width_mm", "label": "Plate Width", "unit": "mm", "type": "number", "min": 10.0, "max": 3000.0, "required": True, "question": "Enter the plate width in mm:"},
+        {"key": "thickness_mm", "label": "Plate Thickness", "unit": "mm", "type": "number", "min": 1.0, "max": 200.0, "required": True, "question": "Enter the plate thickness in mm:"},
+        {"key": "hole_layout", "label": "Hole Layout Pattern", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "rectangular", "label": "Rectangular Grid Layout"},
+             {"value": "circular", "label": "Circular Bolt Pattern Layout"},
+         ],
+         "question": "Select the hole layout pattern:"},
+        {"key": "hole_diameter_mm", "label": "Hole Diameter", "unit": "mm", "type": "number", "min": 1.0, "max": 100.0, "required": True, "question": "Enter the hole diameter in mm:"},
+        {"key": "hole_count", "label": "Hole Count", "unit": "", "type": "number", "min": 1.0, "max": 100.0, "required": True, "question": "Enter the total number of holes:"},
+        {"key": "material_id", "label": "Material Grade", "unit": "", "type": "select", "required": True, "options": _material_options(), "question": "Select the material grade:"},
+    ],
+    "pin_dowel": [
+        {"key": "outer_diameter_mm", "label": "Outer Diameter", "unit": "mm", "type": "number", "min": 1.0, "max": 500.0, "required": True, "question": "Enter the pin outer diameter in mm:"},
+        {"key": "length_mm", "label": "Pin Length", "unit": "mm", "type": "number", "min": 2.0, "max": 3000.0, "required": True, "question": "Enter the total pin length in mm:"},
+        {"key": "retaining_groove", "label": "Retaining Groove", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "yes", "label": "Yes — has e-clip/retaining groove"},
+             {"value": "no", "label": "No retaining grooves"},
+         ],
+         "question": "Does the pin require a retaining ring groove?"},
+        {"key": "groove_width_mm", "label": "Groove Width", "unit": "mm", "type": "number", "min": 0.5, "max": 50.0, "required": True,
+         "condition": {"key": "retaining_groove", "equals": "yes"}, "question": "Enter the width of the retaining groove in mm:"},
+        {"key": "groove_diameter_mm", "label": "Groove Minor Diameter", "unit": "mm", "type": "number", "min": 0.5, "max": 480.0, "required": True,
+         "condition": {"key": "retaining_groove", "equals": "yes"}, "question": "Enter the minor diameter at the bottom of the groove in mm:"},
+        {"key": "material_id", "label": "Material Grade", "unit": "", "type": "select", "required": True, "options": _material_options(), "question": "Select the material grade:"},
+    ],
+    "generic": [
+        {"key": "length_mm", "label": "Overall Length", "unit": "mm", "type": "number", "min": 1.0, "max": 5000.0, "required": True, "question": "Enter the overall length in mm:"},
+        {"key": "width_mm", "label": "Overall Width", "unit": "mm", "type": "number", "min": 1.0, "max": 5000.0, "required": True, "question": "Enter the overall width in mm:"},
+        {"key": "height_mm", "label": "Overall Thickness/Height", "unit": "mm", "type": "number", "min": 1.0, "max": 5000.0, "required": True, "question": "Enter the thickness/height in mm:"},
+        {"key": "has_holes", "label": "Has Holes", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "yes", "label": "Yes"},
+             {"value": "no", "label": "No"},
+         ],
+         "question": "Does this part have holes?"},
+        {"key": "has_slots", "label": "Has Slots/Grooves", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "yes", "label": "Yes"},
+             {"value": "no", "label": "No"},
+         ],
+         "question": "Does this part have slots or grooves?"},
+        {"key": "has_chamfers", "label": "Has Chamfers/Fillets", "unit": "", "type": "select", "required": True,
+         "options": [
+             {"value": "yes", "label": "Yes"},
+             {"value": "no", "label": "No"},
+         ],
+         "question": "Does this part need chamfers or fillets on its edges?"},
+        {"key": "material_id", "label": "Material Grade", "unit": "", "type": "select", "required": True, "options": _material_options(), "question": "Select the material grade:"},
+    ]
+}
+
+CUSTOM_ARCHETYPE_ASSUMPTIONS: Dict[str, List[Dict[str, Any]]] = {
+    "flange": [
+        {"key": "tolerance_class", "label": "Tolerance Class", "unit": "", "default_value": "ISO 2768-m (Medium)", "explanation": "Standard class for machined industrial flanges.", "type": "select",
+         "options": [
+             {"value": "ISO 2768-f (Fine)", "label": "Fine (±0.05mm)"},
+             {"value": "ISO 2768-m (Medium)", "label": "Medium (±0.15mm)"},
+             {"value": "ISO 2768-c (Coarse)", "label": "Coarse (±0.5mm)"},
+         ]},
+        {"key": "surface_finish", "label": "Surface Finish (Ra)", "unit": "μm", "default_value": "3.2 (As-Machined)", "explanation": "3.2 μm is standard for flange matching surfaces.", "type": "select",
+         "options": [
+             {"value": "1.6 (Fine Machined)", "label": "1.6 μm (Smooth)"},
+             {"value": "3.2 (As-Machined)", "label": "3.2 μm (Standard)"},
+             {"value": "6.3 (Rough)", "label": "6.3 μm (Rough)"},
+         ]},
+    ],
+    "pulley": [
+        {"key": "bore_tolerance", "label": "Hub Bore Fit Tolerance", "unit": "", "default_value": "H7 (Slip Fit)", "explanation": "H7 is the ISO standard for precise sliding/keyway fits on shafts.", "type": "select",
+         "options": [
+             {"value": "H7 (Slip Fit)", "label": "H7 (Standard sliding)"},
+             {"value": "H8 (Easy Fit)", "label": "H8 (Loose clearance)"},
+             {"value": "P7 (Press Fit)", "label": "P7 (Tight interference)"},
+         ]},
+        {"key": "wrap_angle_deg", "label": "Estimated Belt Wrap Angle", "unit": "°", "default_value": 180.0, "explanation": "180° represents a balanced 1:1 pulley ratio wrap. Adjust if your layout is different.", "type": "number", "min": 90.0, "max": 270.0},
+    ],
+    "bracket": [
+        {"key": "safety_factor", "label": "Design FOS", "unit": "", "default_value": 2.0, "explanation": "FOS of 2.0 is standard for static structural mounts to prevent yielding.", "type": "number", "min": 1.5, "max": 10.0},
+        {"key": "mount_thread_size", "label": "Anchor Thread Pitch", "unit": "mm", "default_value": 1.5, "explanation": "Standard coarse threads for structural anchor fasteners.", "type": "number", "min": 0.5, "max": 3.0},
+    ],
+    "spacer": [
+        {"key": "tolerance_class", "label": "Length Tolerance", "unit": "", "default_value": "ISO 2768-f (Fine)", "explanation": "Fine tolerance ensures tight alignment spacing.", "type": "select",
+         "options": [
+             {"value": "ISO 2768-f (Fine)", "label": "Fine (±0.05mm)"},
+             {"value": "ISO 2768-m (Medium)", "label": "Medium (±0.15mm)"},
+         ]},
+    ],
+    "lever": [
+        {"key": "design_force_n", "label": "Applied Load Force", "unit": "N", "default_value": 500.0, "explanation": "Default estimated hand or mechanical force applied at the lever end.", "type": "number", "min": 10.0, "max": 100000.0},
+        {"key": "safety_factor", "label": "Design FOS", "unit": "", "default_value": 2.5, "explanation": "Higher FOS of 2.5 used for parts experiencing bending and hand operation.", "type": "number", "min": 1.5, "max": 10.0},
+    ],
+    "housing": [
+        {"key": "tolerance_class", "label": "Tolerance Class", "unit": "", "default_value": "ISO 2768-m (Medium)", "explanation": "Standard class for structural castings and machined casing lids.", "type": "select",
+          "options": [
+             {"value": "ISO 2768-m (Medium)", "label": "Medium (±0.15mm)"},
+             {"value": "ISO 2768-c (Coarse)", "label": "Coarse (±0.5mm)"},
+         ]},
+    ],
+    "plate_hole_pattern": [
+        {"key": "edge_distance_ratio", "label": "Min Edge Distance Ratio", "unit": "", "default_value": 1.5, "explanation": "Hole center distance to edge should be ≥ 1.5 × hole diameter for material integrity.", "type": "number", "min": 1.0, "max": 3.0},
+    ],
+    "pin_dowel": [
+        {"key": "fit_type", "label": "Pin Fit Type", "unit": "", "default_value": "m6 (Press Fit)", "explanation": "m6 is standard for locating dowel pins in machinery.", "type": "select",
+         "options": [
+             {"value": "h6 (Slip Fit)", "label": "h6 (Clearance/locating)"},
+             {"value": "m6 (Press Fit)", "label": "m6 (Interference/locating)"},
+         ]},
+    ],
+    "generic": []
+}
+
 COMPONENT_PARAMS: Dict[str, List[Dict[str, Any]]] = {
     "shaft": SHAFT_PARAMS,
     "bearing": BEARING_PARAMS,
@@ -428,23 +661,32 @@ COMPONENT_LABELS: Dict[str, str] = {
 }
 
 
-def get_params_for_component(component_type: str) -> List[Dict[str, Any]]:
+def get_params_for_component(component_type: str, archetype: Optional[str] = None) -> List[Dict[str, Any]]:
     """Get the full parameter definition list for a component type."""
+    if component_type == "custom":
+        if archetype and archetype in CUSTOM_ARCHETYPE_PARAMS:
+            return BASE_CUSTOM_PARAMS + CUSTOM_ARCHETYPE_PARAMS[archetype]
+        return BASE_CUSTOM_PARAMS
     return COMPONENT_PARAMS.get(component_type, [])
 
 
-def get_assumptions_for_component(component_type: str) -> List[Dict[str, Any]]:
+def get_assumptions_for_component(component_type: str, archetype: Optional[str] = None) -> List[Dict[str, Any]]:
     """Get assumptions with smart defaults for a component type."""
+    if component_type == "custom":
+        if archetype and archetype in CUSTOM_ARCHETYPE_ASSUMPTIONS:
+            return CUSTOM_ARCHETYPE_ASSUMPTIONS[archetype]
+        return []
     return COMPONENT_ASSUMPTIONS.get(component_type, [])
 
 
-def compute_smart_defaults(component_type: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:
+
+def compute_smart_defaults(component_type: str, params: Dict[str, Any], archetype: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Compute context-aware default values for assumptions based on
     the user's already-collected parameters. Returns assumptions
     with populated default_value fields.
     """
-    assumptions = get_assumptions_for_component(component_type)
+    assumptions = get_assumptions_for_component(component_type, archetype)
     if not assumptions:
         return []
 
@@ -488,15 +730,15 @@ def compute_smart_defaults(component_type: str, params: Dict[str, Any]) -> List[
     return result
 
 
-def get_required_params(component_type: str) -> List[str]:
+def get_required_params(component_type: str, archetype: Optional[str] = None) -> List[str]:
     """Get list of required parameter keys for a component type."""
-    params = get_params_for_component(component_type)
+    params = get_params_for_component(component_type, archetype)
     return [p["key"] for p in params if p.get("required", False)]
 
 
-def get_next_missing_param(component_type: str, collected: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def get_next_missing_param(component_type: str, collected: Dict[str, Any], archetype: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Given collected values, find the next param to ask for."""
-    params = get_params_for_component(component_type)
+    params = get_params_for_component(component_type, archetype)
     for p in params:
         key = p["key"]
         # Skip if already collected
@@ -553,6 +795,6 @@ def validate_param(param_def: Dict[str, Any], value: Any) -> Optional[str]:
     return None
 
 
-def are_all_params_collected(component_type: str, collected: Dict[str, Any]) -> bool:
+def are_all_params_collected(component_type: str, collected: Dict[str, Any], archetype: Optional[str] = None) -> bool:
     """Check if all required parameters are collected."""
-    return get_next_missing_param(component_type, collected) is None
+    return get_next_missing_param(component_type, collected, archetype) is None

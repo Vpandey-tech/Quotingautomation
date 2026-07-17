@@ -143,10 +143,31 @@ def build_report_markdown(
     lines.append("| Dimension | Value |")
     lines.append("|-----------|-------|")
     for k, v in dims.items():
-        if v is not None:
+        if v is not None and k != "profile_table":
             unit = "mm" if "mm" in k else ("teeth" if "teeth" in k else "")
             lines.append(f"| {k.replace('_', ' ').title()} | {v} {unit} |")
     lines.append("")
+    
+    # ── Cam Profile Table ──
+    if "profile_table" in dims:
+        lines.append("### 4.1. Cam Angle vs. Radius Coordinates")
+        lines.append("Sampled at 5-degree increments:")
+        lines.append("")
+        lines.append("| Angle (deg) | Radius (mm) | Angle (deg) | Radius (mm) |")
+        lines.append("|-------------|-------------|-------------|-------------|")
+        table_pts = dims["profile_table"]
+        # Print side-by-side to save space
+        half = (len(table_pts) + 1) // 2
+        for idx in range(half):
+            pt1 = table_pts[idx]
+            pt2 = table_pts[idx + half] if (idx + half) < len(table_pts) else None
+            p1_str = f"| {pt1['angle_deg']} | {pt1['radius_mm']} |"
+            if pt2:
+                p2_str = f" {pt2['angle_deg']} | {pt2['radius_mm']} |"
+            else:
+                p2_str = " - | - |"
+            lines.append(p1_str + p2_str)
+        lines.append("")
     
     # ── Safety Assessment ──
     lines.append("## 5. Safety Assessment")
@@ -244,8 +265,9 @@ def generate_pdf_report(
     standards = result.get("standards", [])
     material = result.get("material", {})
     
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
+    from ..pdf import AccuDesignAuthenticPDF
+    pdf = AccuDesignAuthenticPDF()
+    pdf.set_auto_page_break(auto=True, margin=35)
     pdf.add_page()
 
     # Helper — all text through sanitizer
@@ -263,7 +285,7 @@ def generate_pdf_report(
     pdf.cell = safe_cell
     
     # ── Header ──
-    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_font("Helvetica", "B", 14)
     pdf.cell(0, 10, title, new_x="LMARGIN", new_y="NEXT", align="C")
     pdf.set_font("Helvetica", "", 9)
     pdf.cell(0, 5, f"Report ID: {session_id}  |  Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}", 
@@ -326,11 +348,44 @@ def generate_pdf_report(
     pdf.cell(0, 8, "4. Final Dimensions", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Helvetica", "", 9)
     for k, v in dims.items():
-        if v is not None:
+        if v is not None and k != "profile_table":
             label = k.replace("_", " ").title()
             pdf.cell(80, 5, f"  {label}:", new_x="RIGHT")
             pdf.cell(0, 5, str(v), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(3)
+
+    # ── Cam Profile Table ──
+    if "profile_table" in dims:
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(0, 6, "  4.1. Cam Angle vs. Radius Coordinates", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 8)
+        
+        # Print table header
+        col_width = 40
+        pdf.cell(col_width, 5, "Angle (deg)", border=1, align="C")
+        pdf.cell(col_width, 5, "Radius (mm)", border=1, align="C")
+        pdf.cell(10, 5, "", new_x="RIGHT")  # spacer
+        pdf.cell(col_width, 5, "Angle (deg)", border=1, align="C")
+        pdf.cell(col_width, 5, "Radius (mm)", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
+        
+        table_pts = dims["profile_table"]
+        half = (len(table_pts) + 1) // 2
+        for idx in range(half):
+            pt1 = table_pts[idx]
+            pt2 = table_pts[idx + half] if (idx + half) < len(table_pts) else None
+            
+            pdf.cell(col_width, 4, str(pt1["angle_deg"]), border=1, align="C")
+            pdf.cell(col_width, 4, f"{pt1['radius_mm']} mm", border=1, align="C")
+            
+            if pt2:
+                pdf.cell(10, 4, "", new_x="RIGHT")  # spacer
+                pdf.cell(col_width, 4, str(pt2["angle_deg"]), border=1, align="C")
+                pdf.cell(col_width, 4, f"{pt2['radius_mm']} mm", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
+            else:
+                pdf.cell(10, 4, "", new_x="RIGHT")  # spacer
+                pdf.cell(col_width, 4, "-", border=1, align="C")
+                pdf.cell(col_width, 4, "-", border=1, new_x="LMARGIN", new_y="NEXT", align="C")
+        pdf.ln(3)
     
     # ── Safety ──
     pdf.set_font("Helvetica", "B", 12)
