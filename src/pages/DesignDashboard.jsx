@@ -104,12 +104,6 @@ export default function DesignDashboard() {
   const [loading,  setLoading]  = useState(true);
   const [creating, setCreating] = useState(null);
 
-  // New-design modal state
-  const [modal,        setModal]        = useState(null); // null | component object
-  const [promptText,   setPromptText]   = useState('');
-  const [submittingPrompt, setSubmittingPrompt] = useState(false);
-  const promptRef = useRef(null);
-
   const currentUser = localStorage.getItem('accu_user') || 'operator@accudesign.in';
 
   useEffect(() => {
@@ -122,19 +116,8 @@ export default function DesignDashboard() {
     }).catch(() => setSessions([])).finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (modal && promptRef.current) promptRef.current.focus();
-  }, [modal]);
-
-  // Open modal for a component family
-  const openModal = (comp) => {
-    setModal(comp);
-    setPromptText('');
-  };
-  const closeModal = () => { setModal(null); setPromptText(''); };
-
-  // Create session with just the component type (guided form)
-  const handleGuidedCreate = async (type) => {
+  // Direct 1-click start: creates session and opens chat interface directly
+  const handleStartSession = async (type) => {
     setCreating(type);
     try {
       const res = await fetch('/api/design/sessions', {
@@ -144,22 +127,10 @@ export default function DesignDashboard() {
       });
       const session = await res.json();
       navigate(`/design/session/${session.id}`);
-    } catch (e) { console.error(e); setCreating(null); }
-  };
-
-  // Create session with a natural-language prompt (1 LLM call)
-  const handlePromptCreate = async () => {
-    if (!promptText.trim() || !modal) return;
-    setSubmittingPrompt(true);
-    try {
-      const res = await fetch('/api/design/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ component_type: modal.type, custom_description: promptText.trim() }),
-      });
-      const session = await res.json();
-      navigate(`/design/session/${session.id}`);
-    } catch (e) { console.error(e); setSubmittingPrompt(false); }
+    } catch (e) {
+      console.error(e);
+      setCreating(null);
+    }
   };
 
   const deleteSession = async (id, e) => {
@@ -180,89 +151,6 @@ export default function DesignDashboard() {
 
   return (
     <div className="min-h-screen text-gray-100" style={{ background: 'linear-gradient(180deg, #040814 0%, #081022 100%)', fontFamily: "'Inter', sans-serif" }}>
-
-      {/* ── Modal overlay ────────────────────────────────────────────────────── */}
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}
-          onClick={closeModal}>
-          <div className="relative w-full max-w-lg rounded-2xl p-6 space-y-5"
-            style={{ background: 'linear-gradient(135deg,#0d1525,#0a1020)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 32px 64px rgba(0,0,0,0.6)' }}
-            onClick={e => e.stopPropagation()}>
-
-            <button onClick={closeModal}
-              className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
-              <X size={16} />
-            </button>
-
-            {/* Component header */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                style={{ background: modal.color + '18', border: `1px solid ${modal.color}35` }}>
-                {modal.icon}
-              </div>
-              <div>
-                <div className="font-bold text-white text-[13pt]" style={{ fontFamily: 'Outfit,sans-serif' }}>
-                  {modal.name}
-                </div>
-                <div className="text-gray-500 text-[8.5pt] font-mono mt-0.5" style={{ whiteSpace: 'pre-line' }}>
-                  {modal.desc}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ border: '1px solid rgba(255,255,255,0.07)' }} />
-
-            {/* Option A: Natural language prompt */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-[9pt] font-mono font-bold text-indigo-300 uppercase tracking-wider">
-                <Sparkles size={11} className="text-indigo-400" />
-                Option A — Describe in Natural Language
-                <span className="ml-auto text-gray-600 normal-case font-normal">1 AI call</span>
-              </div>
-              <textarea
-                ref={promptRef}
-                rows={3}
-                value={promptText}
-                onChange={e => setPromptText(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handlePromptCreate(); }}
-                placeholder={`e.g. "I need a 150mm ${modal.type.replace(/_/g,' ')} with 20mm thickness, M10 bolts on 110mm PCD, in EN8 steel, qty 5"`}
-                className="w-full px-3 py-2.5 text-[9.5pt] font-mono rounded-xl bg-black/40 border border-white/10 text-white focus:outline-none focus:border-indigo-400 resize-none transition-colors"
-              />
-              <button onClick={handlePromptCreate} disabled={!promptText.trim() || submittingPrompt}
-                className="w-full py-2.5 text-[10pt] font-mono font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-40"
-                style={{ background: 'rgba(99,102,241,0.8)', color: 'white' }}>
-                {submittingPrompt
-                  ? <><Loader2 size={13} className="animate-spin" /> Extracting specs...</>
-                  : <><Sparkles size={13} /> Extract & Start Session</>}
-              </button>
-              <p className="text-[8pt] font-mono text-gray-600 text-center">Ctrl+Enter to submit · AI extracts all dimensions automatically</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-px bg-white/10" />
-              <span className="text-[8.5pt] font-mono text-gray-600">OR</span>
-              <div className="flex-1 h-px bg-white/10" />
-            </div>
-
-            {/* Option B: Guided form */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-[9pt] font-mono font-bold text-emerald-300 uppercase tracking-wider">
-                <BarChart3 size={11} className="text-emerald-400" />
-                Option B — Guided Parameter Form
-                <span className="ml-auto text-gray-600 normal-case font-normal">0 AI calls</span>
-              </div>
-              <button onClick={() => handleGuidedCreate(modal.type)} disabled={creating === modal.type}
-                className="w-full py-2.5 text-[10pt] font-mono font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#34d399' }}>
-                {creating === modal.type
-                  ? <><Loader2 size={13} className="animate-spin" /> Creating...</>
-                  : <><ArrowRight size={13} /> Fill Guided Form</>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Top Nav ─────────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-40 flex items-center justify-between px-8 h-14"
@@ -315,13 +203,13 @@ export default function DesignDashboard() {
           <h2 className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             Select Component Family to Design
-            <span className="ml-auto text-gray-700 normal-case">Click to start · Natural language or guided form</span>
+            <span className="ml-auto text-gray-700 normal-case">Direct 1-Click Entry · Conversational Specification & CAD</span>
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
             {COMPONENTS.map(comp => (
               <button
                 key={comp.type}
-                onClick={() => openModal(comp)}
+                onClick={() => handleStartSession(comp.type)}
                 disabled={creating === comp.type}
                 className="group relative rounded-xl p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50"
                 style={{
@@ -342,7 +230,7 @@ export default function DesignDashboard() {
                   </div>
                   <div className="flex items-center justify-between pt-1 text-[9px] font-mono">
                     <span style={{ color: comp.color }} className="font-bold opacity-80">
-                      {creating === comp.type ? 'CREATING...' : 'START →'}
+                      {creating === comp.type ? 'STARTING...' : 'OPEN CHAT →'}
                     </span>
                     {creating === comp.type
                       ? <Loader2 size={10} className="animate-spin" style={{ color: comp.color }} />
