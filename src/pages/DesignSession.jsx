@@ -1,910 +1,733 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   Loader2, Send, CheckCircle2, AlertTriangle, Download, Calculator,
-  Box, ChevronRight, Home, PenTool, Lock, ArrowRight, Cog,
-  Edit3, ShieldCheck, X, Save, RefreshCw, Brain, Layers
+  Box, ChevronRight, PenTool, ArrowRight, Cog,
+  Edit3, ShieldCheck, X, Save, Sparkles, Info,
+  AlertTriangle as TriangleAlert, Layers, Zap, Lock, Home, BarChart3, FileText
 } from 'lucide-react';
 
-const STATUS_LABELS = {
-  collecting_params: 'COLLECTING',
-  params_complete: 'PARAMS OK',
-  report_ready: 'REPORT READY',
-  report_approved: 'APPROVED',
-  cad_ready: 'CAD DONE',
+// ── Component family meta (icons + hints) ────────────────────────────────────
+const FAMILY_META = {
+  shaft:             { color: '#10b981', icon: '⚙', hint: 'Drive shafts, axles, spindles with keyways & keyslots' },
+  flange:            { color: '#06b6d4', icon: '🔩', hint: 'Circular flanges with bolt-circle hole patterns (PCD)' },
+  plate_hole_pattern:{ color: '#3b82f6', icon: '🪟', hint: 'Flat baseplates with rectangular or circular hole grids' },
+  bracket:           { color: '#f59e0b', icon: '📐', hint: 'L-shape, U-shape or flat mounting brackets' },
+  spacer:            { color: '#8b5cf6', icon: '🧱', hint: 'Bushings, standoffs, collars with inner bore' },
+  lever:             { color: '#ef4444', icon: '↕', hint: 'Lever arms with pivot bore and load-end bore' },
+  housing:           { color: '#64748b', icon: '🏠', hint: 'Protective enclosures, casings, gearbox shells' },
+  bearing:           { color: '#0ea5e9', icon: '⭕', hint: 'Ball or roller bearings sized by load, speed, life' },
+  gearbox:           { color: '#a3e635', icon: '⚙⚙', hint: 'Spur / helical gear transmission — power, ratio, stages' },
+  cam:               { color: '#fb923c', icon: '🌀', hint: 'Cam disc motion profiles — rise, dwell, lift' },
+  custom:            { color: '#e2e8f0', icon: '✦', hint: 'Any other mechanical part via freeform description' },
 };
+
+// ── Field hints per parameter key ─────────────────────────────────────────────
+const FIELD_HINTS = {
+  outer_diameter_mm:     'Typical flanges: 80–400 mm',
+  inner_bore_diameter_mm:'Enter 0 for solid (no bore)',
+  thickness_mm:          'Min 6mm for structural integrity',
+  bolt_circle_diameter_mm:'PCD must be smaller than outer diameter',
+  num_bolts:             'Standard patterns: 4, 6, or 8 bolts',
+  wall_thickness_mm:     'Minimum 1.0mm; CNC min 0.8mm',
+  diameter_mm:           'Final diameter after machining allowance',
+  length_mm:             'Total end-to-end length in mm',
+  power_kw:              'Motor rated power at operating load',
+  speed_rpm:             'Shaft operating speed under load',
+  radial_load_n:         '1 kN = 1000 N; 1 tonne-force ≈ 9810 N',
+  desired_life_hours:    'Industrial standard: 20 000 h',
+  outer_length_mm:       'External bounding length of the housing',
+  pivot_bore_diameter_mm:'Bore for pivot pin or shaft passing through lever',
+  hole_diameter_mm:      'Clearance hole = bolt size + 0.5–1.0 mm',
+};
+
+// ── Workflow steps ─────────────────────────────────────────────────────────────
+const STEPS = [
+  { id: 'gather',  label: 'Specifications', icon: FileText },
+  { id: 'report',  label: 'Analysis',       icon: BarChart3 },
+  { id: 'cad',     label: '3D CAD',         icon: Box },
+];
+
+function currentStep(status) {
+  if (status === 'cad_ready')                    return 2;
+  if (['report_approved','report_ready'].includes(status)) return 1;
+  return 0;
+}
 
 export default function DesignSession() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const scrollRef = useRef(null);
-  const inputRef = useRef(null);
+  const scrollRef  = useRef(null);
+  const inputRef   = useRef(null);
 
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [report, setReport] = useState(null);
-  const [paramDefs, setParamDefs] = useState([]);
+  const [session,   setSession]   = useState(null);
+  const [report,    setReport]    = useState(null);
+  const [loading,   setLoading]   = useState(true);
 
-  // Chat-like param intake
-  const [chatMessages, setChatMessages] = useState([]);
-  const [inputValue, setInputValue] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [generatingReport, setGeneratingReport] = useState(false);
-  const [generatingCad, setGeneratingCad] = useState(false);
-  const [approvingReport, setApprovingReport] = useState(false);
-  const [chatAttachment, setChatAttachment] = useState(null);
+  const [inputValue,      setInputValue]      = useState('');
+  const [submitting,      setSubmitting]      = useState(false);
+  const [genReport,       setGenReport]       = useState(false);
+  const [genCad,          setGenCad]          = useState(false);
+  const [approving,       setApproving]       = useState(false);
+  const [cadError,        setCadError]        = useState(null);
 
-  // Edit & AI Validation
-  const [editingParam, setEditingParam] = useState(null);
-  const [editValue, setEditValue] = useState('');
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [validating, setValidating] = useState(false);
-  const [validation, setValidation] = useState(null);
+  // Batch form — keyed by field, pre-filled with defaults
+  const [formValues,  setFormValues]  = useState({});
+  const [formErrors,  setFormErrors]  = useState({});
 
-  // Load session
-  const fetchSession = async () => {
+  // Inline param editing
+  const [editKey,   setEditKey]   = useState(null);
+  const [editVal,   setEditVal]   = useState('');
+  const [saving,    setSaving]    = useState(false);
+  const [savedKey,  setSavedKey]  = useState(null);
+
+  // ── Data fetching ───────────────────────────────────────────────────────────
+  const fetchSession = useCallback(async () => {
     try {
       const res = await fetch(`/api/design/sessions/${id}`);
       if (!res.ok) { navigate('/design'); return; }
       const data = await res.json();
       setSession(data);
-
-      // Load param definitions (empty for custom)
-      if (data.component_type !== 'custom') {
-        const pRes = await fetch(`/api/design/components/${data.component_type}/params`);
-        const pData = await pRes.json();
-        setParamDefs(pData.params || []);
-      }
-
-      if (['report_ready', 'report_approved', 'cad_ready'].includes(data.status)) {
-        const rRes = await fetch(`/api/design/sessions/${id}/report`);
-        if (rRes.ok) setReport(await rRes.json());
+      if (['report_ready','report_approved','cad_ready'].includes(data.status)) {
+        const rr = await fetch(`/api/design/sessions/${id}/report`);
+        if (rr.ok) setReport(await rr.json());
       }
     } catch (e) { console.error(e); }
     setLoading(false);
-  };
+  }, [id, navigate]);
 
-  useEffect(() => { fetchSession(); }, [id]);
+  useEffect(() => { fetchSession(); }, [fetchSession]);
 
+  // Auto-scroll chat
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [chatMessages]);
+  }, [session]);
 
+  // Pre-fill batch form defaults whenever clarification_questions changes
   useEffect(() => {
-    if (!submitting && inputRef.current) inputRef.current.focus();
-  }, [submitting, session?.next_param]);
-
-  // Build chat history from session params
-  // Build chat from params (standard components)
-  useEffect(() => {
-    if (!session) return;
-    if (session.component_type === 'custom') return; // custom uses own chat
-    if (!paramDefs.length) return;
-    const msgs = [];
-    for (const pd of paramDefs) {
-      const val = session.params?.[pd.key];
-      if (val !== undefined && val !== null) {
-        msgs.push({ role: 'assistant', text: pd.question });
-        const label = pd.type === 'select'
-          ? (pd.options?.find(o => o.value === String(val))?.label || val)
-          : `${val} ${pd.unit || ''}`;
-        msgs.push({ role: 'user', text: String(label) });
-      }
-    }
-    if (session.next_param) {
-      msgs.push({ role: 'assistant', text: session.next_param.question });
-    } else if (session.all_params_collected) {
-      msgs.push({ role: 'assistant', text: '✓ All parameters collected. Ready for report generation.' });
-    }
-    setChatMessages(msgs);
-  }, [session?.params, session?.next_param, paramDefs]);
-
-  // Custom part chat — uses /chat endpoint with iterative questions
-  const [customQuestion, setCustomQuestion] = useState(null);
-  const [customProgress, setCustomProgress] = useState('0/15');
-
-  useEffect(() => {
-    if (!session || session.component_type !== 'custom') return;
-    // On first load, send empty chat to get first question
-    if (Object.keys(session.params || {}).length === 0 && !customQuestion) {
-      setChatMessages([{ role: 'assistant', text: 'Welcome! Let me collect details about your custom part. I\'ll ask a series of questions.' }]);
-      // Trigger first question
-      fetch(`/api/design/sessions/${id}/chat`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: session.custom_description || 'start' }),
-      }).then(r => r.json()).then(data => {
-        if (data.next_question) {
-          setCustomQuestion(data.next_question);
-          setCustomProgress(data.progress || '1/15');
-          setChatMessages(prev => [...prev, { role: 'assistant', text: data.next_question.q }]);
+    if (!session?.clarification_questions) return;
+    setFormValues(prev => {
+      const next = { ...prev };
+      for (const q of session.clarification_questions) {
+        if (!(q.field in next) && q.default_value != null) {
+          next[q.field] = String(q.default_value);
         }
-      }).catch(console.error);
-    } else if (Object.keys(session.params || {}).length > 0 && !customQuestion) {
-      // Rebuild chat from existing params
-      const msgs = [];
-      for (const [k, v] of Object.entries(session.params)) {
-        msgs.push({ role: 'assistant', text: `(${k})` });
-        msgs.push({ role: 'user', text: String(v) });
       }
-      if (session.all_params_collected) {
-        msgs.push({ role: 'assistant', text: '✓ All information collected! Ready for report.' });
-      }
-      setChatMessages(msgs);
-    }
-  }, [session?.component_type]);
+      return next;
+    });
+  }, [session?.clarification_questions]);
 
-  const handleCustomOptionClick = async (optionValue) => {
-    if (submitting) return;
-    setSubmitting(true);
-    setChatMessages(prev => [...prev, { role: 'user', text: optionValue }]);
-    
-    try {
-      const res = await fetch(`/api/design/sessions/${id}/chat`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: optionValue }),
-      });
-      
-      const data = await res.json();
-      if (data.error) {
-        setChatMessages(prev => [...prev, { role: 'error', text: data.error }]);
-      } else if (data.all_done) {
-        setChatMessages(prev => [...prev, { role: 'assistant', text: data.message }]);
-        setCustomQuestion(null);
-        await fetchSession();
-      } else if (data.next_question) {
-        setCustomQuestion(data.next_question);
-        setCustomProgress(data.progress || '');
-        setChatMessages(prev => {
-          const msgs = [...prev];
-          if (data.extracted_val !== undefined && data.extracted_val !== null) {
-            msgs.push({ role: 'assistant', text: `Got it. Extracted: **${data.extracted_val}**` });
-          }
-          msgs.push({ role: 'assistant', text: data.next_question.q });
-          return msgs;
-        });
-      }
-    } catch (e) {
-      setChatMessages(prev => [...prev, { role: 'error', text: 'Network error' }]);
-    }
-    setSubmitting(false);
-  };
-
-  const handleCustomSubmit = async (e) => {
+  // ── Handlers ────────────────────────────────────────────────────────────────
+  const handleChatSubmit = async (e) => {
     e.preventDefault();
-    if ((!inputValue.trim() && !chatAttachment) || submitting) return;
-    const val = inputValue.trim() || 'Uploaded a file';
-    setSubmitting(true);
+    const txt = inputValue.trim();
+    if (!txt || submitting) return;
     setInputValue('');
-    setChatMessages(prev => [...prev, { role: 'user', text: val, attachment: chatAttachment?.name }]);
-    
-    try {
-      let res;
-      if (chatAttachment) {
-          const formData = new FormData();
-          formData.append('file', chatAttachment);
-          formData.append('message', val);
-          res = await fetch(`/api/design/sessions/${id}/chat/multimodal`, {
-              method: 'POST',
-              body: formData
-          });
-          setChatAttachment(null);
-      } else {
-          res = await fetch(`/api/design/sessions/${id}/chat`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: val }),
-          });
-      }
-      
-      const data = await res.json();
-      if (data.error) {
-        setChatMessages(prev => [...prev, { role: 'error', text: data.error }]);
-      } else if (data.all_done) {
-        setChatMessages(prev => [...prev, { role: 'assistant', text: data.message }]);
-        setCustomQuestion(null);
-        await fetchSession();
-      } else if (data.next_question) {
-        setCustomQuestion(data.next_question);
-        setCustomProgress(data.progress || '');
-        setChatMessages(prev => {
-            const msgs = [...prev];
-            if (data.extracted_val !== undefined && data.extracted_val !== null) {
-                msgs.push({ role: 'assistant', text: `Got it. Extracted: **${data.extracted_val}**` });
-            }
-            msgs.push({ role: 'assistant', text: data.next_question.q });
-            return msgs;
-        });
-      }
-    } catch (e) {
-      setChatMessages(prev => [...prev, { role: 'error', text: 'Network error' }]);
-    }
-    setSubmitting(false);
-  };
-
-  // Submit parameter
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if ((!inputValue.trim() && !chatAttachment) || !session?.next_param || submitting) return;
-
-    const np = session.next_param;
-    let value = inputValue.trim() || 'File uploaded';
-
-    // For select types, try matching by label or value
-    if (np.type === 'select') {
-      const match = np.options?.find(o =>
-        o.value === value || o.label.toLowerCase().includes(value.toLowerCase())
-      );
-      if (match) value = match.value;
-    }
-
-    setSubmitting(true);
-    setInputValue('');
-    setChatMessages(prev => [...prev, { role: 'user', text: value, attachment: chatAttachment?.name }]);
-
-    try {
-      let res;
-      if (chatAttachment) {
-          const formData = new FormData();
-          formData.append('file', chatAttachment);
-          formData.append('key', np.key);
-          res = await fetch(`/api/design/sessions/${id}/params/multimodal`, {
-              method: 'POST',
-              body: formData
-          });
-          setChatAttachment(null);
-      } else {
-          res = await fetch(`/api/design/sessions/${id}/params`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: np.key, value }),
-          });
-      }
-      
-      if (!res.ok) {
-        const err = await res.json();
-        setChatMessages(prev => [...prev, { role: 'error', text: err.detail || 'Invalid value' }]);
-      }
-      await fetchSession();
-    } catch (e) {
-      setChatMessages(prev => [...prev, { role: 'error', text: 'Network error' }]);
-    }
-    setSubmitting(false);
-  };
-  
-  const handleChatFileSelect = (e) => {
-      if (e.target.files && e.target.files.length > 0) {
-          setChatAttachment(e.target.files[0]);
-      }
-  };
-
-  // Select option click
-  const handleOptionClick = async (optionValue) => {
-    if (!session?.next_param || submitting) return;
     setSubmitting(true);
     try {
-      await fetch(`/api/design/sessions/${id}/params`, {
+      const res = await fetch(`/api/design/sessions/${id}/spec-intake`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: session.next_param.key, value: optionValue }),
+        body: JSON.stringify({ message: txt }),
       });
+      await fetchSession();
+      if (!res.ok) console.error(await res.json());
+    } catch (e) { console.error(e); }
+    setSubmitting(false);
+  };
+
+  const validateForm = () => {
+    if (!session?.clarification_questions) return true;
+    const errs = {};
+    for (const q of session.clarification_questions) {
+      const val = formValues[q.field];
+      if (q.type === 'number' && val != null && val !== '') {
+        const n = parseFloat(val);
+        if (isNaN(n)) { errs[q.field] = 'Must be a number'; continue; }
+        if (q.min != null && n < q.min) { errs[q.field] = `Min ${q.min}`; continue; }
+        if (q.max != null && n > q.max) { errs[q.field] = `Max ${q.max}`; }
+      }
+    }
+    setFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleBatchSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (submitting || !validateForm()) return;
+    setSubmitting(true);
+    // Fill defaults for any still-empty fields
+    const answers = {};
+    for (const q of (session?.clarification_questions || [])) {
+      const raw = formValues[q.field];
+      if (raw != null && String(raw).trim() !== '') {
+        answers[q.field] = q.type === 'number' ? parseFloat(raw) : raw;
+      } else if (q.default_value != null) {
+        answers[q.field] = q.default_value;
+      }
+    }
+    try {
+      await fetch(`/api/design/sessions/${id}/params/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers }),
+      });
+      setFormValues({});
+      setFormErrors({});
       await fetchSession();
     } catch (e) { console.error(e); }
     setSubmitting(false);
+  };
+
+  const startEdit = (k, v) => { setEditKey(k); setEditVal(String(v ?? '')); };
+  const cancelEdit = () => { setEditKey(null); setEditVal(''); };
+
+  const saveEdit = async () => {
+    if (!editKey) return;
+    setSaving(true);
+    const keyDone = editKey;
+    try {
+      const res = await fetch(`/api/design/sessions/${id}/params`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ params: { [editKey]: isNaN(parseFloat(editVal)) ? editVal : parseFloat(editVal) } }),
+      });
+      if (res.ok) {
+        setSavedKey(keyDone);
+        setTimeout(() => setSavedKey(prev => prev === keyDone ? null : prev), 2500);
+      }
+      cancelEdit();
+      await fetchSession();
+    } catch (e) { console.error(e); }
+    setSaving(false);
   };
 
   const handleGenerateReport = async () => {
-    setGeneratingReport(true);
-    setValidation(null);
+    setGenReport(true);
     try {
       const res = await fetch(`/api/design/sessions/${id}/generate-report`, { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        setReport(data);
-      }
+      if (res.ok) { const d = await res.json(); setReport(d); }
       await fetchSession();
     } catch (e) { console.error(e); }
-    setGeneratingReport(false);
+    setGenReport(false);
   };
 
   const handleApprove = async () => {
-    setApprovingReport(true);
+    setApproving(true);
     try {
       await fetch(`/api/design/sessions/${id}/approve-report`, { method: 'POST' });
       await fetchSession();
     } catch (e) { console.error(e); }
-    setApprovingReport(false);
+    setApproving(false);
   };
 
   const handleGenerateCad = async () => {
-    setGeneratingCad(true);
+    setGenCad(true); setCadError(null);
     try {
-      await fetch(`/api/design/sessions/${id}/generate-cad`, { method: 'POST' });
-      await fetchSession();
+      const res = await fetch(`/api/design/sessions/${id}/generate-cad`, { method: 'POST' });
+      if (res.ok) { await fetchSession(); }
+      else { const d = await res.json(); setCadError(d.explanation || 'CAD generation failed.'); }
     } catch (e) { console.error(e); }
-    setGeneratingCad(false);
+    setGenCad(false);
   };
 
-  // ── Edit a parameter ──
-  const handleStartEdit = (key, currentValue) => {
-    setEditingParam(key);
-    setEditValue(String(currentValue));
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editingParam) return;
-    setSavingEdit(true);
+  const sendToQuoting = async () => {
     try {
-      const res = await fetch(`/api/design/sessions/${id}/params`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: editingParam, value: editValue }),
-      });
+      const res = await fetch(`/api/design/sessions/${id}/send-to-quoting`, { method: 'POST' });
       if (res.ok) {
-        setEditingParam(null);
-        setEditValue('');
-        setReport(null);
-        setValidation(null);
-        await fetchSession();
-      } else {
-        const err = await res.json();
-        alert(err.detail || 'Invalid value');
+        const d = await res.json();
+        sessionStorage.setItem('design_transfer', JSON.stringify(d));
+        navigate(`/quote?design_session=${id}`);
       }
     } catch (e) { console.error(e); }
-    setSavingEdit(false);
   };
 
-  // ── AI Validation Agent ──
-  const handleValidate = async () => {
-    setValidating(true);
-    try {
-      const res = await fetch(`/api/design/sessions/${id}/validate`, { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        setValidation(data.validation);
-      }
-    } catch (e) { console.error(e); }
-    setValidating(false);
-  };
-
-  if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center" style={{ background: '#060a13' }}>
-        <Loader2 size={32} className="animate-spin text-cyan-400" />
+  // ── Derived state ──────────────────────────────────────────────────────────
+  if (loading) return (
+    <div className="h-screen flex items-center justify-center" style={{ background: '#060a13' }}>
+      <div className="flex flex-col items-center gap-3">
+        <Loader2 size={28} className="animate-spin text-cyan-400" />
+        <span className="font-mono text-[9pt] text-gray-500 uppercase tracking-widest">Loading session...</span>
       </div>
-    );
-  }
-
+    </div>
+  );
   if (!session) return null;
 
-  const isCustom = session.component_type === 'custom';
-  const np = session.next_param;
-  const allDone = session.all_params_collected || (isCustom && session.status !== 'collecting_params');
-  const isCollecting = session.status === 'collecting_params';
-  const hasReport = report?.result != null;
-  const isApproved = session.status === 'report_approved' || session.status === 'cad_ready';
-  const isCadReady = session.status === 'cad_ready';
+  const meta            = FAMILY_META[session.component_type] || FAMILY_META.custom;
+  const qs              = session.clarification_questions || [];
+  const params          = session.params || {};
+  const paramEntries    = Object.entries(params).filter(([,v]) => v != null && v !== '');
+  const allDone         = session.all_params_collected || session.status !== 'collecting_params';
+  const hasReport       = !!report?.result;
+  const isApproved      = ['report_approved','cad_ready'].includes(session.status);
+  const isCadReady      = session.status === 'cad_ready';
+  const stepIdx         = currentStep(session.status);
+  const tokenUsage      = session.token_usage || {};
+  const totalCalls      = (tokenUsage.intake_calls||0) + (tokenUsage.delta_parser_calls||0) + (tokenUsage.failure_corrector_calls||0);
 
-  const filledCount = Object.keys(session.params || {}).length;
-  const totalRequired = isCustom ? 15 : paramDefs.filter(p => p.required).length;
+  // Progress in the batch form
+  const answeredCount   = qs.filter(q => {
+    const v = formValues[q.field];
+    return v != null && String(v).trim() !== '';
+  }).length;
+  const totalCount      = qs.length;
+  const pct             = totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 100;
 
   return (
-    <div className="h-screen flex flex-col" style={{ background: '#060a13' }}>
+    <div className="h-screen flex flex-col" style={{ background: '#060a13', fontFamily: "'Inter', sans-serif" }}>
 
-      {/* Header */}
-      <header className="h-12 flex items-center justify-between px-5 shrink-0"
-        style={{ background: 'rgba(6,10,19,0.9)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)' }}>
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <header className="h-13 shrink-0 flex items-center justify-between px-5"
+        style={{ background: 'rgba(6,10,19,0.95)', borderBottom: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(16px)' }}>
+
         <div className="flex items-center gap-2.5">
           <Link to="/design" className="text-gray-500 hover:text-gray-300 transition-colors">
             <PenTool size={14} />
           </Link>
           <ChevronRight size={10} className="text-gray-700" />
-          <span className="font-mono text-[10pt] text-cyan-400/60 border border-cyan-400/20 px-1.5 py-0.5 rounded">
+          <span className="font-mono text-[10px] px-2 py-0.5 rounded border"
+            style={{ color: meta.color, borderColor: meta.color + '40', background: meta.color + '12' }}>
             #{id}
           </span>
-          <span className="text-sm font-bold text-white tracking-widest uppercase" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            {isCustom ? 'User Part' : session.component_type}
+          <span className="font-bold text-white text-sm tracking-widest uppercase"
+            style={{ fontFamily: 'Outfit, sans-serif' }}>
+            {FAMILY_META[session.component_type]?.icon} {session.component_type.replace(/_/g,' ')}
           </span>
-          <ChevronRight size={10} className="text-gray-700" />
-          <span className="font-mono text-[9pt] px-2 py-0.5 rounded tracking-wider"
-            style={{ color: '#22d3ee', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)' }}>
-            {STATUS_LABELS[session.status] || session.status}
-          </span>
+        </div>
+
+        {/* Step rail */}
+        <div className="hidden md:flex items-center gap-0">
+          {STEPS.map((s, i) => {
+            const done    = i < stepIdx;
+            const active  = i === stepIdx;
+            return (
+              <React.Fragment key={s.id}>
+                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[9pt] font-mono transition-all ${
+                  done   ? 'text-emerald-400' :
+                  active ? 'text-white bg-white/10' :
+                           'text-gray-600'
+                }`}>
+                  {done ? <CheckCircle2 size={11} /> : <s.icon size={11} />}
+                  {s.label}
+                </div>
+                {i < STEPS.length - 1 && (
+                  <ChevronRight size={10} className={done ? 'text-emerald-600' : 'text-gray-700'} />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+
+        {/* LLM budget badge */}
+        <div className="flex items-center gap-2 font-mono text-[9pt]">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded"
+            style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc' }}>
+            <Sparkles size={10} className="text-indigo-400" />
+            <span>AI Calls: <strong className="text-white">{totalCalls}</strong> / Budget ≤ 3</span>
+          </div>
         </div>
       </header>
 
-      {/* Main: Chat Left + Report Right */}
+      {/* ── Body: Left chat | Right workflow ───────────────────────────────── */}
       <div className="flex-1 flex overflow-hidden">
 
-        {/* LEFT: Chat Panel — 45% width */}
-        <div className="flex flex-col" style={{ width: '45%', minWidth: 340, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+        {/* LEFT — Chat + Guided Intake */}
+        <div className="flex flex-col" style={{ width: '46%', minWidth: 340, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
 
-          {/* Param Progress */}
-          <div className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.015)' }}>
-            {isCustom ? (
-              <div>
-                <div className="w-full h-1.5 rounded-full mb-2" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                  <div className="h-full rounded-full transition-all" style={{
-                    width: `${(filledCount / totalRequired) * 100}%`,
-                    background: allDone ? '#34d399' : 'linear-gradient(90deg, #7c3aed, #818cf8)',
-                  }} />
-                </div>
-                <div className="font-mono text-[10pt] text-gray-500">
-                  {allDone
-                    ? <span className="text-violet-400 flex items-center gap-1"><CheckCircle2 size={10} /> Custom part info complete</span>
-                    : <span className="text-violet-400/80">{customProgress} — Gathering details...</span>
-                  }
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+
+            {/* ── Welcome assistant bubble ── */}
+            <AssistantBubble>
+              <div className="flex items-start gap-2.5">
+                <div className="text-2xl shrink-0">{meta.icon}</div>
+                <div>
+                  <p className="font-bold text-white text-[10pt] mb-0.5">
+                    {session.component_type.replace(/_/g,' ').toUpperCase()} Design Session
+                  </p>
+                  <p className="text-gray-400 text-[9.5pt] leading-relaxed">{meta.hint}</p>
+                  {session.custom_description && (
+                    <p className="mt-2 text-cyan-300 text-[9pt] italic border-l-2 border-cyan-500/40 pl-2">
+                      "{session.custom_description}"
+                    </p>
+                  )}
                 </div>
               </div>
-            ) : (
-              <div>
-                <div className="flex gap-1 mb-2">
-                  {paramDefs.filter(p => p.required).map((p) => {
-                    const filled = session.params?.[p.key] != null;
-                    const isNext = np?.key === p.key;
+            </AssistantBubble>
+
+            {/* ── Extracted spec card (all values inline-editable) ── */}
+            {paramEntries.length > 0 && (
+              <div className="rounded-xl p-3.5 space-y-2 text-[9pt] font-mono"
+                style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.18)' }}>
+                <div className="flex items-center gap-1.5 text-emerald-400 font-bold uppercase tracking-wider text-[8.5pt] mb-1">
+                  <CheckCircle2 size={11} /> Extracted Specifications
+                  <span className="ml-auto text-gray-600 text-[8pt] normal-case">Click any value to edit</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {paramEntries.map(([k, v]) => {
+                    const isEditing = editKey === k;
+                    const isDirty = isEditing && editVal !== String(v ?? '');
+                    const isJustSaved = savedKey === k;
+
                     return (
-                      <div key={p.key} className="flex-1 py-1.5 px-1 text-center rounded transition-all" style={{
-                        background: filled ? 'rgba(34,211,238,0.08)' : isNext ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.02)',
-                        border: `1px solid ${filled ? 'rgba(34,211,238,0.25)' : isNext ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.04)'}`,
-                      }}>
-                        <div className="font-mono text-[9pt] text-gray-600 truncate">{p.label.split(' ')[0]}</div>
-                        <div className={`font-mono text-[10pt] font-bold mt-0.5 ${filled ? 'text-cyan-400' : isNext ? 'text-amber-400' : 'text-gray-700'}`}>
-                          {filled ? '✓' : isNext ? '→' : '—'}
-                        </div>
+                      <div key={k} className={`rounded-lg p-2 flex items-center justify-between gap-1 group cursor-pointer transition-all ${
+                        isJustSaved ? 'bg-emerald-950/40 ring-1 ring-emerald-400/60' : 'hover:bg-white/5'
+                      }`}
+                        style={{
+                          background: isJustSaved ? 'rgba(16,185,129,0.12)' : 'rgba(0,0,0,0.25)',
+                          border: isJustSaved ? '1px solid rgba(16,185,129,0.4)' : isDirty ? '1px solid rgba(251,191,36,0.6)' : '1px solid rgba(255,255,255,0.06)'
+                        }}
+                        onClick={() => editKey !== k && startEdit(k, v)}>
+                        <span className="text-gray-500 truncate text-[8.5pt]">{k.replace(/_mm$/,' mm').replace(/_/g,' ')}</span>
+                        {isEditing ? (
+                          <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                            <input
+                              autoFocus
+                              value={editVal}
+                              onChange={e => setEditVal(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                              className={`w-20 text-[8.5pt] px-1.5 py-0.5 rounded bg-black/60 outline-none transition-colors ${
+                                isDirty ? 'border border-amber-400 text-amber-300 ring-1 ring-amber-400/40' : 'border border-cyan-400 text-cyan-300'
+                              }`}
+                            />
+                            <button onClick={saveEdit} disabled={saving}
+                              title="Save (Enter)"
+                              className="text-emerald-400 hover:text-emerald-300 disabled:opacity-50">
+                              {saving ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
+                            </button>
+                            <button onClick={cancelEdit} title="Cancel (Esc)" className="text-gray-500 hover:text-gray-300">
+                              <X size={10} />
+                            </button>
+                          </div>
+                        ) : isJustSaved ? (
+                          <span className="font-bold text-emerald-400 flex items-center gap-1 text-[9pt] animate-pulse">
+                            {String(v)} <CheckCircle2 size={10} className="text-emerald-400" />
+                          </span>
+                        ) : (
+                          <span className="font-bold text-cyan-300 group-hover:text-cyan-200 flex items-center gap-1 text-[9pt]">
+                            {String(v)}
+                            <Edit3 size={9} className="opacity-0 group-hover:opacity-60 transition-opacity" />
+                          </span>
+                        )}
                       </div>
                     );
                   })}
                 </div>
-                <div className="font-mono text-[10pt] text-gray-500">
-                  {allDone
-                    ? <span className="text-cyan-400 flex items-center gap-1"><CheckCircle2 size={10} /> All {totalRequired} parameters collected</span>
-                    : <span className="text-amber-400/80">{filledCount}/{totalRequired} — Awaiting: {np?.label}</span>
-                  }
-                </div>
               </div>
             )}
-          </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={scrollRef}
-            style={{ scrollbarWidth: 'thin', scrollbarColor: '#1e3448 transparent' }}>
-            {chatMessages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] px-3 py-2 text-[10pt] leading-relaxed rounded-lg ${
-                  msg.role === 'user'
-                    ? 'text-white'
-                    : msg.role === 'error'
-                    ? 'text-red-400'
-                    : 'text-gray-400'
-                }`} style={{
-                  background: msg.role === 'user' ? 'rgba(34,211,238,0.12)' : msg.role === 'error' ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${msg.role === 'user' ? 'rgba(34,211,238,0.2)' : msg.role === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.05)'}`,
-                }}>
-                  {msg.attachment && (
-                      <div className="text-[8pt] text-cyan-300 font-mono bg-black/20 px-1.5 py-0.5 mb-1 rounded truncate">
-                          📎 {msg.attachment}
-                      </div>
-                  )}
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-            {submitting && (
-              <div className="flex justify-start">
-                <div className="px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <Loader2 size={14} className="animate-spin text-cyan-400" />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Input */}
-          <div className="p-3 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.015)' }}>
-            {isCustom && isCollecting ? (
-              <div className="space-y-2">
-                {customQuestion?.options && (
-                  <div className="flex flex-wrap gap-1.5 pb-1">
-                    {customQuestion.options.map(opt => (
-                      <button key={opt.value} type="button" onClick={() => handleCustomOptionClick(opt.value)}
-                        disabled={submitting}
-                        className="px-2 py-1 text-[8.5pt] font-mono rounded-full border bg-violet-400/5 border-violet-400/20 text-violet-300 hover:bg-violet-400/10 hover:border-violet-400/40 transition-all">
-                        {opt.label}
-                      </button>
-                    ))}
+            {/* ── Batched Questions Card ── */}
+            {qs.length > 0 && !allDone && (
+              <div className="rounded-xl p-4 space-y-3"
+                style={{ background: 'linear-gradient(135deg,rgba(30,27,75,0.45),rgba(17,24,39,0.55))', border: '1px solid rgba(129,140,248,0.35)' }}>
+                {/* Header + progress */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-[10pt] text-indigo-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Sparkles size={12} className="text-indigo-400" />
+                      Missing Specifications ({totalCount - answeredCount} remaining)
+                    </span>
+                    <span className="text-[8.5pt] font-mono text-gray-500">{pct}% done</span>
                   </div>
-                )}
-                <form onSubmit={handleCustomSubmit} className="flex gap-2 relative">
-                  <label className="absolute left-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-cyan-400 cursor-pointer">
-                      <input type="file" className="hidden" onChange={handleChatFileSelect} accept=".pdf,.step,.stp,.png,.jpg,.jpeg" />
-                      <Layers size={14} />
-                  </label>
-                  <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)}
-                    placeholder={chatAttachment ? `Attached: ${chatAttachment.name}` : "Type your answer or upload..."}
-                    className="flex-1 pl-9 pr-3 py-2 text-[10pt] font-mono text-white rounded-lg outline-none
-                      focus:ring-1 focus:ring-violet-400/40 placeholder:text-gray-600"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-                    disabled={submitting} autoComplete="off" />
-                  <button type="submit" disabled={submitting || (!inputValue.trim() && !chatAttachment)}
-                    className="px-3 py-2 rounded-lg transition-all disabled:opacity-30"
-                    style={{ background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)' }}>
-                    {submitting ? <Loader2 size={14} className="animate-spin text-violet-400" /> : <Send size={14} className="text-violet-400" />}
+                  {/* progress bar */}
+                  <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${pct}%`, background: pct === 100 ? '#10b981' : '#6366f1' }} />
+                  </div>
+                </div>
+
+                <form onSubmit={handleBatchSubmit} className="space-y-3">
+                  {qs.map((q) => (
+                    <FieldInput
+                      key={q.field}
+                      q={q}
+                      value={formValues[q.field] ?? ''}
+                      error={formErrors[q.field]}
+                      onChange={val => {
+                        setFormValues(prev => ({ ...prev, [q.field]: val }));
+                        setFormErrors(prev => { const n={...prev}; delete n[q.field]; return n; });
+                      }}
+                    />
+                  ))}
+
+                  <button type="submit" disabled={submitting}
+                    className="w-full mt-1 py-2.5 text-[10pt] font-mono font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    style={{ background: pct === 100 ? 'rgba(16,185,129,0.85)' : 'rgba(99,102,241,0.85)', color: 'white' }}>
+                    {submitting
+                      ? <><Loader2 size={13} className="animate-spin" /> Processing...</>
+                      : <><ArrowRight size={13} /> {pct === 100 ? 'Submit & Lock Specifications' : 'Submit (defaults fill blanks)'}</>}
                   </button>
                 </form>
               </div>
-            ) : isCollecting && np ? (
-              <div className="space-y-2">
-                {np.type !== 'select' && np.options && (
-                  <div className="flex flex-wrap gap-1.5 pb-1">
-                    {np.options.map(opt => (
-                      <button key={opt.value} type="button" onClick={() => handleOptionClick(opt.value)}
-                        disabled={submitting}
-                        className="px-2 py-1 text-[8.5pt] font-mono rounded-full border bg-cyan-400/5 border-cyan-400/20 text-cyan-300 hover:bg-cyan-400/10 hover:border-cyan-400/40 transition-all">
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {np.type === 'select' ? (
-                  <div className="space-y-1.5">
-                    {np.options?.map(opt => (
-                      <button key={opt.value} onClick={() => handleOptionClick(opt.value)}
-                        disabled={submitting}
-                        className="w-full text-left px-3 py-2 text-[10pt] font-mono rounded-lg transition-all
-                          hover:bg-cyan-400/10 text-gray-400 hover:text-cyan-300 disabled:opacity-50"
-                        style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="flex gap-2 relative">
-                    <label className="absolute left-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-cyan-400 cursor-pointer">
-                        <input type="file" className="hidden" onChange={handleChatFileSelect} accept=".pdf,.step,.stp,.png,.jpg,.jpeg" />
-                        <Layers size={14} />
-                    </label>
-                    <input ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)}
-                      placeholder={chatAttachment ? `Attached: ${chatAttachment.name}` : `Enter ${np.label} (${np.unit || 'value'})...`}
-                      className="flex-1 pl-9 pr-3 py-2 text-[10pt] font-mono text-white rounded-lg outline-none
-                        focus:ring-1 focus:ring-cyan-400/40 placeholder:text-gray-600"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
-                      disabled={submitting} autoComplete="off" />
-                    <button type="submit" disabled={submitting || (!inputValue.trim() && !chatAttachment)}
-                      className="px-3 py-2 rounded-lg transition-all disabled:opacity-30"
-                      style={{ background: 'rgba(34,211,238,0.15)', border: '1px solid rgba(34,211,238,0.3)' }}>
-                      {submitting ? <Loader2 size={14} className="animate-spin text-cyan-400" /> : <Send size={14} className="text-cyan-400" />}
-                    </button>
-                  </form>
-                )}
-                {np.type === 'number' && np.min != null && (
-                  <div className="text-[9pt] font-mono text-gray-600 px-1">Range: {np.min} — {np.max} {np.unit}</div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-1 text-[10pt] font-mono text-cyan-400 flex items-center justify-center gap-2">
-                <CheckCircle2 size={12} /> Intake complete — review report →
-              </div>
             )}
+
+            {/* ── All specs collected confirmation ── */}
+            {allDone && (
+              <AssistantBubble>
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-emerald-300 text-[10pt]">All specifications locked ✓</p>
+                    <p className="text-gray-400 text-[9.5pt] mt-0.5">Generate your engineering analysis report on the right →</p>
+                  </div>
+                </div>
+              </AssistantBubble>
+            )}
+
           </div>
+
+          {/* ── Chat input bar ── */}
+          <form onSubmit={handleChatSubmit}
+            className="p-3 shrink-0 flex items-center gap-2"
+            style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.25)' }}>
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder={allDone
+                ? "Type parameter edits, e.g. 'change diameter to 40mm'…"
+                : "Describe your part in natural language to auto-fill specs…"}
+              value={inputValue}
+              onChange={e => setInputValue(e.target.value)}
+              disabled={submitting}
+              className="flex-1 px-3.5 py-2 text-[9.5pt] font-mono rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-400 disabled:opacity-50 transition-colors"
+            />
+            <button type="submit" disabled={!inputValue.trim() || submitting}
+              className="px-3 py-2 rounded-xl font-bold transition-all disabled:opacity-30 flex items-center gap-1.5"
+              style={{ background: 'rgba(34,211,238,0.9)', color: '#000' }}>
+              {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+            </button>
+          </form>
         </div>
 
-        {/* RIGHT: Workflow Stages */}
-        <div className="flex-1 overflow-y-auto p-5" style={{ scrollbarWidth: 'thin', scrollbarColor: '#1e3448 transparent' }}>
-          <div className="space-y-4">
+        {/* RIGHT — Engineering Analysis + CAD */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
 
-            {/* Stage 1: Report */}
-            <StageCard
-              icon={Calculator} title="Engineering Calculations"
-              locked={!allDone && !hasReport}
-              badge={hasReport ? (isApproved ? { text: 'APPROVED', color: '#34d399' } : { text: 'REVIEW', color: '#f59e0b' }) : null}
-              action={!hasReport && allDone ? (
-                <button onClick={handleGenerateReport} disabled={generatingReport}
-                  className="px-3 py-1.5 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
-                    text-cyan-300 hover:text-white disabled:opacity-50"
-                  style={{ background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.3)' }}>
-                  {generatingReport ? <><Loader2 size={12} className="inline animate-spin mr-1" />GENERATING</> : 'GENERATE REPORT'}
-                </button>
-              ) : null}
-            >
-              {hasReport ? (
-                <div className="space-y-4">
-                  {/* Editable Parameters Summary */}
-                  <div className="px-3 py-2.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                    <div className="text-[10pt] font-mono text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <Edit3 size={10} /> Input Parameters <span className="text-gray-700">(click to edit)</span>
-                    </div>
-                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-1.5">
-                      {Object.entries(session.params || {}).map(([k, v]) => (
-                        <div key={k} className="group relative">
-                          {editingParam === k ? (
-                            <div className="flex gap-1">
-                              <input value={editValue} onChange={e => setEditValue(e.target.value)}
-                                className="flex-1 px-2 py-1 text-[10pt] font-mono text-white rounded bg-transparent outline-none"
-                                style={{ border: '1px solid rgba(34,211,238,0.4)' }}
-                                autoFocus onKeyDown={e => e.key === 'Enter' && handleSaveEdit()} />
-                              <button onClick={handleSaveEdit} disabled={savingEdit}
-                                className="p-1 rounded text-emerald-400 hover:bg-emerald-400/10">
-                                {savingEdit ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                              </button>
-                              <button onClick={() => setEditingParam(null)} className="p-1 rounded text-gray-500 hover:bg-white/5">
-                                <X size={12} />
-                              </button>
-                            </div>
-                          ) : (
-                            <button onClick={() => handleStartEdit(k, v)}
-                              className="w-full text-left px-2 py-1.5 rounded transition-all hover:bg-white/[0.03] group"
-                              style={{ border: '1px solid transparent' }}>
-                              <div className="text-[10pt] font-mono text-gray-500 truncate">{k}</div>
-                              <div className="text-[10pt] font-mono text-cyan-400 font-bold truncate flex items-center gap-1">
-                                {String(v)}
-                                <Edit3 size={10} className="text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity" />
-                              </div>
-                            </button>
+          {/* ── DFM / CAD error banner ── */}
+          {cadError && (
+            <div className="rounded-xl p-4 border border-rose-500/40 bg-rose-950/20 space-y-2">
+              <div className="flex items-center gap-2 font-mono font-bold text-[10pt] text-rose-400">
+                <TriangleAlert size={14} /> CAD Validation Failed — DFM / Topology Issue
+              </div>
+              <p className="font-mono text-[9.5pt] leading-relaxed text-rose-300/90">{cadError}</p>
+              <p className="text-gray-500 text-[8.5pt]">Edit the highlighted parameters on the left to correct the geometry.</p>
+            </div>
+          )}
+
+          {/* ── Step 1: Gather specs (right-side summary) ── */}
+          {!allDone && (
+            <PanelCard icon={FileText} title="Step 1 — Gather Specifications" active>
+              <div className="text-center py-5 space-y-3">
+                <div className="text-4xl">{meta.icon}</div>
+                <p className="font-mono text-[9.5pt] text-gray-400">
+                  {Object.keys(params).length > 0
+                    ? `${Object.keys(params).length} values extracted. Fill in the remaining ${qs.length} fields on the left.`
+                    : 'Type a natural-language description or fill in the form on the left to define your part.'}
+                </p>
+                {Object.keys(params).length > 0 && qs.length > 0 && (
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[8.5pt] font-mono"
+                    style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc' }}>
+                    <span>{Object.keys(params).length} fields extracted · {qs.length} still needed</span>
+                  </div>
+                )}
+              </div>
+            </PanelCard>
+          )}
+
+          {/* ── Step 2: Engineering Analysis Report ── */}
+          <PanelCard
+            icon={BarChart3}
+            title="Step 2 — Engineering Analysis"
+            locked={!allDone}
+            badge={hasReport ? { text: 'CALCULATED', color: '#34d399' } : undefined}
+            action={hasReport && !isApproved ? (
+              <button onClick={handleApprove} disabled={approving}
+                className="px-3 py-1 text-[9pt] font-mono font-bold tracking-wider rounded transition-all"
+                style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', color: '#6ee7b7' }}>
+                {approving ? <Loader2 size={11} className="inline animate-spin mr-1" /> : <ShieldCheck size={11} className="inline mr-1" />}
+                APPROVE REPORT
+              </button>
+            ) : isApproved ? (
+              <span className="text-[9pt] font-mono px-2 py-0.5 rounded text-emerald-400"
+                style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                ✓ APPROVED
+              </span>
+            ) : null}
+          >
+            {hasReport ? (
+              <div className="space-y-4">
+                {/* Safety block */}
+                <SafetyBlock safety={report.result?.safety} />
+
+                {/* Calculations grid */}
+                {report.result?.calculations?.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-[8.5pt] font-mono font-bold text-gray-500 uppercase tracking-wider">Calculated Values</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {report.result.calculations.map((c, i) => (
+                        <div key={i} className="p-2.5 rounded-lg space-y-0.5"
+                          style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                          <div className="text-[8.5pt] font-mono text-gray-500 truncate">{c.name}</div>
+                          <div className="text-[11pt] font-mono font-bold text-white">
+                            {/* Use c.result (correct key from math_engine) */}
+                            {c.result != null ? c.result : c.value}
+                            {' '}<span className="text-[9pt] font-normal text-gray-400">{c.unit}</span>
+                          </div>
+                          {c.formula && (
+                            <div className="text-[8pt] text-gray-600 truncate font-mono">{c.formula}</div>
                           )}
                         </div>
                       ))}
                     </div>
                   </div>
+                )}
 
-                  {/* Calculations grid — 2 columns */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-                    {report.result.calculations?.map((c, i) => (
-                      <div key={i} className="px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10pt] font-semibold text-gray-300">{c.name}</span>
-                          <span className="font-mono text-[10pt] font-bold text-cyan-400">{c.result} {c.unit}</span>
-                        </div>
-                        <div className="font-mono text-[10pt] text-gray-600 mt-0.5">{c.formula}</div>
-                        <div className="text-[10pt] text-gray-500 mt-0.5">{c.description}</div>
+                {/* Standards */}
+                {report.result?.standards?.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="text-[8.5pt] font-mono font-bold text-gray-500 uppercase tracking-wider">Applied Standards</div>
+                    {report.result.standards.map((s, i) => (
+                      <div key={i} className="text-[8.5pt] font-mono text-gray-600 flex items-center gap-1.5">
+                        <ShieldCheck size={9} className="text-gray-700" /> {s}
                       </div>
                     ))}
                   </div>
+                )}
 
-                  {/* Safety Assessment */}
-                  <SafetyBlock safety={report.result.safety} />
-
-                  {/* Internal Validation */}
-                  {validation && (
-                    <div className="rounded-lg p-3 space-y-2" style={{
-                      background: validation.validation_status === 'PASS' ? 'rgba(52,211,153,0.05)' : validation.validation_status === 'FAIL' ? 'rgba(239,68,68,0.05)' : 'rgba(245,158,11,0.05)',
-                      border: `1px solid ${validation.validation_status === 'PASS' ? 'rgba(52,211,153,0.2)' : validation.validation_status === 'FAIL' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)'}`,
-                    }}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck size={14} className={validation.validation_status === 'PASS' ? 'text-emerald-400' : 'text-amber-400'} />
-                          <span className="text-[10pt] font-mono font-bold text-white uppercase tracking-wider">Engineering Assessment</span>
-                        </div>
-                        <span className={`px-2 py-0.5 text-[10pt] font-mono font-bold rounded ${validation.validation_status === 'PASS' ? 'text-emerald-400' : 'text-amber-400'}`}
-                          style={{ background: validation.validation_status === 'PASS' ? 'rgba(52,211,153,0.1)' : 'rgba(245,158,11,0.1)' }}>
-                          {validation.validation_status}
-                        </span>
-                      </div>
-                      <div className="text-[10pt] text-gray-400">{validation.overall_assessment}</div>
-                      {validation.checks?.slice(0, 5).map((c, i) => (
-                        <div key={i} className="flex items-start gap-2 text-[10pt] font-mono">
-                          <span className={`shrink-0 mt-0.5 ${c.status === 'OK' ? 'text-emerald-400' : c.status === 'ERROR' ? 'text-red-400' : 'text-amber-400'}`}>
-                            {c.status === 'OK' ? '✓' : c.status === 'ERROR' ? '✗' : '⚠'}
-                          </span>
-                          <div>
-                            <span className="text-gray-300">{c.item}</span>
-                            {c.note && <span className="text-gray-500 block mt-0.5">{c.note}</span>}
-                          </div>
-                        </div>
-                      ))}
-                      {validation.recommendations?.length > 0 && (
-                        <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                          {validation.recommendations.map((r, i) => (
-                            <div key={i} className="text-[10pt] font-mono text-gray-400 flex items-start gap-2">
-                              <span className="text-cyan-400 shrink-0 mt-0.5">→</span>
-                              <span>{r}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Standards */}
-                  {report.result.standards?.length > 0 && (
-                    <div className="px-3 py-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                      <div className="text-[10pt] font-mono text-gray-500 uppercase tracking-wider mb-1">Standards Referenced</div>
-                      {report.result.standards.map((s, i) => (
-                        <div key={i} className="text-[10pt] text-gray-400">• {s}</div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Action buttons */}
-                  {hasReport && (
-                    <div className="flex items-center justify-between border-t border-white/[0.04] pt-4">
-                      <div className="flex gap-2">
-                        {!isApproved ? (
-                          <>
-                            <button onClick={handleValidate} disabled={validating}
-                              className="px-3 py-1.5 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
-                                text-violet-300 hover:text-white disabled:opacity-50"
-                              style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.3)' }}>
-                              {validating ? <><Loader2 size={12} className="inline animate-spin mr-1" />CHECKING</> : <><ShieldCheck size={12} className="inline mr-1" />SYSTEM CHECK</>}
-                            </button>
-                            <button onClick={handleGenerateReport} disabled={generatingReport}
-                              className="px-3 py-1.5 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
-                                text-amber-300 hover:text-white disabled:opacity-50"
-                              style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}>
-                              <RefreshCw size={12} className="inline mr-1" />RE-GENERATE
-                            </button>
-                          </>
-                        ) : (
-                          <div className="text-[10pt] font-mono text-emerald-400 flex items-center gap-1.5">
-                            <CheckCircle2 size={14} /> Approved
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <a href={`/api/design/sessions/${id}/export-pdf`} download>
-                          <button
-                            className="px-3 py-1.5 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
-                              text-cyan-300 hover:text-white"
-                            style={{ background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.3)' }}
-                          >
-                            <Download size={12} className="inline mr-1" /> EXPORT CALCULATION
-                          </button>
-                        </a>
-                        {!isApproved && (
-                          <button onClick={handleApprove} disabled={approvingReport}
-                            className="px-4 py-2 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
-                              text-emerald-300 hover:text-white disabled:opacity-50"
-                            style={{ background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.3)' }}>
-                            {approvingReport ? <><Loader2 size={12} className="inline animate-spin mr-1" />APPROVING</> : <><CheckCircle2 size={12} className="inline mr-1" />APPROVE REPORT</>}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : allDone ? (
-                <div className="space-y-4">
-                  {session.assumptions?.length > 0 && (
-                    <div className="px-4 py-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                      <div className="text-[10pt] font-mono text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-2">
-                        <Brain size={14} className="text-cyan-400" /> Engineering Assumptions
-                      </div>
-                      <div className="text-[10pt] text-gray-500 mb-4 font-mono">
-                        The system has automatically filled standard engineering defaults based on best practices. You can edit them or proceed.
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {session.assumptions.map(a => {
-                          const isEdited = session.params[a.key] !== undefined && session.params[a.key] !== a.default_value;
-                          const displayVal = session.params[a.key] !== undefined ? session.params[a.key] : a.default_value;
-                          return (
-                            <div key={a.key} className="group relative">
-                              {editingParam === a.key ? (
-                                <div className="flex gap-2">
-                                  <input value={editValue} onChange={e => setEditValue(e.target.value)}
-                                    className="flex-1 px-3 py-2 text-[10pt] font-mono text-white rounded bg-transparent outline-none"
-                                    style={{ border: '1px solid rgba(34,211,238,0.4)' }}
-                                    autoFocus onKeyDown={e => e.key === 'Enter' && handleSaveEdit()} />
-                                  <button onClick={handleSaveEdit} disabled={savingEdit}
-                                    className="p-2 rounded text-emerald-400 hover:bg-emerald-400/10">
-                                    {savingEdit ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                                  </button>
-                                  <button onClick={() => setEditingParam(null)} className="p-2 rounded text-gray-500 hover:bg-white/5">
-                                    <X size={14} />
-                                  </button>
-                                </div>
-                              ) : (
-                                <button onClick={() => handleStartEdit(a.key, displayVal)}
-                                  className="w-full text-left px-3 py-2 rounded transition-all hover:bg-white/[0.03] group"
-                                  style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
-                                  <div className="text-[10pt] font-mono text-gray-400 flex items-center justify-between">
-                                    <span className="truncate">{a.label}</span>
-                                    {isEdited && <span className="text-[9pt] text-amber-400 px-1.5 rounded bg-amber-400/10 border border-amber-400/20">EDITED</span>}
-                                  </div>
-                                  <div className="text-[10pt] font-mono font-bold mt-1 flex items-center gap-1" style={{ color: isEdited ? '#fcd34d' : '#22d3ee' }}>
-                                    {String(displayVal)} {a.unit || ''}
-                                    <Edit3 size={12} className="text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
-                                  </div>
-                                  <div className="text-[9pt] text-gray-600 mt-1.5 leading-tight">{a.reason}</div>
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  <div className="text-center py-4 font-mono text-[10pt] text-gray-600">
-                    Review assumptions above, then click GENERATE REPORT to compute engineering calculations.
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-6 font-mono text-[10pt] text-gray-700">
-                  Complete parameter intake in the chat to unlock.
-                </div>
-              )}
-            </StageCard>
-
-            {/* Stage 2: CAD */}
-            <StageCard icon={Box} title="CAD Generation" locked={!isApproved}>
-              {isCadReady ? (
-                <div className="text-center space-y-3">
-                  <div className="font-mono text-[10pt] text-cyan-400">✓ Model generated successfully.</div>
-                  <div className="flex gap-3 justify-center">
-                    <a href={`/api/design/sessions/${id}/download-cad`} download>
-                      <button className="px-4 py-2 text-[10pt] font-mono font-bold tracking-wider rounded-lg
-                        text-cyan-300 hover:text-white transition-all"
-                        style={{ background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.3)' }}>
-                        <Download size={12} className="inline mr-1" /> DOWNLOAD STEP
-                      </button>
-                    </a>
-                    <button onClick={async () => {
-                      try {
-                        // Auto-transfer design data to quoting engine
-                        const res = await fetch(`/api/design/sessions/${id}/send-to-quoting`, { method: 'POST' });
-                        if (res.ok) {
-                          const data = await res.json();
-                          // Store transfer data for the quoting page to pick up
-                          sessionStorage.setItem('design_transfer', JSON.stringify(data));
-                          navigate(`/quote?design_session=${id}`);
-                        } else {
-                          alert('Transfer failed — please ensure report is approved and CAD is generated.');
-                        }
-                      } catch (e) {
-                        console.error(e);
-                        alert('Transfer error — check server connection.');
-                      }
-                    }}
-                      className="px-4 py-2 text-[10pt] font-mono font-bold tracking-wider rounded-lg
-                        text-indigo-300 hover:text-white transition-all"
-                      style={{ background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.3)' }}>
-                      <Cog size={12} className="inline mr-1" /> SEND TO QUOTING
+                <div className="flex gap-2 pt-1">
+                  <a href={`/api/design/sessions/${id}/download-pdf`} download>
+                    <button className="px-3 py-1.5 text-[9pt] font-mono text-gray-400 hover:text-white rounded-lg transition-all flex items-center gap-1"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <Download size={11} /> PDF Report
                     </button>
+                  </a>
+                </div>
+              </div>
+            ) : allDone ? (
+              <div className="text-center py-6 space-y-3">
+                <p className="font-mono text-[9.5pt] text-gray-500">
+                  All parameters ready. Click to run engineering formulas using Shigley's & ISO standards.
+                </p>
+                <button onClick={handleGenerateReport} disabled={genReport}
+                  className="px-5 py-2.5 text-[10pt] font-mono font-bold tracking-wider rounded-xl transition-all flex items-center gap-2 mx-auto disabled:opacity-50"
+                  style={{ background: 'rgba(34,211,238,0.15)', border: '1px solid rgba(34,211,238,0.4)', color: '#67e8f9' }}>
+                  {genReport
+                    ? <><Loader2 size={13} className="animate-spin" /> Calculating...</>
+                    : <><Calculator size={13} /> GENERATE REPORT</>}
+                </button>
+              </div>
+            ) : (
+              <div className="py-5 text-center font-mono text-[9.5pt] text-gray-600 flex items-center justify-center gap-2">
+                <Lock size={12} /> Complete specifications on the left first.
+              </div>
+            )}
+          </PanelCard>
+
+          {/* ── Step 3: 3D CAD & Quoting ── */}
+          <PanelCard
+            icon={Box}
+            title="Step 3 — 3D CAD & Quoting Handoff"
+            locked={!hasReport && !isApproved}
+          >
+            {isCadReady ? (
+              <div className="space-y-3">
+                <div className="rounded-lg p-3 flex items-center gap-3"
+                  style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
+                  <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                  <div>
+                    <div className="font-mono font-bold text-[10pt] text-emerald-300">AP242 STEP Solid Verified</div>
+                    <div className="font-mono text-[8.5pt] text-gray-500">Watertight manifold · Positive OCC volume · Bounding box validated</div>
                   </div>
                 </div>
-              ) : isApproved ? (
-                <div className="text-center py-4">
-                  <button onClick={handleGenerateCad} disabled={generatingCad}
-                    className="px-4 py-2 text-[10pt] font-mono font-bold tracking-wider rounded-lg transition-all
-                      text-cyan-300 hover:text-white disabled:opacity-50"
-                    style={{ background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.3)' }}>
-                    {generatingCad ? <><Loader2 size={12} className="inline animate-spin mr-1" />GENERATING CAD</> : <><Box size={12} className="inline mr-1" />GENERATE CAD MODEL</>}
+                {/* OCC measured metrics */}
+                {session.cad_result && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { label: 'Volume (OCC)', value: session.cad_result.volume?.toFixed(1), unit: 'mm³' },
+                      { label: 'Surface Area (OCC)', value: session.cad_result.surface_area?.toFixed(1), unit: 'mm²' },
+                    ].map(m => (
+                      <div key={m.label} className="p-2.5 rounded-lg"
+                        style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div className="text-[8.5pt] font-mono text-gray-500">{m.label}</div>
+                        <div className="text-[11pt] font-mono font-bold text-white">
+                          {m.value} <span className="text-[8.5pt] text-gray-400">{m.unit}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2 pt-1">
+                  <a href={`/api/design/sessions/${id}/download-cad`} download className="flex-1">
+                    <button className="w-full px-4 py-2 text-[10pt] font-mono font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                      style={{ background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.35)', color: '#67e8f9' }}>
+                      <Download size={13} /> DOWNLOAD STEP
+                    </button>
+                  </a>
+                  <button onClick={sendToQuoting}
+                    className="flex-1 px-4 py-2 text-[10pt] font-mono font-bold rounded-xl transition-all flex items-center justify-center gap-2"
+                    style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.45)', color: '#a5b4fc' }}>
+                    <Cog size={13} /> SEND TO QUOTING
                   </button>
                 </div>
-              ) : (
-                <div className="text-center py-4 font-mono text-[10pt] text-gray-700">
-                  Approve report to unlock.
-                </div>
-              )}
-            </StageCard>
+              </div>
+            ) : (isApproved || hasReport) ? (
+              <div className="text-center py-6 space-y-3">
+                <p className="font-mono text-[9.5pt] text-gray-500">
+                  Deterministic OpenCASCADE build — no LLM involved in geometry generation.
+                </p>
+                <button onClick={handleGenerateCad} disabled={genCad}
+                  className="px-5 py-2.5 text-[10pt] font-mono font-bold tracking-wider rounded-xl transition-all flex items-center gap-2 mx-auto disabled:opacity-50"
+                  style={{ background: 'rgba(34,211,238,0.15)', border: '1px solid rgba(34,211,238,0.4)', color: '#67e8f9' }}>
+                  {genCad
+                    ? <><Loader2 size={13} className="animate-spin" /> Building STEP solid...</>
+                    : <><Box size={13} /> GENERATE CAD MODEL</>}
+                </button>
+              </div>
+            ) : (
+              <div className="py-5 text-center font-mono text-[9.5pt] text-gray-600 flex items-center justify-center gap-2">
+                <Lock size={12} /> Generate and approve the analysis report first.
+              </div>
+            )}
+          </PanelCard>
 
-          </div>
         </div>
       </div>
     </div>
   );
 }
 
-/* ── Sub-components ──────────────────────────────────────────────────────── */
-function StageCard({ icon: Icon, title, locked, badge, action, children }) {
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function AssistantBubble({ children }) {
   return (
-    <div className={`rounded-xl overflow-hidden transition-all ${locked ? 'opacity-40 pointer-events-none' : ''}`}
-      style={{
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
-        border: '1px solid rgba(255,255,255,0.06)',
-      }}>
+    <div className="flex justify-start">
+      <div className="max-w-[94%] rounded-xl px-4 py-3 text-[9.5pt] font-mono leading-relaxed"
+        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function PanelCard({ icon: Icon, title, locked, badge, action, active, children }) {
+  return (
+    <div className={`rounded-xl overflow-hidden transition-all duration-300 ${locked ? 'opacity-35 pointer-events-none' : ''} ${active ? 'ring-1 ring-indigo-500/30' : ''}`}
+      style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))', border: '1px solid rgba(255,255,255,0.07)' }}>
       <div className="flex items-center justify-between px-4 py-3"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.15)' }}>
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.18)' }}>
         <div className="flex items-center gap-2">
-          <Icon size={14} className="text-cyan-400" />
+          <Icon size={13} className="text-cyan-400" />
           <span className="text-[10pt] font-bold text-white uppercase tracking-widest" style={{ fontFamily: 'Outfit, sans-serif' }}>
             {title}
           </span>
         </div>
         <div className="flex items-center gap-2">
           {badge && (
-            <span className="px-2 py-0.5 text-[9pt] font-mono font-bold tracking-wider rounded"
-              style={{ color: badge.color, background: badge.color + '15', border: `1px solid ${badge.color}30` }}>
+            <span className="px-2 py-0.5 text-[8.5pt] font-mono font-bold tracking-wider rounded"
+              style={{ color: badge.color, background: badge.color + '18', border: `1px solid ${badge.color}35` }}>
               {badge.text}
             </span>
           )}
           {action}
-          {locked && <Lock size={12} className="text-gray-600" />}
+          {locked && <Lock size={11} className="text-gray-600" />}
         </div>
       </div>
       <div className="p-4">{children}</div>
@@ -912,39 +735,120 @@ function StageCard({ icon: Icon, title, locked, badge, action, children }) {
   );
 }
 
+function FieldInput({ q, value, error, onChange }) {
+  const hint = FIELD_HINTS[q.field];
+
+  return (
+    <div className="space-y-1">
+      {/* Label row */}
+      <label className="flex items-center justify-between text-[9pt] font-mono">
+        <span className="text-gray-200 font-semibold">{q.label}</span>
+        {q.unit && (
+          <span className="text-[8pt] px-1.5 py-0.5 rounded font-mono"
+            style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.1)' }}>
+            {q.unit}
+          </span>
+        )}
+      </label>
+
+      {/* Input control */}
+      {q.options && q.options.length > 0 ? (
+        /* Select chips */
+        <div className="flex flex-wrap gap-1.5">
+          {q.options.map(opt => {
+            const sel = value === opt.value;
+            return (
+              <button key={opt.value} type="button"
+                onClick={() => onChange(opt.value)}
+                className={`px-2.5 py-1 text-[8.5pt] font-mono rounded-lg border transition-all ${
+                  sel
+                    ? 'font-bold'
+                    : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+                }`}
+                style={sel ? { background: 'rgba(99,102,241,0.75)', borderColor: 'rgba(129,140,248,0.7)', color: 'white' } : {}}>
+                {opt.label || opt.value}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        /* Number / text input */
+        <div className="relative">
+          <input
+            type={q.type === 'number' ? 'number' : 'text'}
+            step="any"
+            placeholder={q.default_value != null ? `Default: ${q.default_value}` : q.question}
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            className={`w-full px-3 py-2 text-[9.5pt] font-mono rounded-lg bg-black/40 text-white focus:outline-none transition-colors ${
+              error ? 'border-rose-500' : value ? 'border-indigo-400/60' : 'border-white/10'
+            }`}
+            style={{ border: `1px solid ${error ? '#f43f5e' : value ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.1)'}` }}
+          />
+          {/* Filled indicator dot */}
+          {value && !error && (
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          )}
+        </div>
+      )}
+
+      {/* Hint */}
+      {hint && !error && (
+        <div className="flex items-center gap-1 text-[8pt] font-mono text-gray-600">
+          <Info size={8} /> {hint}
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div className="flex items-center gap-1 text-[8pt] font-mono text-rose-400">
+          <AlertTriangle size={9} /> {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SafetyBlock({ safety }) {
   if (!safety) return null;
-  const safe = safety.is_safe;
+  const safe = safety.is_safe !== false;
   return (
-    <div className="rounded-lg p-3 space-y-2" style={{
-      background: safe ? 'rgba(52,211,153,0.05)' : 'rgba(239,68,68,0.05)',
-      border: `1px solid ${safe ? 'rgba(52,211,153,0.2)' : 'rgba(239,68,68,0.2)'}`,
-    }}>
+    <div className="rounded-lg p-3 space-y-2"
+      style={{
+        background: safe ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
+        border: `1px solid ${safe ? 'rgba(16,185,129,0.22)' : 'rgba(239,68,68,0.22)'}`,
+      }}>
       <div className="flex items-center gap-6">
-        <div>
-          <div className="text-[9pt] font-mono text-gray-500 uppercase">Actual FOS</div>
-          <div className={`text-xl font-bold font-mono ${safe ? 'text-emerald-400' : 'text-red-400'}`}>
-            {safety.fos_actual}
+        {safety.fos_actual != null && (
+          <div>
+            <div className="text-[8.5pt] font-mono text-gray-500 uppercase">Actual FOS</div>
+            <div className={`text-xl font-bold font-mono ${safe ? 'text-emerald-400' : 'text-red-400'}`}>
+              {safety.fos_actual}
+            </div>
           </div>
-        </div>
-        <div>
-          <div className="text-[9pt] font-mono text-gray-500 uppercase">Required</div>
-          <div className="text-xl font-bold font-mono text-white">{safety.fos_required}</div>
-        </div>
+        )}
+        {safety.fos_required != null && (
+          <div>
+            <div className="text-[8.5pt] font-mono text-gray-500 uppercase">Required</div>
+            <div className="text-xl font-bold font-mono text-white">{safety.fos_required}</div>
+          </div>
+        )}
         <div className="ml-auto">
           <span className={`px-2 py-0.5 text-[9pt] font-mono font-bold tracking-wider rounded ${safe ? 'text-emerald-400' : 'text-red-400'}`}
-            style={{ background: safe ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)', border: `1px solid ${safe ? 'rgba(52,211,153,0.3)' : 'rgba(239,68,68,0.3)'}` }}>
+            style={{ background: safe ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', border: `1px solid ${safe ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.35)'}` }}>
             {safe ? 'SAFE' : 'CRITICAL'}
           </span>
         </div>
       </div>
       {safety.warnings?.map((w, i) => (
-        <div key={i} className="flex items-start gap-2 text-[10pt] font-mono text-amber-400">
+        <div key={i} className="flex items-start gap-2 text-[9pt] font-mono text-amber-400">
           <AlertTriangle size={11} className="shrink-0 mt-0.5" /> {w}
         </div>
       ))}
       {safety.recommendations?.map((r, i) => (
-        <div key={i} className="text-[10pt] font-mono text-gray-500">• {r}</div>
+        <div key={i} className="flex items-start gap-2 text-[8.5pt] font-mono text-gray-500">
+          <Info size={9} className="shrink-0 mt-0.5" /> {r}
+        </div>
       ))}
     </div>
   );

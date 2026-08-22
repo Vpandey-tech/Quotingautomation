@@ -1045,6 +1045,13 @@ ENGINES = {
     "gearbox": calculate_gearbox,
     "cam": calculate_cam,
     "custom": calculate_custom,
+    "flange": lambda p: calculate_custom({**p, "archetype": "flange"}),
+    "plate_hole_pattern": lambda p: calculate_custom({**p, "archetype": "plate_hole_pattern"}),
+    "bracket": lambda p: calculate_custom({**p, "archetype": "bracket"}),
+    "spacer": lambda p: calculate_custom({**p, "archetype": "spacer"}),
+    "lever": lambda p: calculate_custom({**p, "archetype": "lever"}),
+    "housing": lambda p: calculate_custom({**p, "archetype": "housing"}),
+    "pin_dowel": lambda p: calculate_custom({**p, "archetype": "pin_dowel"}),
 }
 
 
@@ -1052,6 +1059,7 @@ def run_calculation(component_type: str, params: Dict[str, Any]) -> Dict[str, An
     """Run the math engine for a given component type and parameters."""
     engine = ENGINES.get(component_type)
     if not engine:
-        raise ValueError(f"Unknown component type: {component_type}")
+        # Fallback to custom calculation with archetype set to component_type
+        return calculate_custom({**params, "archetype": component_type})
     return engine(params)
 

@@ -1,133 +1,170 @@
-# ACCU DESIGN Quoting Automation System
+# ACCU DESIGN — Manufacturing Quoting & Text-to-CAD Automation System
 
-## 🚀 Overview
-
-The **ACCU DESIGN Quoting Automation System** is an AI-powered, intelligent manufacturing quotation engine. It accelerates the otherwise manual and time-consuming estimation process for engineering parts and assemblies by automatically extracting precise metrics (volumes, bounding boxes, processes, holes) straight from industrial 2D PDFs or 3D STEP files, and dynamically pricing them based on live global metal market rates and exchange APIs.
-
-With its sleek, glassmorphic Dark Mode UI, built-in interactive 3D WebGL Viewer, and an intelligent **ACCU AI Copilot**, quoting shifts from hours of tedious spreadsheet work to a seamless, precise, and highly professional automated workflow.
+An enterprise-grade, AI-powered mechanical design engineering and instant manufacturing quotation platform. Accelerates manual estimation and CAD drafting into an automated pipeline: from **natural-language specification** to **deterministic parametric 3D CAD (.STEP solid)**, **engineering analysis**, and **live INR manufacturing quotation**.
 
 ---
 
-## 🔥 Key Technical Capabilities
+## 🚀 Key Modules & Capabilities
 
-### 1. Intelligent File Analysis
-- **3D Geometry (STEP Files):**
-  - Powered by **[CadQuery](https://github.com/CadQuery/cadquery)** and **OpenCASCADE** running on the Python backend.
-  - Automatically calculates bounding box dimensions (Max X, Y, Z), precise calculated volume, surface area, and complex topologies (detecting vertices, faces, edges, threaded/blind/through holes).
-  - Determines complexity scores (Simple, Moderate, Complex) based on geometric features.
-
-- **2D Drawing Parsing (PDF Files):**
-  - Driven by **Google Gemini AI 2.5 Flash / Pro Multimodal Vision Models**.
-  - Systematically parses industrial PDF drawings (Orthographic projections, Isometric views).
-  - Extracts Multi-part Bill of Materials (BOM), determining bounding boxes, quantities, dimensions, weights, tolerances (H7, etc.), client names, and machining processes automatically.
-  - Differentiates automatically between "Machined Parts" (calculated rates) and "Buyout Items" (off-the-shelf).
-
-### 2. Live Pricing & Economics Engine
-- **Global Market Integration:**
-  - Pulls live metal spot prices in USD/kg (via `metals.dev` integration).
-  - Converts dynamically via active live USD → INR exchange rate lookups.
-- **Complex Costing Algorithm:**
-  - Calculates Machine Setup Time + Operation Time based on Part Complexity, Machine Rate (per hour), Material Cost, and Manufacturing Tolerances (Multiplier parameters).
-  - Calculates specific processing times varying for Turning, 3-Axis / 5-Axis Milling, Wire EDM.
-  - Includes adjustable logic for Scrap factors, Margin padding (% profit), internal logistics, and Taxation (18% GST).
-
-### 3. High-Fidelity PDF Quotation Generation
-- **Authentic Industry Formatting:**
-  - Employs **`fpdf2`** utilizing strict coordinates and precise Unicode fonts (`ArialUni`).
-  - Capable of generating two distinct PDF formats:
-    - **Single Component Quote:** Standard landscape/portrait quotation styling.
-    - **BOM Assembly Quote:** Strict industrial invoice matching (including exact custom columns like `HSN`, `QTY`, `RATE`, `TAX`, dynamically numbered Total sections, and dynamically sized multiline tracking).
-- **Automation Logic:** 
-  - Predicts Y-axis page overlap to ensure clean page breaks rather than overlapping static footers.
-  - Translates massive numerical sums into professional "Amount in Words" (e.g., *Forty Six Thousand Rupees Only*).
-
-### 4. Parametric Engineering Rules Engine (New in Phase 4)
-- **Deterministic Math Engine:**
-  - Performs complex calculations for mechanical components (Shafts, Gears, Bearings, Cams).
-  - Evaluates formulas purely in Python per strict industry standards (ASME B106.1M, ISO 281, AGMA 2001) rather than relying on unreliable LLM arithmetic.
-- **AI-Cross-Validated Knowledge Base:**
-  - Built-in `knowledge_base.json` with 250+ engineering formulas and rules.
-  - Safely evaluates string formulas using restricted `safe_eval`.
-  - Employs Gemini AI as a secondary validator to double-check edge cases.
-- **Parametric CAD Generation:**
-  - Uses **build123d** to dynamically generate `.STEP` files directly from computed design dimensions.
-- **Engineering PDF Reporting:**
-  - Auto-generates detailed calculation reports with actual formulas rendered into PDF format for immediate review and approval.
-
-### 5. Interactive Frontend Application
-- **Modern React + Vite Frontend:**
-  - Responsive, high-performance UI styled entirely with native customized **Tailwind CSS**.
-  - **Draggable Context Sidebar:** Users can simultaneously view 3D geometries or 2D PDFs alongside the active quoting configuration sidebar, seamlessly dragging to resize the UI workspace securely bypassing 3D hover-locks.
-- **3D Viewer Module:**
-  - Built with `@react-three/fiber` and `three.js`. Runs `.wasm` based OpenCASCADE mesh loading directly in-browser.
-- **ACCU AI Conversational Copilot:**
-  - Allows the user to naturally speak to the loaded assembly. E.g., *"Make this part EN-8 Steel with Ultra Precision tolerances."* The AI parses conversational text, updating the internal application states securely.
+### 1. 🤖 AI-Guided Text-to-CAD & Design Automation (`/design`)
+* **1-Pass Gemini Multimodal Spec-Intake**: Single LLM intake call with strict call budget enforcement ($\le 3$ calls per design session) that extracts structured engineering parameters and identifies the component family.
+* **11 Parametric Component Families**:
+  * ⚙️ **Shaft**: Drive shafts, stepped axles, spindles (power, speed, torque, keyways, FOS).
+  * 🔩 **Flange**: Pipe flanges, mounting rings, PCD bolt circles, center bores.
+  * 🪟 **Base Plate**: Flat plates with rectangular or circular hole grid patterns.
+  * 📐 **Bracket**: L-brackets, U-brackets, flat mounting plates with gusset reinforcement.
+  * 🧱 **Spacer / Bushing**: Standoffs, bushings, collars with bore and outer diameter.
+  * ↕️ **Lever Arm**: Pivot arms and linkages with dual bore configurations.
+  * 🏠 **Housing / Enclosure**: Hollow casings, shells, electronics enclosures.
+  * ⭕ **Bearing Selection**: Deep groove ball / roller bearing sizing by load, speed, $L_{10}$ life.
+  * ⚙️⚙️ **Gearbox Transmission**: Spur and helical gear train ratio and stage solver.
+  * 🌀 **Cam Profile**: Disc cam motion profiles (Simple Harmonic, Cycloidal, Parabolic).
+  * ✦ **Custom Part**: Freeform mechanical part intake with smart archetype mapping.
+* **Interactive Specification Card with Inline Editing**:
+  * Live click-to-edit for any parameter key with immediate delta `PATCH /api/design/sessions/{id}/params`.
+  * Visual feedback: pending/dirty edit detection (amber ring) and saved confirmation (green flash).
+  * Guided batch input forms with contextual hints, unit badges, and min/max range guards.
+* **Progressive Workflow Rail**:
+  * **Step 1**: Gather Specifications (Form + NLP extraction + Progress tracking).
+  * **Step 2**: Engineering Analysis (Shigley's machine design formulas, safety factor verification, PDF generation).
+  * **Step 3**: 3D CAD & Quoting Handoff (Deterministic OpenCASCADE solid build, exact volume/surface area measurement, seamless handoff).
 
 ---
 
-## 🏗️ Technology Stack
-
-### Backend Environment 🐍
-- **Framework:** `FastAPI` (Asynchronous ultra-fast Python APi)
-- **Geometry Kernel:** `CadQuery` / `OpenCASCADE` (OCP/OCC via Python)
-- **AI Core:** `google-generativeai` (Gemini Models 2.5 Flash & 2.5 Pro)
-- **PDF Engine:** `fpdf2`
-- **Concurrency:** Uses `asyncio` and optimized thread pools for CAD heavy-lifting.
-
-### Frontend Environment ⚛️
-- **Framework:** React 18 / Vite
-- **Web 3D Visualization:** `@react-three/fiber`, `@react-three/drei`, `three.js`, `occt-import-js`
-- **Icons & Styling:** `lucide-react`, `@heroicons/react`, `Tailwind CSS 3`, Custom Glassmorphism.
-- **File Handling:** `react-dropzone`
+### 2. 🧮 Deterministic Engineering Calculation Engine
+* **Pure Python Shigley & ISO Compliance**: Eliminates LLM arithmetic hallucination by running verified formulas in Python.
+* **Mechanical Safety Analysis**:
+  * Torsional and bending shear stresses ($\tau = \frac{16T}{\pi d^3}$, $\sigma_b = \frac{32M}{\pi d^3}$).
+  * Combined von Mises equivalent stress ($\sigma_e = \sqrt{\sigma_b^2 + 3\tau^2}$).
+  * Factor of Safety (FOS) evaluation against ASME and ISO allowable yield limits.
+* **Automated Engineering Reports**: Auto-generates branded PDF and Markdown calculation reports.
 
 ---
 
-## ⚙️ Architecture & Data Workflow
-
-1. **User Uploads File:** 
-   - Application detects if the file is `.step` or `.pdf`.
-2. **Analysis Route:**
-   - **STEP:** Dispatched to `/api/analyze`. CadQuery ingests the 3D file, computes B-Rep data, and responds with geometric statistics.
-   - **PDF:** Dispatched to `/api/analyze/pdf`. Gemini Vision visually reviews the drawing grid, identifies parts/dimensions, and replies with a highly structured deterministic JSON matrix.
-3. **Quoting Context:**
-   - Data enters the `QuotePanel.jsx` React context. 
-   - `fetch("/api/prices")` runs simultaneously to capture daily live USD/INR material costs.
-4. **Interactive Adjustment:**
-   - User edits material properties, processes, markup percentages, and surfaces.
-5. **Report Generation:**
-   - User selects `Download BOM Quote (PDF)`.
-   - The React app submits verified, formatted JSON definitions to `main.py` -> `/api/quote/bom-pdf`.
-   - Python processes the numerical sums and dynamically spins up an `AccuDesignAuthenticPDF()` payload and responds with a downloadable stream of the final PDF.
+### 3. 🛠️ Parametric 3D CAD Solid Engine (`build123d` + OpenCASCADE)
+* **Deterministic Geometry Synthesis**: Generates valid, watertight, manifold **AP242 STEP solids** (`.step`) with zero LLM in the CAD loop.
+* **Code-Only DFM (Design for Manufacturability) Preflight Gates**:
+  * Minimum CNC tool wall thickness enforcement ($\ge 0.8\text{ mm}$).
+  * Minimum bore and PCD geometric envelope constraints.
+  * Watertight topology and positive OpenCASCADE volume validation.
+* **Fallback Error Explanation**: If geometric parameters violate manufacturing constraints, a targeted reasoning prompt explains the exact conflict in plain language.
 
 ---
 
-## 🔧 Setup & Installation (Local Development)
-
-### 1. Requirements
-* Node.js v18+
-* Python 3.10+
-* Google Gemini API Key
-* Metals API Key (Optional but recommended)
-
-### 2. Backend Setup
-1. Navigate to the `/backend` folder.
-2. Create your virtual environment: `python -m venv venv`
-3. Activate the environment: `.\venv\Scripts\activate` (Windows)
-4. Install dependencies: `pip install -r requirements.txt` *(Note: Ensure CadQuery is installed cleanly according to OS limitations).*
-5. Create `.env` file holding secrets:
-   ```env
-   GEMINI_API_KEY="your-gemini-key"
-   METALS_DEV_API_KEY="your-metals-dev-key"
-   ```
-6. Start Server: `uvicorn main:app --reload`
-
-### 3. Frontend Setup
-1. Navigate to the root directory `/`.
-2. Install npm packages: `npm install`
-3. Execute the WASM library command (Important for 3D): `npm run copy-wasm`
-4. Run Dev Server: `npm run dev`
-5. Visit `http://localhost:5173` to experience the Quoting Interface.
+### 4. 💰 Live Manufacturing Quoting Engine (`/quote`)
+* **Dual Input Modes**:
+  * **Direct 3D STEP Upload**: Native B-Rep topology analysis via `build123d` / `OCP` (calculates exact volume, surface area, bounding box, hole depths/types, edge perimeters, and complexity tier).
+  * **2D Engineering Drawing (PDF)**: Multimodal Gemini AI drawing analysis to parse orthographic projections, isometric views, multi-part BOMs, and H7 tolerance callouts.
+* **Live Material Pricing (INR)**: Real-time metal spot prices via global market APIs with live USD $\to$ INR currency conversion.
+* **Cycle Time & Costing Breakdown**:
+  * Machine setup and operational machining cycle times for 3-Axis / 5-Axis CNC Milling, CNC Turning, and Wire EDM.
+  * Raw material stock size optimization (Round bar, Plate, Hex bar).
+  * Tolerance multipliers (Standard, Precision, Ultra-Precision) and surface treatment pricing.
+  * Profit margin controls (15%–30%), regional labor adjustments (Pune, Ahmedabad, Mumbai, Chennai, Bengaluru, Delhi), and 18% GST calculation.
+* **Commercial PDF Generation**: Downloadable formal quotation and itemized BOM PDF generation using `fpdf2` and Unicode typography.
 
 ---
 
-*System designed exclusively for ACCU DESIGN.*
+### 5. 👁️ Interactive 3D WebGL Viewer
+* Embedded Three.js / React Three Fiber viewport with in-browser OpenCASCADE mesh rendering.
+* Interactive 3D bounding box dimension callouts (X, Y, Z in mm), coordinate axes gizmo, and orbit controls.
+
+---
+
+## 🏗️ Architecture & Technology Stack
+
+```
+Quotingautomation/
+├── backend/
+│   ├── main.py                     # FastAPI backend entrypoint & quoting routes
+│   ├── engineering_routes.py       # AIAE Design Phase API (/api/design/*)
+│   ├── services/
+│   │   ├── costing.py              # Machining cycle time & cost calculation
+│   │   ├── pricing.py              # Metal material database & live spot rates
+│   │   ├── currency.py             # USD to INR exchange rates
+│   │   ├── pdf.py                  # Formal commercial PDF quote generator
+│   │   ├── pdf_analyzer.py         # Gemini 2D drawing multimodal parser
+│   │   └── engineering/
+│   │       ├── cad_engine.py       # build123d / OpenCASCADE parametric CAD builder
+│   │       ├── math_engine.py      # Shigley's machine design formula solver
+│   │       ├── params.py           # Component specs, aliases, and clarification rules
+│   │       ├── report_generator.py # Engineering analysis PDF reports
+│   │       ├── knowledge_lookup.py # 250+ engineering formula KB & validation
+│   │       └── hardware.py         # Standard off-the-shelf fasteners & parts
+│   └── tests/
+│       ├── test_design_refactor.py # CAD generation & DFM preflight tests
+│       ├── test_api_contract.py    # End-to-end API intake & quoting handoff tests
+│       └── test_calculations.py    # Engineering formula unit tests
+├── src/
+│   ├── pages/
+│   │   ├── DesignDashboard.jsx     # 11 component families catalogue & session manager
+│   │   ├── DesignSession.jsx       # 3-step linear design workspace & inline editor
+│   │   └── Landing.jsx             # Main platform landing page
+│   ├── components/
+│   │   ├── quote/                  # Quoting panel, costing sliders & pricing breakdown
+│   │   ├── viewer/                 # Three.js 3D WebGL B-Rep viewer & bounding box
+│   │   └── admin/                  # Live metal rates & exchange rates dashboard
+│   ├── App.jsx                     # Route definitions & global context
+│   └── main.jsx                    # React root
+```
+
+---
+
+## 🔧 Setup & Installation
+
+### Prerequisites
+* **Node.js**: v18.0 or higher
+* **Python**: 3.10 or 3.11
+* **API Keys**: Google Gemini API key (set in `.env`)
+
+### 1. Backend Setup
+```powershell
+# Navigate to backend
+cd backend
+
+# Create & activate virtual environment
+python -m venv venv
+.\venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment variables
+# Create a .env file in backend/:
+# GEMINI_API_KEY="your_google_gemini_api_key"
+# METALS_DEV_API_KEY="your_metals_dev_api_key" # (Optional)
+
+# Start backend server
+py -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 2. Frontend Setup
+```powershell
+# In project root:
+npm install
+
+# Start Vite development server
+npm run dev
+```
+
+Visit **`http://localhost:5173`** to access the application.
+
+---
+
+## 🧪 Running Automated Tests
+
+```powershell
+# 1. Test CAD Generator across all 11 component families & DFM preflight
+py backend/tests/test_design_refactor.py
+
+# 2. Test End-to-End Design Session Intake, Report & Quoting Handoff Contract
+py backend/tests/test_api_contract.py
+
+# 3. Test Engineering Formulas & Calculations
+py backend/tests/test_calculations.py
+```
+
+---
+
+## 📄 License & Attribution
+*Designed and engineered exclusively for ACCU DESIGN.*

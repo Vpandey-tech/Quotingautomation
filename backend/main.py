@@ -27,6 +27,22 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import tempfile, os
+import numpy as np
+for alias, target in [
+    ("bool8", "bool_"),
+    ("bool0", "bool_"),
+    ("object0", "object_"),
+    ("int0", "intp"),
+    ("uint0", "uintp"),
+    ("void0", "void"),
+    ("bytes0", "bytes_"),
+    ("str0", "str_"),
+    ("float0", "float64"),
+    ("complex0", "complex128"),
+]:
+    if not hasattr(np, alias) and hasattr(np, target):
+        setattr(np, alias, getattr(np, target))
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -975,118 +991,126 @@ async def gen_bom_quote_pdf(req: BomPdfRequest, background_tasks: BackgroundTask
         raise HTTPException(500, f"BOM PDF generation failed: {str(e)}")
 
 
-# ── CadQuery geometry analysis ────────────────────────────────────────────────
+# ── CadQuery / build123d geometry analysis ────────────────────────────────────
 def _analyze_with_cadquery(path: str, original_name: str) -> dict:
-    """Full B-Rep analysis using CadQuery."""
+    """Full B-Rep geometry analysis using build123d / OpenCASCADE with CadQuery fallback."""
     try:
-        import cadquery as cq
-    except Exception as e:
-        raise RuntimeError(f"CadQuery import failed: {e}")
+        from build123d import import_step
+        shape = import_step(path)
 
-    BRepAdaptor_Surface = None
-    GeomAbs_Cylinder = None
-    try:
-        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
-        from OCC.Core.GeomAbs import GeomAbs_Cylinder
-    except ImportError:
+        bbox = shape.bounding_box()
+        size_x = round(float(bbox.size.X), 4)
+        size_y = round(float(bbox.size.Y), 4)
+        size_z = round(float(bbox.size.Z), 4)
+        thickness = round(min(size_x, size_y, size_z), 4)
+
+        volume = round(abs(float(shape.volume)), 4)
+        faces = shape.faces()
+        edges = shape.edges()
+        vertices = shape.vertices()
+
+        surface_area = round(float(sum(f.area for f in faces)), 4)
+
+        try:
+            ctr = shape.center()
+            centroid = {"x": round(float(ctr.X), 4), "y": round(float(ctr.Y), 4), "z": round(float(ctr.Z), 4)}
+        except Exception:
+            centroid = {"x": 0.0, "y": 0.0, "z": 0.0}
+
+        total_edge_length = 0.0
+        for edge in edges:
+            try:
+                total_edge_length += float(edge.length)
+            except Exception:
+                pass
+        if total_edge_length <= 0.0:
+            total_edge_length = 2 * (size_x + size_y)
+
+        # Detect cylindrical holes via OpenCASCADE Surface Adaptor
+        holes = []
+        seen_centers = []
         try:
             from OCP.BRepAdaptor import BRepAdaptor_Surface
-            from OCP.GeomAbs import GeomAbs_Cylinder
-        except ImportError:
-            pass
+            from OCP.GeomAbs import GeomAbs_SurfaceType
+            for face in faces:
+                try:
+                    adaptor = BRepAdaptor_Surface(face.wrapped)
+                    if adaptor.GetType() != GeomAbs_SurfaceType.GeomAbs_Cylinder:
+                        continue
+                    cylinder = adaptor.Cylinder()
+                    radius = float(cylinder.Radius())
+                    if radius <= 0 or radius > 500:
+                        continue
 
-    try:
-        shape = cq.importers.importStep(path)
-    except Exception as e:
-        raise RuntimeError(f"STEP file import failed: {e}")
+                    fbb = face.bounding_box()
+                    cx = (fbb.max.X + fbb.min.X) / 2.0
+                    cy = (fbb.max.Y + fbb.min.Y) / 2.0
+                    cz = (fbb.max.Z + fbb.min.Z) / 2.0
 
-    solid = shape.val()
+                    is_dup = False
+                    for (sx, sy, sz) in seen_centers:
+                        if abs(cx - sx) < 0.5 and abs(cy - sy) < 0.5 and abs(cz - sz) < 0.5:
+                            is_dup = True
+                            break
+                    if is_dup:
+                        continue
+                    seen_centers.append((cx, cy, cz))
 
-    bb     = solid.BoundingBox()
-    size_x = round(bb.xmax - bb.xmin, 4)
-    size_y = round(bb.ymax - bb.ymin, 4)
-    size_z = round(bb.zmax - bb.zmin, 4)
-    thickness = min(size_x, size_y, size_z)
-
-    volume       = round(abs(solid.Volume()), 4)
-    surface_area = round(solid.Area(), 4)
-
-    try:
-        centroid_vec = solid.Center()
-        centroid = {"x": round(centroid_vec.x, 4), "y": round(centroid_vec.y, 4), "z": round(centroid_vec.z, 4)}
-    except Exception:
-        centroid = {"x": 0.0, "y": 0.0, "z": 0.0}
-
-    faces    = solid.Faces()
-    edges    = solid.Edges()
-    vertices = solid.Vertices()
-
-    total_edge_length = 0.0
-    for edge in edges:
-        try:
-            total_edge_length += edge.Length()
+                    diameter = round(radius * 2, 4)
+                    depth = round(max(fbb.size.X, fbb.size.Y, fbb.size.Z), 4)
+                    hole_type = "through" if depth > diameter * 0.5 else "blind"
+                    holes.append({"diameter": diameter, "depth": depth, "type": hole_type})
+                except Exception:
+                    continue
         except Exception:
             pass
 
-    if total_edge_length <= 0.0:
-        total_edge_length = 2 * (size_x + size_y)
+        n_faces = len(faces)
+        n_edges = len(edges)
+        n_holes = len(holes)
+        score = n_faces * 1 + n_edges * 0.5 + n_holes * 10
+        tier = ("Simple" if score < 100 else "Moderate" if score < 300 else
+                "Complex" if score < 800 else "Very Complex")
 
-    holes = []
-    seen_centers = []
-    if BRepAdaptor_Surface and GeomAbs_Cylinder:
-        for face in faces:
-            try:
-                adaptor = BRepAdaptor_Surface(face.wrapped)
-                if adaptor.GetType() != GeomAbs_Cylinder:
-                    continue
-                cylinder = adaptor.Cylinder()
-                radius   = cylinder.Radius()
-                if radius <= 0 or radius > 500:
-                    continue
-                    
-                fbb   = face.BoundingBox()
-                cx = (fbb.xmax + fbb.xmin) / 2.0
-                cy = (fbb.ymax + fbb.ymin) / 2.0
-                cz = (fbb.zmax + fbb.zmin) / 2.0
-                
-                # Check for duplicates to prevent overcounting split cylinder faces
-                is_dup = False
-                for (sx, sy, sz) in seen_centers:
-                    if abs(cx-sx) < 0.5 and abs(cy-sy) < 0.5 and abs(cz-sz) < 0.5:
-                        is_dup = True
-                        break
-                if is_dup:
-                    continue
-                seen_centers.append((cx, cy, cz))
-                
-                diameter = round(radius * 2, 4)
-                depth = round(max(fbb.xmax - fbb.xmin, fbb.ymax - fbb.ymin, fbb.zmax - fbb.zmin), 4)
-                hole_type = "through" if depth > diameter * 0.5 else "blind"
-                holes.append({"diameter": diameter, "depth": depth, "type": hole_type})
-            except Exception:
-                continue
+        return {
+            "fileName":    original_name,
+            "unit":        "Millimeter",
+            "boundingBox": {"sizeX": size_x, "sizeY": size_y, "sizeZ": size_z},
+            "volume":      volume,
+            "surfaceArea": surface_area,
+            "centroid":    centroid,
+            "perimeter":   round(total_edge_length, 4),
+            "thickness":   thickness,
+            "topology":    {"faces": n_faces, "edges": n_edges, "vertices": len(vertices)},
+            "holes":       holes,
+            "complexity":  {"score": round(score, 1), "tier": tier,
+                            "faces": n_faces, "edges": n_edges, "holes": n_holes},
+        }
 
-    n_faces = len(faces)
-    n_edges = len(edges)
-    n_holes = len(holes)
-    score   = n_faces * 1 + n_edges * 0.5 + n_holes * 10
-    tier    = ("Simple" if score < 100 else "Moderate" if score < 300 else
-               "Complex" if score < 800 else "Very Complex")
-
-    return {
-        "fileName":    original_name,
-        "unit":        "Millimeter",
-        "boundingBox": {"sizeX": size_x, "sizeY": size_y, "sizeZ": size_z},
-        "volume":      volume,
-        "surfaceArea": surface_area,
-        "centroid":    centroid,
-        "perimeter":   round(total_edge_length, 4),
-        "thickness":   round(thickness, 4),
-        "topology":    {"faces": n_faces, "edges": n_edges, "vertices": len(vertices)},
-        "holes":       holes,
-        "complexity":  {"score": round(score, 1), "tier": tier,
-                        "faces": n_faces, "edges": n_edges, "holes": n_holes},
-    }
+    except Exception as b3d_err:
+        logger.warning(f"build123d analysis fallback, trying cadquery: {b3d_err}")
+        try:
+            import cadquery as cq
+            shape = cq.importers.importStep(path)
+            solid = shape.val()
+            bb = solid.BoundingBox()
+            size_x = round(bb.xmax - bb.xmin, 4)
+            size_y = round(bb.ymax - bb.ymin, 4)
+            size_z = round(bb.zmax - bb.zmin, 4)
+            return {
+                "fileName": original_name, "unit": "Millimeter",
+                "boundingBox": {"sizeX": size_x, "sizeY": size_y, "sizeZ": size_z},
+                "volume": round(abs(solid.Volume()), 4),
+                "surfaceArea": round(solid.Area(), 4),
+                "centroid": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "perimeter": round(2 * (size_x + size_y), 4),
+                "thickness": min(size_x, size_y, size_z),
+                "topology": {"faces": len(solid.Faces()), "edges": len(solid.Edges()), "vertices": len(solid.Vertices())},
+                "holes": [],
+                "complexity": {"score": 50, "tier": "Simple", "faces": len(solid.Faces()), "edges": len(solid.Edges()), "holes": 0},
+            }
+        except Exception as cq_err:
+            raise RuntimeError(f"B-Rep analysis failed: {b3d_err} | {cq_err}")
 
 # ── STATIC ASSETS (For Production/Render) ────────────────────────────────────
 # We serve the compiled React SPA from the "dist" folder.
