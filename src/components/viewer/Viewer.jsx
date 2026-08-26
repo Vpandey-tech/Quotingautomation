@@ -304,7 +304,7 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
     }, [activePart, loadCadFromSession, status, file, pdfUrl]);
 
     return (
-        <div className="w-full h-full relative bg-[#080c14]" {...getRootProps()}>
+        <div className="w-full h-full relative bg-[#f1f5f9]" {...getRootProps()}>
             <input {...getInputProps()} />
 
             {/* ── 3D Canvas — only for STEP files ────────────────────────── */}
@@ -313,7 +313,7 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
                     className="absolute inset-0"
                     camera={{ fov: 45, near: 0.01, far: 1e7 }}
                     gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
-                    style={{ background: 'linear-gradient(135deg, #080c14 0%, #0d1a2e 100%)' }}
+                    style={{ background: '#f1f5f9' }}
                     shadows
                 >
                     <Suspense fallback={null}>
@@ -325,37 +325,37 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
             {/* ── On-Screen Metrics HUD ──────────────────────────────── */}
             {status === 'loaded' && viewerMetrics && (
                 <div className="absolute bottom-4 right-4 z-20 pointer-events-none">
-                    <div className="bg-gray-900/85 backdrop-blur-md rounded-xl border border-gray-700/50
-                        px-3 py-2.5 shadow-xl" style={{ minWidth: 175 }}>
-                        <p className="text-[9px] text-gray-500 uppercase tracking-widest font-bold mb-1.5
+                    <div className="bg-white/95 backdrop-blur-md rounded-xl border border-slate-200/90
+                        px-3.5 py-2.5 shadow-lg" style={{ minWidth: 175 }}>
+                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1.5
                             flex items-center gap-1">
                             <span>📐</span> Model Dimensions
                         </p>
                         <div className="space-y-0.5 text-[11px] font-mono">
                             <div className="flex justify-between gap-6">
-                                <span className="text-red-400 font-bold">X</span>
-                                <span className="text-gray-100">{viewerMetrics.sizeX} <span className="text-gray-500 text-[9px]">mm</span></span>
+                                <span className="text-red-500 font-bold">X</span>
+                                <span className="text-slate-800 font-semibold">{viewerMetrics.sizeX} <span className="text-slate-400 text-[9px]">mm</span></span>
                             </div>
                             <div className="flex justify-between gap-6">
-                                <span className="text-green-400 font-bold">Y</span>
-                                <span className="text-gray-100">{viewerMetrics.sizeY} <span className="text-gray-500 text-[9px]">mm</span></span>
+                                <span className="text-emerald-600 font-bold">Y</span>
+                                <span className="text-slate-800 font-semibold">{viewerMetrics.sizeY} <span className="text-slate-400 text-[9px]">mm</span></span>
                             </div>
                             <div className="flex justify-between gap-6">
-                                <span className="text-blue-400 font-bold">Z</span>
-                                <span className="text-gray-100">{viewerMetrics.sizeZ} <span className="text-gray-500 text-[9px]">mm</span></span>
+                                <span className="text-accu-600 font-bold">Z</span>
+                                <span className="text-slate-800 font-semibold">{viewerMetrics.sizeZ} <span className="text-slate-400 text-[9px]">mm</span></span>
                             </div>
                         </div>
-                        <div className="border-t border-gray-700/40 mt-1.5 pt-1.5 space-y-0.5 text-[10px]">
+                        <div className="border-t border-slate-100 mt-1.5 pt-1.5 space-y-0.5 text-[10px]">
                             <div className="flex justify-between gap-4">
-                                <span className="text-gray-500">Volume</span>
-                                <span className="text-cyan-300 font-semibold">
-                                    {Number(viewerMetrics.volume).toLocaleString()} <span className="text-gray-500 text-[8px]">mm³</span>
+                                <span className="text-slate-500">Volume</span>
+                                <span className="text-accu-700 font-bold font-mono">
+                                    {Number(viewerMetrics.volume).toLocaleString()} <span className="text-slate-400 text-[8px]">mm³</span>
                                 </span>
                             </div>
                             <div className="flex justify-between gap-4">
-                                <span className="text-gray-500">Surface</span>
-                                <span className="text-cyan-300 font-semibold">
-                                    {Number(viewerMetrics.surfaceArea).toLocaleString()} <span className="text-gray-500 text-[8px]">mm²</span>
+                                <span className="text-slate-500">Surface</span>
+                                <span className="text-accu-700 font-bold font-mono">
+                                    {Number(viewerMetrics.surfaceArea).toLocaleString()} <span className="text-slate-400 text-[8px]">mm²</span>
                                 </span>
                             </div>
                         </div>
@@ -365,8 +365,7 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
 
             {/* ── PDF PREVIEW — shows the actual PDF inline ──────────────── */}
             {(status === 'pdf_loaded' || (status === 'loading' && fileType === 'pdf')) && pdfUrl && (
-                <div className="absolute inset-0 z-10 flex flex-col"
-                    style={{ background: '#1a1a2e' }}>
+                <div className="absolute inset-0 z-10 flex flex-col bg-slate-100">
 
                     {/* PDF embedded viewer */}
                     <div className="flex-1 relative">
@@ -378,28 +377,27 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
                         />
                     </div>
 
-
                     {/* Status bar at bottom */}
                     {status === 'loading' && (
                         <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
                             <div className="mx-4 mb-4 px-4 py-3 rounded-xl flex items-center gap-3
-                                bg-gray-900/90 backdrop-blur-xl border border-cyan-500/30
-                                shadow-[0_0_25px_rgba(34,211,238,0.15)]">
-                                <Loader2 size={16} className="text-cyan-400 animate-spin flex-shrink-0" />
+                                bg-white/95 backdrop-blur-xl border border-accu-300
+                                shadow-lg">
+                                <Loader2 size={16} className="text-accu-600 animate-spin flex-shrink-0" />
                                 <div className="flex-1">
-                                    <p className="text-[11px] text-cyan-300 font-bold">
+                                    <p className="text-[11px] text-accu-700 font-bold">
                                         {isAddingPart ? 'Adding Part with ACCU AI…' : 'Analyzing with ACCU AI…'}
                                     </p>
-                                    <p className="text-[9px] text-gray-500 font-mono">
+                                    <p className="text-[9px] text-slate-500 font-mono">
                                         Extracting dimensions, materials, tolerances & client info
                                     </p>
                                 </div>
                                 <div className="flex gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce"
+                                    <span className="w-1.5 h-1.5 rounded-full bg-accu-500 animate-bounce"
                                         style={{ animationDelay: '0ms' }} />
-                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce"
+                                    <span className="w-1.5 h-1.5 rounded-full bg-accu-500 animate-bounce"
                                         style={{ animationDelay: '150ms' }} />
-                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce"
+                                    <span className="w-1.5 h-1.5 rounded-full bg-accu-500 animate-bounce"
                                         style={{ animationDelay: '300ms' }} />
                                 </div>
                             </div>
@@ -409,11 +407,10 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
                     {(status === 'pdf_loaded' && showPdfToast) && (
                         <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none fade-out-animation transition-opacity duration-500">
                             <div className="mx-4 mb-4 px-4 py-2.5 rounded-xl flex items-center gap-3
-                                bg-gray-900/90 backdrop-blur-xl border border-green-500/30
-                                shadow-[0_0_20px_rgba(74,222,128,0.1)]">
-                                <span className="w-2.5 h-2.5 rounded-full bg-green-400 flex-shrink-0"
-                                    style={{ boxShadow: '0 0 8px rgba(74,222,128,0.8)' }} />
-                                <p className="text-[10px] text-green-300 font-mono font-bold">
+                                bg-white/95 backdrop-blur-xl border border-emerald-300
+                                shadow-lg">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0 shadow-sm" />
+                                <p className="text-[10px] text-emerald-700 font-mono font-bold">
                                     {isAddingPart
                                         ? '✓ Part added — Check Quote tab for combined costing'
                                         : '✓ PDF analyzed — Dimensions extracted — Check Details & Quote tabs'}
@@ -429,89 +426,89 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
                 <div
                     className={`absolute inset-0 z-10 flex flex-col items-center justify-center
                         cursor-pointer transition-all duration-300
-                        ${isDragActive ? 'bg-cyan-500/5' : 'bg-transparent'}`}
+                        ${isDragActive ? 'bg-accu-50/70' : 'bg-transparent'}`}
                     onClick={open}
                 >
                     {/* Animated ring */}
                     <div className={`relative w-40 h-40 mb-8 rounded-full border-2 flex items-center justify-center
-                        transition-all duration-300
+                        transition-all duration-300 bg-white
                         ${isDragActive
-                            ? 'border-cyan-400 shadow-[0_0_60px_rgba(0,212,255,0.2)] scale-110'
-                            : 'border-gray-700/60 hover:border-gray-500/80 hover:scale-105'}`}
+                            ? 'border-accu-500 shadow-xl scale-110'
+                            : 'border-slate-300 hover:border-accu-500 hover:scale-105 hover:shadow-lg'}`}
                     >
                         {isDragActive && (
                             <>
-                                <div className="absolute inset-0 rounded-full border-2 border-cyan-400 animate-ping opacity-30" />
-                                <div className="absolute inset-[-8px] rounded-full border border-cyan-400/20 animate-pulse" />
+                                <div className="absolute inset-0 rounded-full border-2 border-accu-400 animate-ping opacity-30" />
+                                <div className="absolute inset-[-8px] rounded-full border border-accu-400/30 animate-pulse" />
                             </>
                         )}
                         <Box
                             size={52}
-                            className={`transition-colors duration-300 ${isDragActive ? 'text-cyan-400' : 'text-gray-500'}`}
-                            strokeWidth={1.2}
+                            className={`transition-colors duration-300 ${isDragActive ? 'text-accu-600' : 'text-accu-500'}`}
+                            strokeWidth={1.4}
                         />
                     </div>
 
-                    <h2 className="text-2xl font-semibold text-gray-100 mb-2 tracking-tight">
-                        {isDragActive ? 'Release to load' : 'Drop your file here'}
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2 tracking-tight font-heading">
+                        {isDragActive ? 'Release to load' : 'Drop your CAD or Drawing file'}
                     </h2>
-                    <p className="text-gray-500 text-sm mb-1">.STEP · .STP · .PDF</p>
-                    <p className="text-gray-600 text-xs mb-6">CAD models or PDF engineering drawings</p>
+                    <p className="text-accu-600 font-mono text-sm mb-1 font-bold">.STEP · .STP · .PDF</p>
+                    <p className="text-slate-500 text-xs mb-6">Precision CAD models or 2D engineering drawings</p>
 
                     <button
-                        className="px-6 py-2.5 rounded-xl bg-gray-800/70 border border-gray-700/80
-                            text-gray-300 hover:bg-gray-700/80 hover:text-white hover:border-gray-600
-                            transition-all duration-200 text-sm font-medium backdrop-blur-sm"
+                        className="px-7 py-3 rounded-xl bg-white border border-slate-300
+                            text-slate-800 hover:bg-accu-600 hover:text-white hover:border-accu-600
+                            transition-all duration-200 text-sm font-semibold shadow-sm hover:shadow-md"
                     >
-                        Browse files
+                        Browse Files
                     </button>
                 </div>
             )}
 
-            {/* ── LOADING overlay (STEP only — PDF shows the PDF while loading) */}
+            {/* ── LOADING overlay ────────────────────────────────────────── */}
             {status === 'loading' && fileType !== 'pdf' && (
                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center
-                    bg-[#080c14]/90 backdrop-blur-sm">
+                    bg-white/95 backdrop-blur-sm">
                     <div className="relative mb-6">
-                        <Loader2 size={48} className="text-cyan-400 animate-spin" />
-                        <div className="absolute inset-0 rounded-full bg-cyan-400/10 animate-pulse" />
+                        <Loader2 size={48} className="text-accu-600 animate-spin" />
+                        <div className="absolute inset-0 rounded-full bg-accu-100 animate-pulse" />
                     </div>
-                    <p className="text-gray-100 font-semibold text-lg mb-1">
-                        {isAddingPart ? 'Adding part geometry' : 'Parsing geometry'}
+                    <p className="text-slate-900 font-bold text-lg mb-1 font-heading">
+                        {isAddingPart ? 'Adding part geometry' : 'Parsing CAD geometry'}
                     </p>
-                    <p className="text-gray-400 text-sm mb-1">{file?.name}</p>
-                    <p className="text-gray-600 text-xs">Running OCCT WebAssembly engine…</p>
+                    <p className="text-accu-600 text-sm mb-1 font-mono font-bold">{file?.name}</p>
+                    <p className="text-slate-500 text-xs">Running OCCT WebAssembly CAD kernel…</p>
                 </div>
             )}
 
             {/* ── ERROR overlay ──────────────────────────────────────────── */}
             {status === 'error' && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#080c14]/95">
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/95">
                     <div className="flex flex-col items-center gap-4 p-8 rounded-2xl
-                        bg-red-950/25 border border-red-900/40 max-w-sm mx-4 text-center
-                        backdrop-blur-md shadow-2xl">
-                        <div className="w-16 h-16 rounded-full bg-red-900/20 flex items-center justify-center">
-                            <AlertCircle size={36} className="text-red-400" />
+                        bg-red-50 border border-red-200 max-w-sm mx-4 text-center
+                        shadow-xl">
+                        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+                            <AlertCircle size={36} className="text-red-500" />
                         </div>
                         <div>
-                            <p className="text-red-300 font-bold text-xl mb-2">
+                            <p className="text-red-800 font-bold text-xl mb-2 font-heading">
                                 {fileType === 'pdf' ? 'PDF Analysis Failed' : 'Import Failed'}
                             </p>
-                            <p className="text-red-400/80 text-sm leading-relaxed">{errorMsg}</p>
+                            <p className="text-red-600 text-sm leading-relaxed">{errorMsg}</p>
                         </div>
                         {activePart?.metrics?.designSession ? (
                             <button
                                 onClick={() => loadCadFromSession(activePart.metrics.designSession, activePart.fileName)}
-                                className="mt-1 px-6 py-2.5 rounded-xl bg-cyan-900/40 border border-cyan-500/50
-                                    text-cyan-300 hover:bg-cyan-800/60 hover:text-white transition-all text-sm font-semibold"
+                                className="mt-1 px-6 py-2.5 rounded-xl bg-accu-50 border border-accu-300
+                                    text-accu-700 hover:bg-accu-600 hover:text-white transition-all text-sm font-semibold"
                             >
                                 Reload from Server
                             </button>
                         ) : (
                             <button
                                 onClick={open}
-                                className="mt-1 px-6 py-2.5 rounded-xl bg-gray-800 border border-gray-700
-                                    text-gray-300 hover:bg-gray-700 hover:text-white transition-all text-sm font-medium"
+                                className="mt-1 px-6 py-2.5 rounded-xl bg-white border border-slate-300
+                                    text-slate-700 hover:bg-slate-50 transition-all text-sm font-medium shadow-sm"
                             >
                                 Try another file
                             </button>
@@ -524,37 +521,36 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
             {(status === 'loaded' || status === 'loading' || status === 'pdf_loaded') && file && (
                 <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between
                     px-4 py-3 pointer-events-none">
-                    <div className="bg-gray-900/80 backdrop-blur-md px-3 py-2 rounded-xl border border-gray-700/60
-                        text-gray-300 text-sm font-mono truncate max-w-[50%] flex items-center gap-2 pointer-events-auto
-                        shadow-lg">
-                        <span className="text-cyan-400 flex-shrink-0">
+                    <div className="bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-200
+                        text-slate-800 text-sm font-mono truncate max-w-[50%] flex items-center gap-2 pointer-events-auto
+                        shadow-sm">
+                        <span className="text-accu-600 flex-shrink-0">
                             {fileType === 'pdf' ? '📄' : '📐'}
                         </span>
-                        <span className="truncate">{file.name}</span>
-                        <span className="text-gray-500 text-xs flex-shrink-0">
+                        <span className="truncate font-semibold">{file.name}</span>
+                        <span className="text-slate-400 text-xs flex-shrink-0">
                             ({(file.size / 1024).toFixed(0)} KB)
                         </span>
                     </div>
                     <div className="flex items-center gap-2 pointer-events-auto">
-                        {/* Add Part button — green accent, clearly distinct from New File */}
+                        {/* Add Part button — AccuDesign orange accent */}
                         <button
                             onClick={(e) => { e.stopPropagation(); handleAddPart(); }}
-                            className="flex items-center gap-1.5 bg-emerald-900/80 backdrop-blur-md px-3 py-2 rounded-xl
-                                border border-emerald-500/40 text-emerald-300 hover:text-white hover:bg-emerald-800/90
-                                hover:border-emerald-400/60 transition-all text-sm shadow-lg
-                                hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                            className="flex items-center gap-1.5 bg-accuorange-500 px-3.5 py-2 rounded-xl
+                                text-white hover:bg-accuorange-600
+                                transition-all text-sm shadow-md"
                             title="Add another part to this quotation (same quote PDF)"
                         >
                             <PlusCircle size={14} />
                             <span className="font-semibold">Add Part</span>
                         </button>
 
-                        {/* New File button — resets everything */}
+                        {/* New File button */}
                         <button
                             onClick={handleReset}
-                            className="flex items-center gap-1.5 bg-gray-900/80 backdrop-blur-md px-3 py-2 rounded-xl
-                                border border-gray-700/60 text-gray-400 hover:text-white hover:bg-gray-800/90
-                                transition-all text-sm pointer-events-auto shadow-lg"
+                            className="flex items-center gap-1.5 bg-white backdrop-blur-md px-3.5 py-2 rounded-xl
+                                border border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-50
+                                transition-all text-sm pointer-events-auto shadow-sm"
                             title="Start a fresh quotation (clears all parts)"
                         >
                             <RotateCcw size={13} />
@@ -567,9 +563,9 @@ export default function Viewer({ onMetrics, onAddPart, hasExistingParts = false,
             {/* ── Drag-over replace overlay ──────────────────────────────── */}
             {(status === 'loaded' || status === 'pdf_loaded') && isDragActive && (
                 <div className="absolute inset-0 z-40 flex items-center justify-center
-                    bg-cyan-900/15 border-2 border-cyan-400/60 border-dashed rounded-xl m-2 pointer-events-none
-                    backdrop-blur-sm">
-                    <p className="text-cyan-300 text-lg font-semibold">Release to replace</p>
+                    bg-accu-50/80 border-2 border-accu-500 border-dashed rounded-xl m-2 pointer-events-none
+                    backdrop-blur-sm shadow-xl">
+                    <p className="text-accu-800 text-lg font-bold font-heading">Release to replace geometry</p>
                 </div>
             )}
         </div>

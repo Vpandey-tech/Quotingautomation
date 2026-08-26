@@ -11,14 +11,15 @@ import {
 /* ─── Metric row ─────────────────────────────────────────────────────────── */
 function MetricRow({ label, value, highlight }) {
   return (
-    <div className="flex items-center justify-between py-[7px]
-      border-b border-white/[0.035] last:border-0 px-1 rounded-md
-      hover:bg-white/[0.025] transition-colors duration-150 group">
-      <span className="text-[11px] text-gray-500 font-medium tracking-wide group-hover:text-gray-400 transition-colors">
+    <div className="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0 px-1.5 rounded-lg hover:bg-slate-50 transition-colors duration-150 group">
+      <span className="text-[11px] text-slate-600 font-semibold tracking-wide group-hover:text-slate-900 transition-colors">
         {label}
       </span>
-      <span className={`font-mono text-[11px] font-semibold tracking-wider
-        ${highlight ? 'text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.5)]' : 'text-gray-200'}`}>
+      <span className={`font-mono text-[11px] tracking-wider font-bold ${
+        highlight 
+          ? 'text-accu-600 font-extrabold' 
+          : 'text-slate-800 font-bold'
+      }`}>
         {value}
       </span>
     </div>
@@ -28,24 +29,17 @@ function MetricRow({ label, value, highlight }) {
 /* ─── Section card ───────────────────────────────────────────────────────── */
 function SectionCard({ icon: Icon, title, children, accent }) {
   return (
-    <div className="rounded-xl overflow-hidden transition-all duration-200
-      hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)] group"
-      style={{
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
-        border: '1px solid rgba(255,255,255,0.06)',
-      }}>
-      <div className="flex items-center gap-2 px-3.5 py-2.5
-        border-b border-white/[0.05]"
-        style={{ background: 'rgba(0,0,0,0.2)' }}>
-        <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-          style={{ background: accent || 'rgba(34,211,238,0.1)' }}>
-          <Icon size={11} className="text-cyan-400" />
+    <div className="rounded-2xl overflow-hidden transition-all duration-200 bg-white border border-slate-200 shadow-sm hover:shadow-md hover:border-accu-300 group">
+      <div className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-100">
+        <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 bg-accu-50 text-accu-600 border border-accu-200"
+          style={accent ? { background: accent } : undefined}>
+          <Icon size={12} className="text-accu-600" />
         </div>
-        <h2 className="text-[10px] font-bold text-gray-300 uppercase tracking-[0.12em]">
+        <h2 className="text-[10.5px] font-bold text-slate-900 uppercase tracking-[0.12em] font-heading">
           {title}
         </h2>
       </div>
-      <div className="px-3.5 py-2">{children}</div>
+      <div className="px-3.5 py-2.5 bg-white text-slate-800">{children}</div>
     </div>
   );
 }
@@ -55,24 +49,20 @@ function Tab({ active, onClick, icon: Icon, label, badge }) {
   return (
     <button
       onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-[10px]
-        font-bold uppercase tracking-[0.12em] transition-all duration-200 relative
+      className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-[10.5px]
+        font-bold uppercase tracking-[0.12em] transition-all duration-200 relative cursor-pointer
         ${active
-          ? 'text-cyan-300'
-          : 'text-gray-600 hover:text-gray-400 hover:bg-white/[0.02]'
+          ? 'text-accu-600 font-extrabold bg-white shadow-xs border-b-2 border-accu-600'
+          : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/60 font-semibold'
         }`}
     >
-      <Icon size={12} className={active ? 'drop-shadow-[0_0_4px_rgba(34,211,238,0.6)]' : ''} />
+      <Icon size={13} className={active ? 'text-accu-600' : 'text-slate-400'} />
       {label}
       {badge > 0 && (
-        <span className="ml-1 w-4 h-4 rounded-full bg-emerald-500/80 text-white text-[8px] font-bold
-          flex items-center justify-center leading-none shadow-[0_0_6px_rgba(16,185,129,0.5)]">
+        <span className="ml-1 px-1.5 py-0.5 rounded-full bg-accuorange-500 text-white text-[8.5px] font-bold
+          flex items-center justify-center leading-none shadow-xs">
           {badge}
         </span>
-      )}
-      {active && (
-        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[2px] rounded-full"
-          style={{ background: 'linear-gradient(90deg, transparent, #22d3ee, transparent)' }} />
       )}
     </button>
   );
@@ -461,96 +451,100 @@ export default function App() {
     setBrepStatus(part.brepStatus || 'idle');
   };
 
-  // ── Remove a specific part ──
-  const handleRemovePart = (partId) => {
+  // ── Remove a part from multi-part list ──
+  const handleRemovePart = useCallback((partId) => {
     setParts(prev => {
-      const updated = prev.filter(p => p.id !== partId);
-      // If no parts left, reset everything
-      if (updated.length === 0) {
-        setMetrics(null);
-        setGeometry(null);
-        setBrepStatus('idle');
-        setActivePartId(null);
-        return [];
+      const remaining = prev.filter(x => x.id !== partId);
+      if (activePartId === partId) {
+        const next = remaining[remaining.length - 1];
+        if (next) {
+          setActivePartId(next.id);
+          setMetrics(next.metrics || null);
+          setGeometry(next.geometry || null);
+          setBrepStatus(next.brepStatus || 'idle');
+        } else {
+          setActivePartId(null);
+          setMetrics(null);
+          setGeometry(null);
+          setBrepStatus('idle');
+        }
       }
-      
-      // If we removed the currently active part, fallback to the last part
-      if (partId === activePartId) {
-        const last = updated[updated.length - 1];
-        setActivePartId(last.id);
-        setMetrics(last.metrics);
-        setGeometry(last.geometry);
-        setBrepStatus(last.brepStatus || 'idle');
-      }
-      return updated;
+      return remaining;
     });
-  };
+  }, [activePartId]);
+
+
 
   const handleSendChat = async (e) => {
     e.preventDefault();
     if (!chatInput.trim() || isAiTyping) return;
-    
-    const newMsgs = [...chatMessages, { role: 'user', text: chatInput }];
-    setChatMessages(newMsgs);
+
+    const userText = chatInput.trim();
     setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', text: userText }]);
     setIsAiTyping(true);
-    
+
     try {
-        const resp = await fetch('/api/chat', {
+        const activePart = parts.find(p => p.id === activePartId);
+        const res = await fetch('http://127.0.0.1:8000/api/analyze/chat', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ message: chatInput, metrics: metrics })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: userText,
+                context: activePart?.metrics?.extracted || metrics?.extracted || {},
+                chat_history: chatMessages
+            })
         });
-        const data = await resp.json();
-        
-        if (data.metrics) {
-            setMetrics(data.metrics);
+
+        if (res.ok) {
+            const data = await res.json();
+            setChatMessages(prev => [...prev, { role: 'assistant', text: data.reply }]);
+            if (data.updated_parameters) {
+                // If AI suggested changing properties, update current geometry/metrics
+                const newExtracted = { ...(activePart?.metrics?.extracted || {}), ...data.updated_parameters };
+                if (activePart) {
+                    handleUpdatePartData(activePart.id, {
+                        metrics: { ...activePart.metrics, extracted: newExtracted }
+                    });
+                }
+            }
+        } else {
+            setChatMessages(prev => [...prev, { role: 'assistant', text: 'Sorry, I could not process that request with ACCU AI.' }]);
         }
-        
-        setChatMessages([...newMsgs, { 
-            role: 'assistant', 
-            text: data.response || "Updated."
-        }]);
     } catch (err) {
-        setChatMessages([...newMsgs, { 
-            role: 'assistant', 
-            text: "Network error trying to reach ACCU AI." 
-        }]);
+        setChatMessages(prev => [...prev, { role: 'assistant', text: 'Error communicating with ACCU AI service.' }]);
     } finally {
         setIsAiTyping(false);
     }
   };
 
   return (
-    <div className="h-screen bg-[#080c14] text-white flex flex-col font-sans overflow-hidden">
+    <div className="h-screen bg-[#f8fafc] text-slate-800 flex flex-col font-sans overflow-hidden">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="h-14 px-5 flex items-center justify-between flex-shrink-0 z-50"
-        style={{
-          background: 'rgba(8,12,20,0.95)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          backdropFilter: 'blur(24px)',
-        }}>
+      <header className="h-14 px-5 flex items-center justify-between flex-shrink-0 z-50 bg-white border-b border-slate-200 shadow-sm">
         {/* Logo */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{
-              background: 'linear-gradient(135deg, #22d3ee, #3b82f6, #6366f1)',
-              boxShadow: '0 0 16px rgba(34,211,238,0.35)',
-            }}>
-            <Box size={16} className="text-white" strokeWidth={2.5} />
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-slate-50 border border-slate-200 shadow-sm">
+            <img 
+              src="https://res.cloudinary.com/dxrryep5y/image/upload/v1753295781/website_static_media/ad_logo.svg" 
+              alt="AccuDesign" 
+              className="w-6 h-6 object-contain"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
+            />
+            <div style={{ display: 'none' }}>
+              <Box size={18} className="text-accu-500" strokeWidth={2.5} />
+            </div>
           </div>
           <div>
-            <h1 className="text-[15px] font-black tracking-tight leading-none"
-              style={{
-                background: 'linear-gradient(90deg, #fff 0%, #e0f7fa 40%, #22d3ee 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}>
-              AccuDesign
+            <h1 className="text-[16px] font-black tracking-tight leading-none text-slate-900 font-heading">
+              ACCU DESIGN
             </h1>
-            <p className="text-[9px] text-gray-600 tracking-wider font-medium leading-none mt-0.5">
-              MANUFACTURING QUOTES
+            <p className="text-[9px] text-accu-600 tracking-widest font-bold leading-none mt-1">
+              PRECISION MANUFACTURING &amp; QUOTING
             </p>
           </div>
         </div>
@@ -559,91 +553,57 @@ export default function App() {
         <div className="flex items-center gap-2">
           {/* Parts count badge */}
           {parts.length > 1 && (
-            <span className="text-[10px] font-mono font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5"
-              style={{
-                background: 'rgba(16,185,129,0.08)',
-                border: '1px solid rgba(16,185,129,0.25)',
-                color: '#6ee7b7',
-              }}>
+            <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 bg-accuorange-50 border border-accuorange-200 text-accuorange-600 shadow-sm">
               <Layers size={10} />
               {parts.length} Parts
             </span>
           )}
           {metrics && (
-            <span className="text-[10px] font-mono font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5"
-              style={{
-                background: 'rgba(74,222,128,0.08)',
-                border: '1px solid rgba(74,222,128,0.25)',
-                color: '#86efac',
-              }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block animate-pulse"
-                style={{ boxShadow: '0 0 6px rgba(74,222,128,0.8)' }} />
+            <span className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 bg-accu-50 border border-accu-200 text-accu-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-accu-500 inline-block animate-pulse" />
               Geometry Ready
             </span>
           )}
           {brepStatus === 'loading' && (
-            <span className="text-[10px] font-mono font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5"
-              style={{
-                background: 'rgba(96,165,250,0.08)',
-                border: '1px solid rgba(96,165,250,0.25)',
-                color: '#93c5fd',
-              }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block animate-ping" />
+            <span className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 bg-sky-50 border border-sky-200 text-sky-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-accu-500 inline-block animate-ping" />
               Analyzing…
             </span>
           )}
           {brepStatus === 'ready' && (
-            <span className="text-[10px] font-mono font-medium px-2.5 py-1 rounded-full"
-              style={{
-                background: 'rgba(34,211,238,0.08)',
-                border: '1px solid rgba(34,211,238,0.2)',
-                color: '#67e8f9',
-              }}>
+            <span className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">
               ✓ B-Rep Ready
             </span>
           )}
           {brepStatus === 'offline' && (
-            <span className="text-[10px] font-mono font-medium px-2.5 py-1 rounded-full flex items-center gap-1"
-              style={{
-                background: 'rgba(251,191,36,0.08)',
-                border: '1px solid rgba(251,191,36,0.2)',
-                color: '#fcd34d',
-              }}>
+            <span className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-700">
               ◐ Mesh Only
             </span>
           )}
           {brepStatus === 'pdf' && (
-            <span className="text-[10px] font-mono font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5"
-              style={{
-                background: 'rgba(168,85,247,0.08)',
-                border: '1px solid rgba(168,85,247,0.25)',
-                color: '#c084fc',
-              }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block animate-pulse"
-                style={{ boxShadow: '0 0 6px rgba(168,85,247,0.8)' }} />
+            <span className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 bg-accuorange-50 border border-accuorange-200 text-accuorange-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-accuorange-500 inline-block animate-pulse" />
               AI Analyzed
             </span>
           )}
-          <span className="text-[10px] text-gray-600 font-mono px-2.5 py-1 rounded-full"
-            style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
+          <span className="text-[10px] text-slate-500 font-mono px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 font-medium">
             v0.5.0
           </span>
         </div>
       </header>
 
       {/* ── Main layout ──────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden bg-[#f8fafc]">
 
         {/* ── Sidebar ────────────────────────────────────────────────────────── */}
         <aside
-          className="flex-shrink-0 flex flex-col z-40 sidebar-bg"
+          className="flex-shrink-0 flex flex-col z-40 bg-white border-r border-slate-200 shadow-sm"
           style={tab === 'admin' ? { width: '100%' } : { width: sidebarWidth, minWidth: 280, maxWidth: '75vw' }}
           onMouseEnter={handleSidebarEnter}
           onMouseLeave={handleSidebarLeave}
         >
           {/* Tab bar */}
-          <div className="flex flex-shrink-0"
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.3)' }}>
+          <div className="flex flex-shrink-0 bg-slate-50 border-b border-slate-200">
             <Tab active={tab === 'details'} onClick={() => setTab('details')}
               icon={Layers} label="Details" />
             <Tab active={tab === 'quote'} onClick={() => setTab('quote')}
@@ -661,21 +621,21 @@ export default function App() {
                 <SectionCard icon={FileText} title="File">
                   {metrics ? (
                     <div className="py-1.5">
-                      <p className="text-[11px] text-cyan-300 font-mono truncate font-medium leading-tight"
+                      <p className="text-[11px] text-accu-700 font-mono truncate font-semibold leading-tight"
                         title={metrics.fileName}>{metrics.fileName}</p>
-                      <p className="text-[10px] text-gray-600 mt-0.5 font-mono">
+                      <p className="text-[10px] text-slate-500 mt-0.5 font-mono">
                         {(metrics.fileSize / 1024).toFixed(1)} KB · STEP / ISO 10303
                       </p>
                       {parts.length > 1 && (
-                        <p className="text-[9px] text-emerald-400/80 font-mono mt-1 flex items-center gap-1">
+                        <p className="text-[9px] text-emerald-600 font-mono mt-1 flex items-center gap-1 font-bold">
                           <Layers size={9} /> {parts.length} parts in this quotation
                         </p>
                       )}
                     </div>
                   ) : (
                     <div className="py-3 flex flex-col items-center gap-1.5">
-                      <ChevronRight size={14} className="text-gray-700 rotate-90" />
-                      <p className="text-[10px] text-gray-700 text-center leading-relaxed">
+                      <ChevronRight size={14} className="text-slate-400 rotate-90" />
+                      <p className="text-[10px] text-slate-500 text-center leading-relaxed">
                         Drop a .STEP file<br />in the viewer →
                       </p>
                     </div>
@@ -684,32 +644,32 @@ export default function App() {
 
                 {/* Parts list (when multiple) */}
                 {parts.length > 1 && (
-                  <SectionCard icon={Layers} title={`Parts (${parts.length})`} accent="rgba(16,185,129,0.1)">
+                  <SectionCard icon={Layers} title={`Parts (${parts.length})`} accent="rgba(36,121,194,0.15)">
                     <div className="space-y-1.5">
                       {parts.map((part, idx) => {
                         const isActive = part.id === activePartId;
                         return (
                           <div key={part.id}
                             onClick={() => handleSelectPart(part.id)}
-                            className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg
+                            className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg
                               border cursor-pointer transition-all duration-200
                               ${isActive 
-                                ? 'bg-emerald-900/40 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.1)]' 
-                                : 'bg-white/[0.03] border-white/[0.05] hover:border-emerald-500/30 hover:bg-white/[0.06]'}`}
+                                ? 'bg-accu-50 border-accu-400 shadow-sm' 
+                                : 'bg-slate-50 border-slate-200 hover:border-accu-300 hover:bg-slate-100'}`}
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <span className={`w-5 h-5 rounded-md text-[9px] font-bold flex items-center justify-center flex-shrink-0
-                                ${isActive ? 'bg-emerald-500/90 text-white shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                                ${isActive ? 'bg-accu-500 text-white shadow-sm' : 'bg-slate-200 text-slate-700'}`}>
                                 {idx + 1}
                               </span>
                               <span className={`text-[10px] font-mono truncate transition-colors
-                                ${isActive ? 'text-emerald-100 font-bold' : 'text-gray-300'}`}>
+                                ${isActive ? 'text-accu-900 font-bold' : 'text-slate-700'}`}>
                                 {part.fileName}
                               </span>
                             </div>
                             <button
                               onClick={(e) => { e.stopPropagation(); handleRemovePart(part.id); }}
-                              className="text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded-sm transition-all flex-shrink-0 p-1"
+                              className="text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-sm transition-all flex-shrink-0 p-1"
                               title="Remove this part"
                             >
                               <X size={12} />
@@ -748,7 +708,7 @@ export default function App() {
                       )}
                     </>
                   ) : (
-                    <p className="text-[10px] text-gray-700 py-2">Upload a file.</p>
+                    <p className="text-[10px] text-slate-500 py-2">Upload a file.</p>
                   )}
                 </SectionCard>
 
@@ -760,15 +720,15 @@ export default function App() {
 
                   if (materialEstimate && pcfg) {
                     return (
-                      <SectionCard icon={Eye} title="Material Verification" accent="rgba(16,185,129,0.1)">
+                      <SectionCard icon={Eye} title="Material Verification" accent="rgba(36,121,194,0.15)">
                         <div className="space-y-0.5 mt-1">
                           <MetricRow label="Stock" value={materialEstimate.stock_type_name || pcfg.stockType} />
                           <MetricRow label="Material" value={materialEstimate.material_name || '-'} />
                           <MetricRow label="Dims (mm)"
                             value={`${parseFloat(geometry?.boundingBox?.sizeX || 0).toFixed(1)} × ${parseFloat(geometry?.boundingBox?.sizeY || 0).toFixed(1)} × ${parseFloat(geometry?.boundingBox?.sizeZ || 0).toFixed(1)}`} />
                           
-                          <div className="mt-3 mb-1 border-t border-white/5 pt-2">
-                             <p className="text-[9px] text-emerald-400/70 uppercase tracking-[0.15em] font-bold mb-1 px-1">Envelope</p>
+                          <div className="mt-3 mb-1 border-t border-slate-100 pt-2">
+                             <p className="text-[9px] text-accu-700 uppercase tracking-[0.15em] font-bold mb-1 px-1">Envelope</p>
                              {materialEstimate.standard_diameter_mm && <MetricRow label="Std Ø" value={`${materialEstimate.standard_diameter_mm} mm`} highlight />}
                              {materialEstimate.standard_af_mm && <MetricRow label="Hex AF" value={`${materialEstimate.standard_af_mm} mm`} highlight />}
                              {materialEstimate.standard_thickness_mm && <MetricRow label="Thick." value={`${materialEstimate.standard_thickness_mm} × ${materialEstimate.standard_width_mm} mm`} highlight />}
@@ -776,8 +736,8 @@ export default function App() {
                              <MetricRow label="Vol." value={`${Number(materialEstimate.envelope_volume_mm3).toLocaleString()} mm³`} />
                           </div>
                           
-                          <div className="mt-3 border-t border-white/5 pt-2">
-                             <p className="text-[9px] text-emerald-400/70 uppercase tracking-[0.15em] font-bold mb-1 px-1">Weight & Cost</p>
+                          <div className="mt-3 border-t border-slate-100 pt-2">
+                             <p className="text-[9px] text-accu-700 uppercase tracking-[0.15em] font-bold mb-1 px-1">Weight & Cost</p>
                              <MetricRow label="Wt/Part" value={`${materialEstimate.gross_weight_per_part_kg?.toFixed(3)} kg`} highlight />
                              <MetricRow label="Batch Wt" value={`${materialEstimate.total_batch_weight_kg?.toFixed(3)} kg`} />
                              <MetricRow label="Utilization" value={`${materialEstimate.material_utilization_pct}%`} />
@@ -795,26 +755,26 @@ export default function App() {
 
                 {/* B-Rep status */}
                 {brepStatus !== 'idle' && (
-                <div className="rounded-lg px-3 py-2 text-[10px] font-mono"
+                <div className="rounded-lg px-3 py-2 text-[10px] font-mono font-semibold"
                     style={{
                       background: brepStatus === 'ready'
-                        ? 'rgba(34,211,238,0.06)'
+                        ? '#ecfdf5'
                         : brepStatus === 'loading'
-                          ? 'rgba(96,165,250,0.06)'
+                          ? '#eff6ff'
                           : brepStatus === 'pdf'
-                            ? 'rgba(168,85,247,0.06)'
-                            : 'rgba(251,191,36,0.06)',
+                            ? '#fff7ed'
+                            : '#fefce8',
                       border: `1px solid ${brepStatus === 'ready'
-                        ? 'rgba(34,211,238,0.15)'
+                        ? '#a7f3d0'
                         : brepStatus === 'loading'
-                          ? 'rgba(96,165,250,0.15)'
+                          ? '#bfdbfe'
                           : brepStatus === 'pdf'
-                            ? 'rgba(168,85,247,0.15)'
-                            : 'rgba(251,191,36,0.15)'}`,
-                      color: brepStatus === 'ready' ? '#67e8f9'
-                        : brepStatus === 'loading' ? '#93c5fd'
-                          : brepStatus === 'pdf' ? '#c084fc'
-                            : '#fcd34d',
+                            ? '#fed7aa'
+                            : '#fde68a'}`,
+                      color: brepStatus === 'ready' ? '#047857'
+                        : brepStatus === 'loading' ? '#1d4ed8'
+                          : brepStatus === 'pdf' ? '#c2410c'
+                            : '#b45309',
                     }}>
                     {brepStatus === 'ready' && '✓ Exact B-Rep analysis complete'}
                     {brepStatus === 'loading' && '⟳ Running CadQuery B-Rep analysis…'}
@@ -825,21 +785,21 @@ export default function App() {
                 
                 {/* ── ACCU AI Chat Interface ── */}
                 {brepStatus === 'pdf' && (
-                  <SectionCard icon={MessageSquare} title="ACCU AI Copilot" accent="rgba(168,85,247,0.1)">
+                  <SectionCard icon={MessageSquare} title="ACCU AI Copilot" accent="rgba(36,121,194,0.15)">
                     <div className="flex flex-col h-[280px]">
                       <div className="flex-1 overflow-y-auto pr-1 space-y-2 mb-2 custom-scrollbar">
                         {chatMessages.length === 0 ? (
-                           <p className="text-[10px] text-gray-500 italic text-center mt-4">Upload a PDF to start chat.</p>
+                           <p className="text-[10px] text-slate-400 italic text-center mt-4">Upload a PDF drawing to start AI chat.</p>
                         ) : (
                           chatMessages.map((msg, i) => (
                             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                               <div className={`text-[10px] rounded-lg px-2.5 py-1.5 max-w-[85%] leading-relaxed ${
                                 msg.role === 'user' 
-                                  ? 'bg-cyan-600/30 border border-cyan-500/20 text-cyan-100' 
-                                  : 'bg-purple-500/10 border border-purple-500/20 text-gray-300'
+                                  ? 'bg-accu-600 text-white shadow-sm' 
+                                  : 'bg-slate-100 border border-slate-200 text-slate-800'
                               }`}>
                                 {msg.role === 'assistant' && (
-                                    <span className="font-bold text-purple-400 block mb-0.5 text-[9px] uppercase tracking-wider">ACCU AI</span>
+                                    <span className="font-bold text-accuorange-600 block mb-0.5 text-[9px] uppercase tracking-wider">ACCU AI</span>
                                 )}
                                 <div dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }} />
                               </div>
@@ -848,10 +808,10 @@ export default function App() {
                         )}
                         {isAiTyping && (
                             <div className="flex justify-start">
-                                <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg px-2.5 py-1.5 flex gap-1 items-center">
-                                    <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce delay-75"></span>
-                                    <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce delay-150"></span>
-                                    <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce delay-300"></span>
+                                <div className="bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5 flex gap-1 items-center">
+                                    <span className="w-1 h-1 bg-accu-500 rounded-full animate-bounce delay-75"></span>
+                                    <span className="w-1 h-1 bg-accu-500 rounded-full animate-bounce delay-150"></span>
+                                    <span className="w-1 h-1 bg-accu-500 rounded-full animate-bounce delay-300"></span>
                                 </div>
                             </div>
                         )}
@@ -862,12 +822,12 @@ export default function App() {
                           value={chatInput}
                           onChange={(e) => setChatInput(e.target.value)}
                           placeholder="Ask ACCU AI to modify interpretation..."
-                          className="w-full bg-gray-900/80 border border-gray-700/50 rounded-lg pl-3 pr-8 py-1.5 text-[10px] text-gray-200 focus:outline-none focus:border-purple-500/50 font-mono"
+                          className="w-full bg-white border border-slate-300 rounded-lg pl-3 pr-8 py-1.5 text-[10px] text-slate-800 placeholder-slate-400 focus:outline-none focus:border-accu-500 font-mono shadow-sm"
                         />
                         <button 
                           type="submit" 
                           disabled={isAiTyping || !chatInput.trim()}
-                          className="absolute right-1.5 p-1 text-gray-500 hover:text-cyan-400 disabled:opacity-50"
+                          className="absolute right-1.5 p-1 text-accu-600 hover:text-accu-700 disabled:opacity-40 transition-colors"
                         >
                           <Send size={12} />
                         </button>
@@ -898,11 +858,11 @@ export default function App() {
           </div>
 
           {/* Sidebar Footer */}
-          <div className="py-3 px-4 border-t border-white/[0.04] text-center bg-gray-950/40 flex-shrink-0 backdrop-blur-md">
-            <span className="text-[9px] text-gray-500 uppercase tracking-[0.18em] font-bold">
-              developed by{" "}
-              <span className="font-extrabold bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(34,211,238,0.15)]">
-                TechNewity Labs
+          <div className="py-3 px-4 border-t border-slate-200 text-center bg-slate-50 flex-shrink-0">
+            <span className="text-[9px] text-slate-500 uppercase tracking-[0.18em] font-semibold">
+              ACCU DESIGN AUTOMATION ·{" "}
+              <span className="font-bold text-accu-600">
+                PUNE, INDIA
               </span>
             </span>
           </div>
@@ -921,8 +881,7 @@ export default function App() {
         {tab !== 'admin' && (
           <section
             ref={viewerRef}
-            className="flex-1 relative overflow-hidden"
-            style={{ background: '#080c14' }}
+            className="flex-1 relative overflow-hidden bg-slate-100"
           >
             <Viewer
               onMetrics={handleMetrics}

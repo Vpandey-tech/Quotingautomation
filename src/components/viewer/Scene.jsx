@@ -443,8 +443,8 @@ export default function Scene({ occtResult }) {
             {/* ── Axis Orientation Gizmo (bottom-left corner) ──────── */}
             <GizmoHelper alignment="bottom-left" margin={[62, 62]}>
                 <GizmoViewport
-                    axisColors={['#f87171', '#4ade80', '#60a5fa']}
-                    labelColor="#ffffff"
+                    axisColors={['#ef4444', '#22c55e', '#3b82f6']}
+                    labelColor="#334155"
                 />
             </GizmoHelper>
 
@@ -461,7 +461,7 @@ export default function Scene({ occtResult }) {
             />
 
             {/* Grid helper */}
-            <gridHelper args={[1000, 100, '#1a2a3a', '#0d1a27']} position={[0, -0.01, 0]} />
+            <gridHelper args={[1000, 100, '#94a3b8', '#e2e8f0']} position={[0, -0.01, 0]} />
         </>
     );
 }

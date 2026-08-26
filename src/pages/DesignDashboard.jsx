@@ -141,100 +141,96 @@ export default function DesignDashboard() {
   };
 
   if (loading) return (
-    <div className="h-screen flex items-center justify-center bg-[#030712]">
+    <div className="h-screen flex items-center justify-center bg-[#f8fafc]">
       <div className="flex flex-col items-center gap-3">
-        <Loader2 size={32} className="animate-spin text-emerald-400" />
-        <span className="text-xs font-mono tracking-widest text-gray-500 uppercase">Loading secure environment...</span>
+        <Loader2 size={32} className="animate-spin text-accu-600" />
+        <span className="text-xs font-mono tracking-widest text-slate-500 uppercase font-semibold">Loading design cockpit...</span>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen text-gray-100" style={{ background: 'linear-gradient(180deg, #040814 0%, #081022 100%)', fontFamily: "'Inter', sans-serif" }}>
+    <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans">
 
       {/* ── Top Nav ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 flex items-center justify-between px-8 h-14"
-        style={{ background: 'rgba(4,8,20,0.9)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <header className="sticky top-0 z-40 flex items-center justify-between px-8 h-14 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2 text-gray-500 hover:text-gray-300 transition-colors">
+          <Link to="/" className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors">
             <Home size={13} />
-            <span className="text-[10px] font-mono tracking-wider uppercase">Workspace</span>
+            <span className="text-[10px] font-mono tracking-wider uppercase font-bold">Workspace</span>
           </Link>
-          <ChevronRight size={12} className="text-gray-700" />
+          <ChevronRight size={12} className="text-slate-400" />
           <div className="flex items-center gap-2">
-            <PenTool size={14} className="text-emerald-400" />
-            <span className="text-sm font-bold text-white tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            <div className="w-6 h-6 rounded-lg bg-accu-50 border border-accu-200 flex items-center justify-center text-accu-600">
+              <PenTool size={13} />
+            </div>
+            <span className="text-sm font-bold text-slate-900 tracking-tight font-heading">
               Design Cockpit
             </span>
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-400">
+          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-mono text-emerald-700 font-bold">
             <ShieldCheck size={12} /> SECURE AUDITED
           </div>
           <Link to="/quote"
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-mono tracking-wider uppercase text-gray-400 hover:text-white hover:bg-white/5 transition-all border border-transparent hover:border-white/10">
-            <Cog size={12} /> Quoting Engine
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-[10px] font-mono font-bold tracking-wider uppercase text-slate-700 hover:text-accu-700 hover:bg-accu-50 transition-all border border-slate-200 bg-white shadow-sm">
+            <Cog size={12} className="text-accu-600" /> Quoting Engine
           </Link>
         </div>
       </header>
 
-      <div className="px-8 py-10 max-w-7xl mx-auto space-y-10">
+      <div className="px-8 py-10 max-w-7xl mx-auto space-y-8">
 
         {/* ── Hero ─────────────────────────────────────────────────────────── */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 rounded-xl border border-gray-800 bg-gray-950/20 backdrop-blur-sm">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div>
-            <h1 className="text-2xl font-extrabold text-white tracking-tight mb-1" style={{ fontFamily: 'Outfit, sans-serif' }}>
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1 font-heading">
               ENGINEERING DESIGN COCKPIT
             </h1>
-            <p className="text-gray-400 text-xs font-mono max-w-xl">
+            <p className="text-slate-500 text-xs font-mono max-w-xl">
               Text-to-CAD pipeline powered by deterministic OpenCASCADE builders.
               1 AI call for spec extraction · 0 AI calls for geometry · Verified STEP output.
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1 font-mono text-[10px] text-gray-500">
-            <span className="flex items-center gap-1.5 text-emerald-400"><ShieldCheck size={11} /> Deterministic CAD Engine Active</span>
-            <span className="flex items-center gap-1.5"><Leaf size={11} className="text-emerald-500/80" /> AP242 STEP · ISO 2768-m · ASME B106.1M</span>
+          <div className="flex flex-col items-start md:items-end gap-1 font-mono text-[10px] text-slate-500 font-semibold">
+            <span className="flex items-center gap-1.5 text-emerald-600"><ShieldCheck size={11} /> Deterministic CAD Engine Active</span>
+            <span className="flex items-center gap-1.5"><Leaf size={11} className="text-emerald-600" /> AP242 STEP · ISO 2768-m · ASME B106.1M</span>
           </div>
         </div>
 
         {/* ── Component Catalogue ──────────────────────────────────────────── */}
         <section>
-          <h2 className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            Select Component Family to Design
-            <span className="ml-auto text-gray-700 normal-case">Direct 1-Click Entry · Conversational Specification & CAD</span>
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xs font-mono text-slate-600 uppercase tracking-widest font-bold flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-accu-500" />
+              Select Component Family to Design
+            </h2>
+            <span className="text-[11px] font-mono text-slate-400">Direct 1-Click Entry · Conversational Spec &amp; CAD</span>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
             {COMPONENTS.map(comp => (
               <button
                 key={comp.type}
                 onClick={() => handleStartSession(comp.type)}
                 disabled={creating === comp.type}
-                className="group relative rounded-xl p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(0,0,0,0.5)] disabled:opacity-50"
-                style={{
-                  background: 'linear-gradient(135deg,rgba(255,255,255,0.03),rgba(255,255,255,0.005))',
-                  border: comp.dashed ? `1px dashed ${comp.color}40` : '1px solid rgba(255,255,255,0.07)',
-                }}
+                className="group relative rounded-2xl p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-lg disabled:opacity-50 bg-white border border-slate-200 hover:border-accu-400 shadow-sm"
               >
-                {/* Hover glow */}
-                <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ background: `linear-gradient(135deg,${comp.color}10,transparent 60%)` }} />
                 <div className="relative z-10 space-y-2">
                   <div className="text-2xl leading-none">{comp.icon}</div>
-                  <div className="font-extrabold text-white text-[10pt] tracking-wide" style={{ fontFamily: 'Outfit,sans-serif' }}>
+                  <div className="font-extrabold text-slate-900 text-[10pt] tracking-wide font-heading">
                     {comp.name}
                   </div>
-                  <div className="text-[8pt] text-gray-500 leading-snug" style={{ whiteSpace: 'pre-line' }}>
+                  <div className="text-[8pt] text-slate-500 leading-snug font-sans" style={{ whiteSpace: 'pre-line' }}>
                     {comp.desc}
                   </div>
-                  <div className="flex items-center justify-between pt-1 text-[9px] font-mono">
-                    <span style={{ color: comp.color }} className="font-bold opacity-80">
+                  <div className="flex items-center justify-between pt-1 text-[9px] font-mono font-bold">
+                    <span style={{ color: comp.color }}>
                       {creating === comp.type ? 'STARTING...' : 'OPEN CHAT →'}
                     </span>
                     {creating === comp.type
                       ? <Loader2 size={10} className="animate-spin" style={{ color: comp.color }} />
-                      : <Plus size={10} className="text-gray-700 group-hover:text-white transition-colors" />}
+                      : <Plus size={10} className="text-slate-400 group-hover:text-slate-800 transition-colors" />}
                   </div>
                 </div>
               </button>
@@ -245,20 +241,19 @@ export default function DesignDashboard() {
         {/* ── Stats ────────────────────────────────────────────────────────── */}
         {stats && (
           <section>
-            <h2 className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Design Telemetry
+            <h2 className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-4 flex items-center gap-2 font-bold">
+              <span className="w-2 h-2 rounded-full bg-accu-500" /> Design Telemetry
             </h2>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               {[
-                { label: 'Total Sessions',    value: stats.totalSessions,    color: 'text-white' },
-                { label: 'Approved Reports',  value: stats.approvedReports,  color: 'text-emerald-400' },
-                { label: 'Completed Designs', value: stats.completedDesigns, color: 'text-cyan-400' },
-                { label: 'Active Sessions',   value: sessions.filter(s => s.status === 'collecting_params').length, color: 'text-indigo-400' },
-                { label: 'KB Formulas',       value: stats.knowledgeBase?.total_entries || '—', color: 'text-yellow-400' },
+                { label: 'Total Sessions',    value: stats.totalSessions,    color: 'text-slate-900' },
+                { label: 'Approved Reports',  value: stats.approvedReports,  color: 'text-emerald-600' },
+                { label: 'Completed Designs', value: stats.completedDesigns, color: 'text-accu-600' },
+                { label: 'Active Sessions',   value: sessions.filter(s => s.status === 'collecting_params').length, color: 'text-accuorange-600' },
+                { label: 'KB Formulas',       value: stats.knowledgeBase?.total_entries || '—', color: 'text-indigo-600' },
               ].map((s, i) => (
-                <div key={i} className="p-5 rounded-xl border border-white/[0.04]"
-                  style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.02),rgba(255,255,255,0.005))' }}>
-                  <div className="text-[9px] font-mono text-gray-500 uppercase tracking-widest mb-3">{s.label}</div>
+                <div key={i} className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <div className="text-[9px] font-mono text-slate-500 uppercase tracking-widest mb-2 font-bold">{s.label}</div>
                   <div className={`text-2xl font-bold font-mono ${s.color}`}>{s.value}</div>
                 </div>
               ))}
@@ -268,13 +263,13 @@ export default function DesignDashboard() {
 
         {/* ── Recent Sessions ──────────────────────────────────────────────── */}
         <section>
-          <h2 className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Recent Design Sessions
+          <h2 className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-4 flex items-center gap-2 font-bold">
+            <span className="w-2 h-2 rounded-full bg-accu-500" /> Recent Design Sessions
           </h2>
-          <div className="rounded-xl overflow-hidden border border-white/[0.04]"
-            style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.02),rgba(255,255,255,0.005))', maxHeight: 450, overflowY: 'auto' }}>
+          <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm"
+            style={{ maxHeight: 450, overflowY: 'auto' }}>
             {sessions.length === 0 ? (
-              <div className="p-10 text-center text-gray-600 font-mono text-xs">
+              <div className="p-10 text-center text-slate-400 font-mono text-xs">
                 No design sessions yet — select a component above to begin.
               </div>
             ) : sessions.map(s => {
@@ -282,30 +277,30 @@ export default function DesignDashboard() {
               const meta = { shaft:'⚙', flange:'🔩', plate_hole_pattern:'🪟', bracket:'📐', spacer:'🧱', lever:'↕', housing:'🏠', bearing:'⭕', gearbox:'⚙⚙', cam:'🌀', custom:'✦' };
               return (
                 <Link key={s.id} to={`/design/session/${s.id}`}
-                  className="flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.015] transition-colors border-b border-white/[0.04] last:border-0 group">
+                  className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 group">
                   <div className="flex items-center gap-3.5">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm bg-gray-900/60 border border-gray-800/80">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm bg-slate-50 border border-slate-200">
                       {meta[s.component_type] || '•'}
                     </div>
                     <div>
-                      <div className="text-[10pt] font-bold text-white uppercase tracking-wide">
+                      <div className="text-[10pt] font-bold text-slate-900 uppercase tracking-wide">
                         {s.component_type.replace(/_/g,' ')}
                       </div>
-                      <div className="text-[8.5pt] text-gray-600 font-mono mt-0.5">
+                      <div className="text-[8.5pt] text-slate-400 font-mono mt-0.5">
                         #{s.id} · {new Date(s.created_at * 1000).toLocaleString()}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="px-2 py-0.5 text-[8.5pt] font-mono font-bold tracking-wider rounded"
-                      style={{ color: st.color, background: st.color + '12', border: `1px solid ${st.color}30` }}>
+                    <span className="px-2.5 py-0.5 text-[8.5pt] font-mono font-bold tracking-wider rounded-md"
+                      style={{ color: st.color, background: st.color + '15', border: `1px solid ${st.color}30` }}>
                       {st.label}
                     </span>
                     <button onClick={(e) => deleteSession(s.id, e)}
-                      className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-red-500 hover:text-red-400 p-1 rounded">
-                      <X size={11} />
+                      className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-red-500 hover:text-red-700 p-1 rounded">
+                      <X size={13} />
                     </button>
-                    <ArrowRight size={12} className="text-gray-700 group-hover:text-gray-400 transition-colors" />
+                    <ArrowRight size={13} className="text-slate-400 group-hover:text-accu-600 transition-colors" />
                   </div>
                 </Link>
               );

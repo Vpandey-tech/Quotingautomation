@@ -154,14 +154,14 @@ export default function AdminPanel() {
     if (loading) {
         return (
             <div className="py-12 flex flex-col items-center justify-center gap-2">
-                <RefreshCw size={24} className="text-cyan-400 animate-spin" />
-                <p className="text-[10px] text-gray-500 font-mono">Loading materials catalog…</p>
+                <RefreshCw size={24} className="text-accu-600 animate-spin" />
+                <p className="text-[10px] text-slate-500 font-mono font-semibold">Loading materials catalog…</p>
             </div>
         );
     }
 
     return (
-        <div className="max-w-6xl mx-auto w-full py-2 px-1">
+        <div className="max-w-6xl mx-auto w-full py-2 px-1 text-slate-800 font-sans">
             {/* Main Side-by-Side Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 
@@ -169,47 +169,47 @@ export default function AdminPanel() {
                 <div className="lg:col-span-1 space-y-5">
                     
                     {/* Secure Admin Overrides Info Card */}
-                    <div className="p-4 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.01] backdrop-blur-sm space-y-4">
+                    <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-4">
                         <div className="space-y-2">
                             <div className="flex items-center gap-2">
-                                <div className="p-1 rounded bg-emerald-500/10 text-emerald-400">
+                                <div className="p-1 rounded-lg bg-accu-50 text-accu-600 border border-accu-200">
                                     <Sliders size={14} />
                                 </div>
-                                <span className="text-[11px] font-extrabold text-white tracking-wider uppercase">
+                                <span className="text-[11px] font-extrabold text-slate-900 tracking-wider uppercase font-heading">
                                     Secure Rate Overrides
                                 </span>
                             </div>
-                            <p className="text-[10px] text-gray-400 leading-relaxed">
-                                Fine-tune local raw material base rates (INR/kg). Changes take effect instantly across all geometry calculations and quotation logs.
+                            <p className="text-[10px] text-slate-600 leading-relaxed font-sans">
+                                Fine-tune local raw material base rates (₹ INR/kg). Changes take effect instantly across all geometry calculations and quotation logs.
                             </p>
                         </div>
 
-                        <div className="pt-3 border-t border-white/[0.03] space-y-2 font-mono text-[9px] text-gray-500">
+                        <div className="pt-3 border-t border-slate-100 space-y-2 font-mono text-[9px] text-slate-500">
                             <div className="flex justify-between">
                                 <span>Status:</span>
-                                <span className="text-emerald-400 font-bold flex items-center gap-1">
-                                    <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" /> Live DB Connected
+                                <span className="text-emerald-600 font-bold flex items-center gap-1">
+                                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Live DB Connected
                                 </span>
                             </div>
                             <div className="flex justify-between">
                                 <span>Storage:</span>
-                                <span className="text-gray-300">Local JSON Encrypted</span>
+                                <span className="text-slate-700 font-bold">Local JSON Encrypted</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Spreadsheet Upload Dropzone */}
-                    <div className="p-4 rounded-xl border border-gray-800 bg-gray-950/20 backdrop-blur-sm space-y-3.5">
-                        <div className="flex justify-between items-center border-b border-white/[0.03] pb-2">
+                    <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-3.5">
+                        <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                             <div className="flex items-center gap-2">
-                                <FileSpreadsheet size={15} className="text-emerald-400" />
-                                <span className="text-[10px] font-bold text-gray-200 uppercase tracking-wider">Bulk Pricing Upload</span>
+                                <FileSpreadsheet size={15} className="text-emerald-600" />
+                                <span className="text-[10px] font-bold text-slate-900 uppercase tracking-wider font-heading">Bulk Pricing Upload</span>
                             </div>
-                            <span className="text-[8px] font-mono text-gray-500">.xlsx, .xls, .csv</span>
+                            <span className="text-[8px] font-mono text-slate-400 font-bold">.xlsx, .xls, .csv</span>
                         </div>
 
                         <div className="space-y-3">
-                            <label className="flex flex-col items-center justify-center border border-dashed border-gray-700/60 hover:border-emerald-500/40 rounded-lg p-5 cursor-pointer hover:bg-white/[0.01] transition-all group text-center min-h-[100px]">
+                            <label className="flex flex-col items-center justify-center border border-dashed border-slate-300 hover:border-accu-500 rounded-xl p-5 cursor-pointer hover:bg-slate-50 transition-all group text-center min-h-[100px]">
                                 <input 
                                     type="file" 
                                     accept=".xlsx,.xls,.csv" 
@@ -219,36 +219,36 @@ export default function AdminPanel() {
                                 />
                                 {uploading ? (
                                     <div className="flex flex-col items-center gap-2">
-                                        <RefreshCw size={18} className="animate-spin text-emerald-400" />
-                                        <span className="text-[9px] font-mono text-gray-400">Updating matrices...</span>
+                                        <RefreshCw size={18} className="animate-spin text-accu-600" />
+                                        <span className="text-[9px] font-mono text-slate-500 font-bold">Updating matrices...</span>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center gap-1.5">
-                                        <Upload size={18} className="text-gray-500 group-hover:text-emerald-400 transition-colors" />
-                                        <span className="text-[10px] font-bold text-gray-300">Choose Senior's Pricing File</span>
-                                        <span className="text-[8px] text-gray-600 font-mono">Auto-matches common aliases</span>
+                                        <Upload size={18} className="text-slate-400 group-hover:text-accu-600 transition-colors" />
+                                        <span className="text-[10px] font-bold text-slate-700">Choose Senior's Pricing File</span>
+                                        <span className="text-[8px] text-slate-400 font-mono">Auto-matches common aliases</span>
                                     </div>
                                 )}
                             </label>
 
                             {/* Upload Results pane */}
                             {uploadResults && (
-                                <div className="p-2.5 rounded-lg bg-gray-950/60 border border-gray-900 text-[9px] flex flex-col justify-between">
-                                    <div className="flex justify-between border-b border-gray-900 pb-1 font-mono">
-                                        <span className="text-emerald-400 font-bold">✓ {uploadResults.updated_count} Synced</span>
+                                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[9px] flex flex-col justify-between">
+                                    <div className="flex justify-between border-b border-slate-200 pb-1 font-mono">
+                                        <span className="text-emerald-600 font-bold">✓ {uploadResults.updated_count} Synced</span>
                                         {uploadResults.unrecognized?.length > 0 && (
-                                            <span className="text-amber-400 font-bold">⚠ {uploadResults.unrecognized.length} Skipped</span>
+                                            <span className="text-amber-600 font-bold">⚠ {uploadResults.unrecognized.length} Skipped</span>
                                         )}
                                     </div>
-                                    <div className="max-h-[80px] overflow-y-auto pr-1 space-y-1 font-mono text-gray-400 mt-1">
+                                    <div className="max-h-[80px] overflow-y-auto pr-1 space-y-1 font-mono text-slate-600 mt-1">
                                         {uploadResults.updated_materials?.map((m, idx) => (
                                             <div key={idx} className="flex justify-between">
-                                                <span className="truncate max-w-[100px]">{m.name}</span>
-                                                <span className="text-emerald-400">₹{m.new_price}/kg</span>
+                                                <span className="truncate max-w-[100px] font-semibold">{m.name}</span>
+                                                <span className="text-emerald-600 font-bold">₹{m.new_price}/kg</span>
                                             </div>
                                         ))}
                                         {uploadResults.unrecognized?.length > 0 && (
-                                            <div className="pt-1 mt-1 text-[8px] text-amber-500">
+                                            <div className="pt-1 mt-1 text-[8px] text-amber-600 font-semibold">
                                                 Skipped: {uploadResults.unrecognized.join(', ')}
                                             </div>
                                         )}
@@ -263,9 +263,9 @@ export default function AdminPanel() {
                         type="button"
                         onClick={handleReset}
                         disabled={saving || resetting || uploading}
-                        className="w-full py-2 px-3.5 rounded border border-red-900/30 hover:border-red-700/40 hover:bg-red-950/10 
-                            disabled:opacity-50 text-red-400 text-[10px] font-bold uppercase tracking-wider transition-all
-                            flex items-center justify-center gap-1.5"
+                        className="w-full py-2 px-3.5 rounded-xl border border-red-200 hover:border-red-300 hover:bg-red-50 
+                            disabled:opacity-50 text-red-600 text-[10px] font-bold uppercase tracking-wider transition-all
+                            flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                     >
                         <Database size={11} />
                         Reset Database Defaults
@@ -276,31 +276,31 @@ export default function AdminPanel() {
                 <div className="lg:col-span-2 space-y-4">
                     
                     {/* Header with Search */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-white/[0.04] pb-2">
-                        <h4 className="text-[10px] font-mono uppercase tracking-widest text-gray-500">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 border-b border-slate-200 pb-2">
+                        <h4 className="text-[10px] font-mono uppercase tracking-widest text-slate-600 font-bold">
                             Manual Catalog Adjustments
                         </h4>
                         <div className="relative w-full md:w-64">
-                            <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-600" />
+                            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
                                 type="text"
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                                 placeholder="Filter catalog..."
-                                className="w-full bg-gray-900/50 border border-gray-800 text-gray-300
-                                    text-[10px] rounded-lg pl-7.5 pr-2.5 py-1.5 focus:outline-none focus:border-emerald-500/30 font-mono"
+                                className="w-full bg-white border border-slate-300 text-slate-800
+                                    text-[10px] rounded-xl pl-8 pr-2.5 py-1.5 focus:outline-none focus:border-accu-500 focus:ring-1 focus:ring-accu-500 font-mono shadow-xs placeholder-slate-400"
                             />
                         </div>
                     </div>
 
                     {/* Notifications */}
                     {message && (
-                        <div className={`p-2.5 rounded-lg border flex items-center gap-2 text-[10px] font-mono animate-fade-in
+                        <div className={`p-2.5 rounded-xl border flex items-center gap-2 text-[10px] font-mono animate-fade-in
                             ${message.type === 'success' 
-                                ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300' 
-                                : 'bg-red-950/20 border-red-500/30 text-red-300'}`}>
-                            {message.type === 'success' ? <CheckCircle size={12} className="shrink-0" /> : <AlertCircle size={12} className="shrink-0" />}
-                            <span>{message.text}</span>
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-800' 
+                                : 'bg-red-50 border-red-300 text-red-800'}`}>
+                            {message.type === 'success' ? <CheckCircle size={12} className="shrink-0 text-emerald-600" /> : <AlertCircle size={12} className="shrink-0 text-red-600" />}
+                            <span className="font-semibold">{message.text}</span>
                         </div>
                     )}
 
@@ -309,33 +309,33 @@ export default function AdminPanel() {
                         {/* Materials Grid (2-column inside 2/3 container) */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[480px] overflow-y-auto pr-1.5 custom-scrollbar pb-1">
                             {filteredMaterials.length === 0 ? (
-                                <p className="text-[10px] text-gray-600 italic text-center py-8 col-span-full">
+                                <p className="text-[10px] text-slate-400 italic text-center py-8 col-span-full">
                                     No matching materials registered in this database.
                                 </p>
                             ) : (
                                 filteredMaterials.map(mid => {
                                     const mat = materials[mid];
                                     return (
-                                        <div key={mid} className="p-3 rounded-lg border border-white/[0.03] bg-white/[0.005] hover:bg-white/[0.015] transition-all duration-150 flex flex-col justify-between gap-3">
+                                        <div key={mid} className="p-3.5 rounded-2xl border border-slate-200 bg-white hover:border-accu-400 hover:shadow-md transition-all duration-150 flex flex-col justify-between gap-3 shadow-xs">
                                             <div>
-                                                <div className="text-[11px] font-extrabold text-white truncate">{mat.name}</div>
-                                                <div className="text-[9px] text-gray-500 font-mono mt-0.5">
+                                                <div className="text-[11px] font-extrabold text-slate-900 truncate font-heading">{mat.name}</div>
+                                                <div className="text-[9px] text-slate-500 font-mono mt-0.5">
                                                     {mat.grade !== '-' && `Grade: ${mat.grade}`} 
                                                     {mat.standard !== '-' && ` · Std: ${mat.standard}`}
                                                 </div>
                                             </div>
-                                            <div className="flex justify-between items-center pt-2.5 border-t border-white/[0.03]">
-                                                <span className="text-[8px] text-gray-600 font-mono">Density: {mat.density} g/cm³</span>
+                                            <div className="flex justify-between items-center pt-2.5 border-t border-slate-100">
+                                                <span className="text-[8.5px] text-slate-500 font-mono font-semibold">Density: {mat.density} g/cm³</span>
                                                 <div className="relative w-28">
-                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[9px] text-cyan-400 font-mono">₹</span>
+                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-accu-600 font-mono font-bold">₹</span>
                                                     <input
                                                         type="number"
                                                         step="0.1"
                                                         min="1"
                                                         value={editedPrices[mid] ?? ''}
                                                         onChange={e => handlePriceChange(mid, e.target.value)}
-                                                        className="w-full bg-gray-950/80 border border-gray-800 rounded py-1 pl-4.5 pr-2
-                                                            text-[10px] text-right font-mono text-cyan-300 focus:outline-none focus:border-cyan-500/80"
+                                                        className="w-full bg-slate-50 border border-slate-300 focus:border-accu-500 focus:ring-1 focus:ring-accu-500 rounded-lg py-1 pl-5 pr-2
+                                                            text-[10px] text-right font-mono text-slate-900 font-bold focus:outline-none shadow-xs"
                                                     />
                                                 </div>
                                             </div>
@@ -346,13 +346,13 @@ export default function AdminPanel() {
                         </div>
 
                         {/* Save Action Bar */}
-                        <div className="flex justify-end gap-3 pt-3 border-t border-white/[0.04]">
+                        <div className="flex justify-end gap-3 pt-3 border-t border-slate-200">
                             <button
                                 type="submit"
                                 disabled={saving || resetting || uploading}
-                                className="py-1.5 px-5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50
-                                    text-white text-[10px] font-bold uppercase tracking-wider transition-colors
-                                    flex items-center justify-center gap-1.5"
+                                className="py-2 px-5 rounded-xl bg-accu-600 hover:bg-accu-700 disabled:opacity-50
+                                    text-white text-[10px] font-bold uppercase tracking-wider transition-colors shadow-md
+                                    flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                                 {saving ? <RefreshCw size={11} className="animate-spin" /> : <Save size={11} />}
                                 Save Manual Prices
@@ -365,10 +365,10 @@ export default function AdminPanel() {
             </div>
 
             {/* TechNewity Labs Branding */}
-            <div className="mt-8 text-center border-t border-white/[0.04] pt-4 pb-2">
-                <p className="text-[9px] uppercase tracking-[0.2em] font-semibold text-gray-500 font-sans">
+            <div className="mt-8 text-center border-t border-slate-200 pt-4 pb-2">
+                <p className="text-[9px] uppercase tracking-[0.2em] font-semibold text-slate-400 font-sans">
                     developed by{" "}
-                    <span className="font-extrabold bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(34,211,238,0.15)]">
+                    <span className="font-extrabold text-accu-600">
                         TechNewity Labs
                     </span>
                 </p>

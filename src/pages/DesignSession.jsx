@@ -244,10 +244,10 @@ export default function DesignSession() {
 
   // ── Derived state ──────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="h-screen flex items-center justify-center" style={{ background: '#060a13' }}>
+    <div className="h-screen flex items-center justify-center bg-[#f8fafc]">
       <div className="flex flex-col items-center gap-3">
-        <Loader2 size={28} className="animate-spin text-cyan-400" />
-        <span className="font-mono text-[9pt] text-gray-500 uppercase tracking-widest">Loading session...</span>
+        <Loader2 size={28} className="animate-spin text-accu-600" />
+        <span className="font-mono text-[9pt] text-slate-500 uppercase tracking-widest font-semibold">Loading design session...</span>
       </div>
     </div>
   );
@@ -274,23 +274,21 @@ export default function DesignSession() {
   const pct             = totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 100;
 
   return (
-    <div className="h-screen flex flex-col" style={{ background: '#060a13', fontFamily: "'Inter', sans-serif" }}>
+    <div className="h-screen flex flex-col bg-[#f8fafc] text-slate-800 font-sans">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="h-13 shrink-0 flex items-center justify-between px-5"
-        style={{ background: 'rgba(6,10,19,0.95)', borderBottom: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(16px)' }}>
+      <header className="h-13 shrink-0 flex items-center justify-between px-5 bg-white/95 border-b border-slate-200 shadow-sm backdrop-blur-md">
 
         <div className="flex items-center gap-2.5">
-          <Link to="/design" className="text-gray-500 hover:text-gray-300 transition-colors">
+          <Link to="/design" className="text-slate-500 hover:text-slate-900 transition-colors">
             <PenTool size={14} />
           </Link>
-          <ChevronRight size={10} className="text-gray-700" />
-          <span className="font-mono text-[10px] px-2 py-0.5 rounded border"
-            style={{ color: meta.color, borderColor: meta.color + '40', background: meta.color + '12' }}>
+          <ChevronRight size={10} className="text-slate-400" />
+          <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md border"
+            style={{ color: meta.color, borderColor: meta.color + '40', background: meta.color + '15' }}>
             #{id}
           </span>
-          <span className="font-bold text-white text-sm tracking-widest uppercase"
-            style={{ fontFamily: 'Outfit, sans-serif' }}>
+          <span className="font-bold text-slate-900 text-sm tracking-wide uppercase font-heading">
             {FAMILY_META[session.component_type]?.icon} {session.component_type.replace(/_/g,' ')}
           </span>
         </div>
@@ -302,16 +300,16 @@ export default function DesignSession() {
             const active  = i === stepIdx;
             return (
               <React.Fragment key={s.id}>
-                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[9pt] font-mono transition-all ${
-                  done   ? 'text-emerald-400' :
-                  active ? 'text-white bg-white/10' :
-                           'text-gray-600'
+                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[9pt] font-mono font-bold transition-all ${
+                  done   ? 'text-emerald-600' :
+                  active ? 'text-slate-900 bg-slate-100 border border-slate-200' :
+                           'text-slate-400'
                 }`}>
                   {done ? <CheckCircle2 size={11} /> : <s.icon size={11} />}
                   {s.label}
                 </div>
                 {i < STEPS.length - 1 && (
-                  <ChevronRight size={10} className={done ? 'text-emerald-600' : 'text-gray-700'} />
+                  <ChevronRight size={10} className={done ? 'text-emerald-500' : 'text-slate-300'} />
                 )}
               </React.Fragment>
             );
@@ -320,10 +318,9 @@ export default function DesignSession() {
 
         {/* LLM budget badge */}
         <div className="flex items-center gap-2 font-mono text-[9pt]">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded"
-            style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc' }}>
-            <Sparkles size={10} className="text-indigo-400" />
-            <span>AI Calls: <strong className="text-white">{totalCalls}</strong> / Budget ≤ 3</span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accu-50 border border-accu-200 text-accu-700 font-bold">
+            <Sparkles size={11} className="text-accu-600" />
+            <span>AI Calls: <strong className="text-slate-900">{totalCalls}</strong> / Budget ≤ 3</span>
           </div>
         </div>
       </header>
@@ -332,21 +329,21 @@ export default function DesignSession() {
       <div className="flex-1 flex overflow-hidden">
 
         {/* LEFT — Chat + Guided Intake */}
-        <div className="flex flex-col" style={{ width: '46%', minWidth: 340, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex flex-col bg-white border-r border-slate-200" style={{ width: '46%', minWidth: 340 }}>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/40">
 
             {/* ── Welcome assistant bubble ── */}
             <AssistantBubble>
               <div className="flex items-start gap-2.5">
                 <div className="text-2xl shrink-0">{meta.icon}</div>
                 <div>
-                  <p className="font-bold text-white text-[10pt] mb-0.5">
+                  <p className="font-bold text-slate-900 text-[10pt] mb-0.5 font-heading">
                     {session.component_type.replace(/_/g,' ').toUpperCase()} Design Session
                   </p>
-                  <p className="text-gray-400 text-[9.5pt] leading-relaxed">{meta.hint}</p>
+                  <p className="text-slate-600 text-[9.5pt] leading-relaxed">{meta.hint}</p>
                   {session.custom_description && (
-                    <p className="mt-2 text-cyan-300 text-[9pt] italic border-l-2 border-cyan-500/40 pl-2">
+                    <p className="mt-2 text-accu-700 text-[9pt] italic border-l-2 border-accu-400 pl-2 bg-accu-50/50 py-0.5 rounded-r">
                       "{session.custom_description}"
                     </p>
                   )}
@@ -356,11 +353,10 @@ export default function DesignSession() {
 
             {/* ── Extracted spec card (all values inline-editable) ── */}
             {paramEntries.length > 0 && (
-              <div className="rounded-xl p-3.5 space-y-2 text-[9pt] font-mono"
-                style={{ background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.18)' }}>
-                <div className="flex items-center gap-1.5 text-emerald-400 font-bold uppercase tracking-wider text-[8.5pt] mb-1">
-                  <CheckCircle2 size={11} /> Extracted Specifications
-                  <span className="ml-auto text-gray-600 text-[8pt] normal-case">Click any value to edit</span>
+              <div className="rounded-2xl p-3.5 space-y-2 text-[9pt] font-mono bg-white border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-1.5 text-emerald-700 font-bold uppercase tracking-wider text-[8.5pt] mb-1">
+                  <CheckCircle2 size={12} className="text-emerald-600" /> Extracted Specifications
+                  <span className="ml-auto text-slate-400 text-[8pt] normal-case">Click any value to edit</span>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   {paramEntries.map(([k, v]) => {
@@ -369,15 +365,15 @@ export default function DesignSession() {
                     const isJustSaved = savedKey === k;
 
                     return (
-                      <div key={k} className={`rounded-lg p-2 flex items-center justify-between gap-1 group cursor-pointer transition-all ${
-                        isJustSaved ? 'bg-emerald-950/40 ring-1 ring-emerald-400/60' : 'hover:bg-white/5'
+                      <div key={k} className={`rounded-xl p-2 flex items-center justify-between gap-1 group cursor-pointer transition-all border ${
+                        isJustSaved 
+                          ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-400/40' 
+                          : isDirty
+                          ? 'bg-amber-50 border-amber-300'
+                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                       }`}
-                        style={{
-                          background: isJustSaved ? 'rgba(16,185,129,0.12)' : 'rgba(0,0,0,0.25)',
-                          border: isJustSaved ? '1px solid rgba(16,185,129,0.4)' : isDirty ? '1px solid rgba(251,191,36,0.6)' : '1px solid rgba(255,255,255,0.06)'
-                        }}
                         onClick={() => editKey !== k && startEdit(k, v)}>
-                        <span className="text-gray-500 truncate text-[8.5pt]">{k.replace(/_mm$/,' mm').replace(/_/g,' ')}</span>
+                        <span className="text-slate-600 truncate text-[8.5pt]">{k.replace(/_mm$/,' mm').replace(/_/g,' ')}</span>
                         {isEditing ? (
                           <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                             <input
@@ -385,25 +381,25 @@ export default function DesignSession() {
                               value={editVal}
                               onChange={e => setEditVal(e.target.value)}
                               onKeyDown={e => e.key === 'Enter' && saveEdit()}
-                              className={`w-20 text-[8.5pt] px-1.5 py-0.5 rounded bg-black/60 outline-none transition-colors ${
-                                isDirty ? 'border border-amber-400 text-amber-300 ring-1 ring-amber-400/40' : 'border border-cyan-400 text-cyan-300'
+                              className={`w-20 text-[8.5pt] px-1.5 py-0.5 rounded bg-white outline-none transition-colors ${
+                                isDirty ? 'border border-amber-400 text-amber-900 ring-1 ring-amber-400/40' : 'border border-accu-400 text-slate-900'
                               }`}
                             />
                             <button onClick={saveEdit} disabled={saving}
                               title="Save (Enter)"
-                              className="text-emerald-400 hover:text-emerald-300 disabled:opacity-50">
+                              className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50">
                               {saving ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
                             </button>
-                            <button onClick={cancelEdit} title="Cancel (Esc)" className="text-gray-500 hover:text-gray-300">
+                            <button onClick={cancelEdit} title="Cancel (Esc)" className="text-slate-400 hover:text-slate-600">
                               <X size={10} />
                             </button>
                           </div>
                         ) : isJustSaved ? (
-                          <span className="font-bold text-emerald-400 flex items-center gap-1 text-[9pt] animate-pulse">
-                            {String(v)} <CheckCircle2 size={10} className="text-emerald-400" />
+                          <span className="font-bold text-emerald-700 flex items-center gap-1 text-[9pt] animate-pulse">
+                            {String(v)} <CheckCircle2 size={10} className="text-emerald-600" />
                           </span>
                         ) : (
-                          <span className="font-bold text-cyan-300 group-hover:text-cyan-200 flex items-center gap-1 text-[9pt]">
+                          <span className="font-bold text-accu-700 group-hover:text-accu-800 flex items-center gap-1 text-[9pt]">
                             {String(v)}
                             <Edit3 size={9} className="opacity-0 group-hover:opacity-60 transition-opacity" />
                           </span>
@@ -417,21 +413,20 @@ export default function DesignSession() {
 
             {/* ── Batched Questions Card ── */}
             {qs.length > 0 && !allDone && (
-              <div className="rounded-xl p-4 space-y-3"
-                style={{ background: 'linear-gradient(135deg,rgba(30,27,75,0.45),rgba(17,24,39,0.55))', border: '1px solid rgba(129,140,248,0.35)' }}>
+              <div className="rounded-2xl p-4 space-y-3 bg-white border border-slate-200 shadow-sm">
                 {/* Header + progress */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-[10pt] text-indigo-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                      <Sparkles size={12} className="text-indigo-400" />
+                    <span className="font-bold text-[10pt] text-accu-700 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                      <Sparkles size={13} className="text-accu-600" />
                       Missing Specifications ({totalCount - answeredCount} remaining)
                     </span>
-                    <span className="text-[8.5pt] font-mono text-gray-500">{pct}% done</span>
+                    <span className="text-[8.5pt] font-mono text-slate-500 font-bold">{pct}% done</span>
                   </div>
                   {/* progress bar */}
-                  <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
+                  <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
                     <div className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${pct}%`, background: pct === 100 ? '#10b981' : '#6366f1' }} />
+                      style={{ width: `${pct}%`, background: pct === 100 ? '#10b981' : '#2479C2' }} />
                   </div>
                 </div>
 
@@ -450,8 +445,7 @@ export default function DesignSession() {
                   ))}
 
                   <button type="submit" disabled={submitting}
-                    className="w-full mt-1 py-2.5 text-[10pt] font-mono font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                    style={{ background: pct === 100 ? 'rgba(16,185,129,0.85)' : 'rgba(99,102,241,0.85)', color: 'white' }}>
+                    className="w-full mt-1 py-2.5 text-[10pt] font-mono font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm text-white bg-accu-600 hover:bg-accu-700 cursor-pointer">
                     {submitting
                       ? <><Loader2 size={13} className="animate-spin" /> Processing...</>
                       : <><ArrowRight size={13} /> {pct === 100 ? 'Submit & Lock Specifications' : 'Submit (defaults fill blanks)'}</>}
@@ -464,10 +458,10 @@ export default function DesignSession() {
             {allDone && (
               <AssistantBubble>
                 <div className="flex items-start gap-2">
-                  <CheckCircle2 size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                  <CheckCircle2 size={14} className="text-emerald-600 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold text-emerald-300 text-[10pt]">All specifications locked ✓</p>
-                    <p className="text-gray-400 text-[9.5pt] mt-0.5">Generate your engineering analysis report on the right →</p>
+                    <p className="font-bold text-emerald-800 text-[10pt]">All specifications locked ✓</p>
+                    <p className="text-slate-600 text-[9.5pt] mt-0.5">Generate your engineering analysis report on the right →</p>
                   </div>
                 </div>
               </AssistantBubble>
@@ -477,8 +471,7 @@ export default function DesignSession() {
 
           {/* ── Chat input bar ── */}
           <form onSubmit={handleChatSubmit}
-            className="p-3 shrink-0 flex items-center gap-2"
-            style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.25)' }}>
+            className="p-3 shrink-0 flex items-center gap-2 border-t border-slate-200 bg-white">
             <input
               ref={inputRef}
               type="text"
@@ -488,27 +481,26 @@ export default function DesignSession() {
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               disabled={submitting}
-              className="flex-1 px-3.5 py-2 text-[9.5pt] font-mono rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-400 disabled:opacity-50 transition-colors"
+              className="flex-1 px-3.5 py-2 text-[9.5pt] font-mono rounded-xl bg-white border border-slate-300 text-slate-800 focus:outline-none focus:border-accu-500 focus:ring-1 focus:ring-accu-500 disabled:opacity-50 transition-colors shadow-xs placeholder-slate-400"
             />
             <button type="submit" disabled={!inputValue.trim() || submitting}
-              className="px-3 py-2 rounded-xl font-bold transition-all disabled:opacity-30 flex items-center gap-1.5"
-              style={{ background: 'rgba(34,211,238,0.9)', color: '#000' }}>
+              className="px-3.5 py-2 rounded-xl font-bold transition-all disabled:opacity-40 flex items-center gap-1.5 bg-accu-600 hover:bg-accu-700 text-white shadow-sm cursor-pointer">
               {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
             </button>
           </form>
         </div>
 
         {/* RIGHT — Engineering Analysis + CAD */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/50">
 
           {/* ── DFM / CAD error banner ── */}
           {cadError && (
-            <div className="rounded-xl p-4 border border-rose-500/40 bg-rose-950/20 space-y-2">
-              <div className="flex items-center gap-2 font-mono font-bold text-[10pt] text-rose-400">
-                <TriangleAlert size={14} /> CAD Validation Failed — DFM / Topology Issue
+            <div className="rounded-2xl p-4 border border-red-200 bg-red-50 space-y-2">
+              <div className="flex items-center gap-2 font-mono font-bold text-[10pt] text-red-700">
+                <TriangleAlert size={14} className="text-red-500" /> CAD Validation Failed — DFM / Topology Issue
               </div>
-              <p className="font-mono text-[9.5pt] leading-relaxed text-rose-300/90">{cadError}</p>
-              <p className="text-gray-500 text-[8.5pt]">Edit the highlighted parameters on the left to correct the geometry.</p>
+              <p className="font-mono text-[9.5pt] leading-relaxed text-red-800">{cadError}</p>
+              <p className="text-slate-500 text-[8.5pt]">Edit the highlighted parameters on the left to correct the geometry.</p>
             </div>
           )}
 
@@ -517,14 +509,13 @@ export default function DesignSession() {
             <PanelCard icon={FileText} title="Step 1 — Gather Specifications" active>
               <div className="text-center py-5 space-y-3">
                 <div className="text-4xl">{meta.icon}</div>
-                <p className="font-mono text-[9.5pt] text-gray-400">
+                <p className="font-mono text-[9.5pt] text-slate-500">
                   {Object.keys(params).length > 0
                     ? `${Object.keys(params).length} values extracted. Fill in the remaining ${qs.length} fields on the left.`
                     : 'Type a natural-language description or fill in the form on the left to define your part.'}
                 </p>
                 {Object.keys(params).length > 0 && qs.length > 0 && (
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[8.5pt] font-mono"
-                    style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc' }}>
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[8.5pt] font-mono bg-accu-50 border border-accu-200 text-accu-700 font-bold">
                     <span>{Object.keys(params).length} fields extracted · {qs.length} still needed</span>
                   </div>
                 )}
@@ -537,17 +528,15 @@ export default function DesignSession() {
             icon={BarChart3}
             title="Step 2 — Engineering Analysis"
             locked={!allDone}
-            badge={hasReport ? { text: 'CALCULATED', color: '#34d399' } : undefined}
+            badge={hasReport ? { text: 'CALCULATED', color: '#059669' } : undefined}
             action={hasReport && !isApproved ? (
               <button onClick={handleApprove} disabled={approving}
-                className="px-3 py-1 text-[9pt] font-mono font-bold tracking-wider rounded transition-all"
-                style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', color: '#6ee7b7' }}>
+                className="px-3 py-1 text-[9pt] font-mono font-bold tracking-wider rounded-lg transition-all bg-emerald-50 border border-emerald-300 text-emerald-700 hover:bg-emerald-100 cursor-pointer">
                 {approving ? <Loader2 size={11} className="inline animate-spin mr-1" /> : <ShieldCheck size={11} className="inline mr-1" />}
                 APPROVE REPORT
               </button>
             ) : isApproved ? (
-              <span className="text-[9pt] font-mono px-2 py-0.5 rounded text-emerald-400"
-                style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+              <span className="text-[9pt] font-mono px-2 py-0.5 rounded-md font-bold text-emerald-700 bg-emerald-50 border border-emerald-200">
                 ✓ APPROVED
               </span>
             ) : null}
@@ -560,19 +549,18 @@ export default function DesignSession() {
                 {/* Calculations grid */}
                 {report.result?.calculations?.length > 0 && (
                   <div className="space-y-2">
-                    <div className="text-[8.5pt] font-mono font-bold text-gray-500 uppercase tracking-wider">Calculated Values</div>
+                    <div className="text-[8.5pt] font-mono font-bold text-slate-500 uppercase tracking-wider">Calculated Values</div>
                     <div className="grid grid-cols-2 gap-2">
                       {report.result.calculations.map((c, i) => (
-                        <div key={i} className="p-2.5 rounded-lg space-y-0.5"
-                          style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                          <div className="text-[8.5pt] font-mono text-gray-500 truncate">{c.name}</div>
-                          <div className="text-[11pt] font-mono font-bold text-white">
+                        <div key={i} className="p-3 rounded-xl space-y-0.5 bg-slate-50 border border-slate-200">
+                          <div className="text-[8.5pt] font-mono text-slate-500 truncate font-semibold">{c.name}</div>
+                          <div className="text-[11pt] font-mono font-bold text-slate-900">
                             {/* Use c.result (correct key from math_engine) */}
                             {c.result != null ? c.result : c.value}
-                            {' '}<span className="text-[9pt] font-normal text-gray-400">{c.unit}</span>
+                            {' '}<span className="text-[9pt] font-normal text-slate-500">{c.unit}</span>
                           </div>
                           {c.formula && (
-                            <div className="text-[8pt] text-gray-600 truncate font-mono">{c.formula}</div>
+                            <div className="text-[8pt] text-slate-400 truncate font-mono">{c.formula}</div>
                           )}
                         </div>
                       ))}
@@ -583,10 +571,10 @@ export default function DesignSession() {
                 {/* Standards */}
                 {report.result?.standards?.length > 0 && (
                   <div className="space-y-1">
-                    <div className="text-[8.5pt] font-mono font-bold text-gray-500 uppercase tracking-wider">Applied Standards</div>
+                    <div className="text-[8.5pt] font-mono font-bold text-slate-500 uppercase tracking-wider">Applied Standards</div>
                     {report.result.standards.map((s, i) => (
-                      <div key={i} className="text-[8.5pt] font-mono text-gray-600 flex items-center gap-1.5">
-                        <ShieldCheck size={9} className="text-gray-700" /> {s}
+                      <div key={i} className="text-[8.5pt] font-mono text-slate-600 flex items-center gap-1.5 font-semibold">
+                        <ShieldCheck size={11} className="text-accu-600" /> {s}
                       </div>
                     ))}
                   </div>
@@ -594,28 +582,26 @@ export default function DesignSession() {
 
                 <div className="flex gap-2 pt-1">
                   <a href={`/api/design/sessions/${id}/download-pdf`} download>
-                    <button className="px-3 py-1.5 text-[9pt] font-mono text-gray-400 hover:text-white rounded-lg transition-all flex items-center gap-1"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                      <Download size={11} /> PDF Report
+                    <button className="px-3.5 py-1.5 text-[9pt] font-mono font-bold text-slate-700 hover:text-slate-900 rounded-xl transition-all flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 shadow-xs cursor-pointer">
+                      <Download size={12} className="text-accu-600" /> PDF Report
                     </button>
                   </a>
                 </div>
               </div>
             ) : allDone ? (
               <div className="text-center py-6 space-y-3">
-                <p className="font-mono text-[9.5pt] text-gray-500">
-                  All parameters ready. Click to run engineering formulas using Shigley's & ISO standards.
+                <p className="font-mono text-[9.5pt] text-slate-500">
+                  All parameters ready. Click to run engineering formulas using Shigley's &amp; ISO standards.
                 </p>
                 <button onClick={handleGenerateReport} disabled={genReport}
-                  className="px-5 py-2.5 text-[10pt] font-mono font-bold tracking-wider rounded-xl transition-all flex items-center gap-2 mx-auto disabled:opacity-50"
-                  style={{ background: 'rgba(34,211,238,0.15)', border: '1px solid rgba(34,211,238,0.4)', color: '#67e8f9' }}>
+                  className="px-5 py-2.5 text-[10pt] font-mono font-bold tracking-wider rounded-xl transition-all flex items-center gap-2 mx-auto disabled:opacity-50 bg-accu-600 hover:bg-accu-700 text-white shadow-md cursor-pointer">
                   {genReport
                     ? <><Loader2 size={13} className="animate-spin" /> Calculating...</>
                     : <><Calculator size={13} /> GENERATE REPORT</>}
                 </button>
               </div>
             ) : (
-              <div className="py-5 text-center font-mono text-[9.5pt] text-gray-600 flex items-center justify-center gap-2">
+              <div className="py-5 text-center font-mono text-[9.5pt] text-slate-400 flex items-center justify-center gap-2 font-semibold">
                 <Lock size={12} /> Complete specifications on the left first.
               </div>
             )}
@@ -629,12 +615,11 @@ export default function DesignSession() {
           >
             {isCadReady ? (
               <div className="space-y-3">
-                <div className="rounded-lg p-3 flex items-center gap-3"
-                  style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
-                  <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                <div className="rounded-xl p-3.5 flex items-center gap-3 bg-emerald-50 border border-emerald-200">
+                  <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
                   <div>
-                    <div className="font-mono font-bold text-[10pt] text-emerald-300">AP242 STEP Solid Verified</div>
-                    <div className="font-mono text-[8.5pt] text-gray-500">Watertight manifold · Positive OCC volume · Bounding box validated</div>
+                    <div className="font-mono font-bold text-[10pt] text-emerald-800">AP242 STEP Solid Verified</div>
+                    <div className="font-mono text-[8.5pt] text-slate-500">Watertight manifold · Positive OCC volume · Bounding box validated</div>
                   </div>
                 </div>
                 {/* OCC measured metrics */}
@@ -644,11 +629,10 @@ export default function DesignSession() {
                       { label: 'Volume (OCC)', value: session.cad_result.volume?.toFixed(1), unit: 'mm³' },
                       { label: 'Surface Area (OCC)', value: session.cad_result.surface_area?.toFixed(1), unit: 'mm²' },
                     ].map(m => (
-                      <div key={m.label} className="p-2.5 rounded-lg"
-                        style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <div className="text-[8.5pt] font-mono text-gray-500">{m.label}</div>
-                        <div className="text-[11pt] font-mono font-bold text-white">
-                          {m.value} <span className="text-[8.5pt] text-gray-400">{m.unit}</span>
+                      <div key={m.label} className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <div className="text-[8.5pt] font-mono text-slate-500 font-semibold">{m.label}</div>
+                        <div className="text-[11pt] font-mono font-bold text-slate-900">
+                          {m.value} <span className="text-[8.5pt] text-slate-500 font-normal">{m.unit}</span>
                         </div>
                       </div>
                     ))}
@@ -656,33 +640,30 @@ export default function DesignSession() {
                 )}
                 <div className="flex gap-2 pt-1">
                   <a href={`/api/design/sessions/${id}/download-cad`} download className="flex-1">
-                    <button className="w-full px-4 py-2 text-[10pt] font-mono font-bold rounded-xl transition-all flex items-center justify-center gap-2"
-                      style={{ background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.35)', color: '#67e8f9' }}>
-                      <Download size={13} /> DOWNLOAD STEP
+                    <button className="w-full px-4 py-2.5 text-[10pt] font-mono font-bold rounded-xl transition-all flex items-center justify-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 shadow-sm cursor-pointer">
+                      <Download size={13} className="text-accu-600" /> DOWNLOAD STEP
                     </button>
                   </a>
                   <button onClick={sendToQuoting}
-                    className="flex-1 px-4 py-2 text-[10pt] font-mono font-bold rounded-xl transition-all flex items-center justify-center gap-2"
-                    style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.45)', color: '#a5b4fc' }}>
-                    <Cog size={13} /> SEND TO QUOTING
+                    className="flex-1 px-4 py-2.5 text-[10pt] font-mono font-bold rounded-xl transition-all flex items-center justify-center gap-2 bg-accuorange-500 hover:bg-accuorange-600 text-white shadow-md cursor-pointer">
+                    <Cog size={14} /> SEND TO QUOTING
                   </button>
                 </div>
               </div>
             ) : (isApproved || hasReport) ? (
               <div className="text-center py-6 space-y-3">
-                <p className="font-mono text-[9.5pt] text-gray-500">
+                <p className="font-mono text-[9.5pt] text-slate-500">
                   Deterministic OpenCASCADE build — no LLM involved in geometry generation.
                 </p>
                 <button onClick={handleGenerateCad} disabled={genCad}
-                  className="px-5 py-2.5 text-[10pt] font-mono font-bold tracking-wider rounded-xl transition-all flex items-center gap-2 mx-auto disabled:opacity-50"
-                  style={{ background: 'rgba(34,211,238,0.15)', border: '1px solid rgba(34,211,238,0.4)', color: '#67e8f9' }}>
+                  className="px-5 py-2.5 text-[10pt] font-mono font-bold tracking-wider rounded-xl transition-all flex items-center gap-2 mx-auto disabled:opacity-50 bg-accu-600 hover:bg-accu-700 text-white shadow-md cursor-pointer">
                   {genCad
                     ? <><Loader2 size={13} className="animate-spin" /> Building STEP solid...</>
                     : <><Box size={13} /> GENERATE CAD MODEL</>}
                 </button>
               </div>
             ) : (
-              <div className="py-5 text-center font-mono text-[9.5pt] text-gray-600 flex items-center justify-center gap-2">
+              <div className="py-5 text-center font-mono text-[9.5pt] text-slate-400 flex items-center justify-center gap-2 font-semibold">
                 <Lock size={12} /> Generate and approve the analysis report first.
               </div>
             )}
@@ -699,8 +680,7 @@ export default function DesignSession() {
 function AssistantBubble({ children }) {
   return (
     <div className="flex justify-start">
-      <div className="max-w-[94%] rounded-xl px-4 py-3 text-[9.5pt] font-mono leading-relaxed"
-        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="max-w-[94%] rounded-2xl px-4 py-3 text-[9.5pt] font-mono leading-relaxed bg-white border border-slate-200 shadow-sm text-slate-800">
         {children}
       </div>
     </div>
@@ -709,25 +689,23 @@ function AssistantBubble({ children }) {
 
 function PanelCard({ icon: Icon, title, locked, badge, action, active, children }) {
   return (
-    <div className={`rounded-xl overflow-hidden transition-all duration-300 ${locked ? 'opacity-35 pointer-events-none' : ''} ${active ? 'ring-1 ring-indigo-500/30' : ''}`}
-      style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))', border: '1px solid rgba(255,255,255,0.07)' }}>
-      <div className="flex items-center justify-between px-4 py-3"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.18)' }}>
+    <div className={`rounded-2xl overflow-hidden transition-all duration-300 bg-white border border-slate-200 shadow-sm ${locked ? 'opacity-40 pointer-events-none' : ''} ${active ? 'ring-1 ring-accu-400' : ''}`}>
+      <div className="flex items-center justify-between px-4 py-3 bg-slate-50/80 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <Icon size={13} className="text-cyan-400" />
-          <span className="text-[10pt] font-bold text-white uppercase tracking-widest" style={{ fontFamily: 'Outfit, sans-serif' }}>
+          <Icon size={14} className="text-accu-600" />
+          <span className="text-[10pt] font-bold text-slate-900 uppercase tracking-wider font-heading">
             {title}
           </span>
         </div>
         <div className="flex items-center gap-2">
           {badge && (
-            <span className="px-2 py-0.5 text-[8.5pt] font-mono font-bold tracking-wider rounded"
+            <span className="px-2 py-0.5 text-[8.5pt] font-mono font-bold tracking-wider rounded-md"
               style={{ color: badge.color, background: badge.color + '18', border: `1px solid ${badge.color}35` }}>
               {badge.text}
             </span>
           )}
           {action}
-          {locked && <Lock size={11} className="text-gray-600" />}
+          {locked && <Lock size={11} className="text-slate-400" />}
         </div>
       </div>
       <div className="p-4">{children}</div>
@@ -742,10 +720,9 @@ function FieldInput({ q, value, error, onChange }) {
     <div className="space-y-1">
       {/* Label row */}
       <label className="flex items-center justify-between text-[9pt] font-mono">
-        <span className="text-gray-200 font-semibold">{q.label}</span>
+        <span className="text-slate-700 font-bold">{q.label}</span>
         {q.unit && (
-          <span className="text-[8pt] px-1.5 py-0.5 rounded font-mono"
-            style={{ background: 'rgba(255,255,255,0.06)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <span className="text-[8pt] px-1.5 py-0.5 rounded-md font-mono bg-slate-100 text-slate-600 border border-slate-200 font-semibold">
             {q.unit}
           </span>
         )}
@@ -760,12 +737,11 @@ function FieldInput({ q, value, error, onChange }) {
             return (
               <button key={opt.value} type="button"
                 onClick={() => onChange(opt.value)}
-                className={`px-2.5 py-1 text-[8.5pt] font-mono rounded-lg border transition-all ${
+                className={`px-2.5 py-1 text-[8.5pt] font-mono rounded-lg border transition-all cursor-pointer ${
                   sel
-                    ? 'font-bold'
-                    : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
-                }`}
-                style={sel ? { background: 'rgba(99,102,241,0.75)', borderColor: 'rgba(129,140,248,0.7)', color: 'white' } : {}}>
+                    ? 'font-bold bg-accu-600 border-accu-600 text-white shadow-xs'
+                    : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}>
                 {opt.label || opt.value}
               </button>
             );
@@ -780,29 +756,28 @@ function FieldInput({ q, value, error, onChange }) {
             placeholder={q.default_value != null ? `Default: ${q.default_value}` : q.question}
             value={value}
             onChange={e => onChange(e.target.value)}
-            className={`w-full px-3 py-2 text-[9.5pt] font-mono rounded-lg bg-black/40 text-white focus:outline-none transition-colors ${
-              error ? 'border-rose-500' : value ? 'border-indigo-400/60' : 'border-white/10'
+            className={`w-full px-3 py-2 text-[9.5pt] font-mono rounded-xl bg-white text-slate-900 focus:outline-none transition-colors border shadow-xs ${
+              error ? 'border-red-500 focus:ring-1 focus:ring-red-500' : value ? 'border-accu-400 focus:ring-1 focus:ring-accu-500' : 'border-slate-300 focus:border-accu-500'
             }`}
-            style={{ border: `1px solid ${error ? '#f43f5e' : value ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.1)'}` }}
           />
           {/* Filled indicator dot */}
           {value && !error && (
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-emerald-500" />
           )}
         </div>
       )}
 
       {/* Hint */}
       {hint && !error && (
-        <div className="flex items-center gap-1 text-[8pt] font-mono text-gray-600">
-          <Info size={8} /> {hint}
+        <div className="flex items-center gap-1 text-[8pt] font-mono text-slate-500">
+          <Info size={10} className="text-slate-400" /> {hint}
         </div>
       )}
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-1 text-[8pt] font-mono text-rose-400">
-          <AlertTriangle size={9} /> {error}
+        <div className="flex items-center gap-1 text-[8pt] font-mono text-red-600 font-semibold">
+          <AlertTriangle size={10} /> {error}
         </div>
       )}
     </div>
@@ -813,41 +788,44 @@ function SafetyBlock({ safety }) {
   if (!safety) return null;
   const safe = safety.is_safe !== false;
   return (
-    <div className="rounded-lg p-3 space-y-2"
+    <div className="rounded-xl p-3.5 space-y-2 border"
       style={{
-        background: safe ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
-        border: `1px solid ${safe ? 'rgba(16,185,129,0.22)' : 'rgba(239,68,68,0.22)'}`,
+        background: safe ? '#ecfdf5' : '#fef2f2',
+        borderColor: safe ? '#a7f3d0' : '#fecaca',
       }}>
       <div className="flex items-center gap-6">
         {safety.fos_actual != null && (
           <div>
-            <div className="text-[8.5pt] font-mono text-gray-500 uppercase">Actual FOS</div>
-            <div className={`text-xl font-bold font-mono ${safe ? 'text-emerald-400' : 'text-red-400'}`}>
+            <div className="text-[8.5pt] font-mono text-slate-500 uppercase font-semibold">Actual FOS</div>
+            <div className={`text-xl font-bold font-mono ${safe ? 'text-emerald-700' : 'text-red-700'}`}>
               {safety.fos_actual}
             </div>
           </div>
         )}
         {safety.fos_required != null && (
           <div>
-            <div className="text-[8.5pt] font-mono text-gray-500 uppercase">Required</div>
-            <div className="text-xl font-bold font-mono text-white">{safety.fos_required}</div>
+            <div className="text-[8.5pt] font-mono text-slate-500 uppercase font-semibold">Required</div>
+            <div className="text-xl font-bold font-mono text-slate-900">{safety.fos_required}</div>
           </div>
         )}
         <div className="ml-auto">
-          <span className={`px-2 py-0.5 text-[9pt] font-mono font-bold tracking-wider rounded ${safe ? 'text-emerald-400' : 'text-red-400'}`}
-            style={{ background: safe ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', border: `1px solid ${safe ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.35)'}` }}>
+          <span className={`px-2.5 py-0.5 text-[9pt] font-mono font-bold tracking-wider rounded-md border ${
+            safe 
+              ? 'text-emerald-800 bg-emerald-100 border-emerald-300' 
+              : 'text-red-800 bg-red-100 border-red-300'
+          }`}>
             {safe ? 'SAFE' : 'CRITICAL'}
           </span>
         </div>
       </div>
       {safety.warnings?.map((w, i) => (
-        <div key={i} className="flex items-start gap-2 text-[9pt] font-mono text-amber-400">
-          <AlertTriangle size={11} className="shrink-0 mt-0.5" /> {w}
+        <div key={i} className="flex items-start gap-2 text-[9pt] font-mono text-amber-700 font-semibold">
+          <AlertTriangle size={12} className="shrink-0 mt-0.5 text-amber-600" /> {w}
         </div>
       ))}
       {safety.recommendations?.map((r, i) => (
-        <div key={i} className="flex items-start gap-2 text-[8.5pt] font-mono text-gray-500">
-          <Info size={9} className="shrink-0 mt-0.5" /> {r}
+        <div key={i} className="flex items-start gap-2 text-[8.5pt] font-mono text-slate-600">
+          <Info size={11} className="shrink-0 mt-0.5 text-slate-400" /> {r}
         </div>
       ))}
     </div>

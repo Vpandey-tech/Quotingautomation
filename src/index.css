@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -18,10 +18,11 @@
     height: 100%;
     margin: 0;
     padding: 0;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+    background-color: #f8fafc;
+    color: #0f172a;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
-    /* Allow vertical scroll; prevent horizontal overflow */
   }
 
   /* Monospace font for metrics/code */
@@ -29,28 +30,18 @@
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
   }
 
-  /* ── SIDEBAR SCROLL ISOLATION ─────────────────────────────────────────────
-     The single most reliable way to stop OrbitControls from catching scroll
-     events that originate in the sidebar:
-       1. The <aside> uses position:relative and has its own scroll container
-       2. The 3D canvas section gets pointer-events:none when sidebar is hovered
-          (we do this in JS with the sidebar's onMouseEnter/onMouseLeave)
-       3. CSS overscroll-behavior:contain stops scroll chaining at page level
-  */
+  /* ── SIDEBAR SCROLL ISOLATION ───────────────────────────────────────────── */
   .sidebar-scroll-container {
-    /* Own scroll context — completely isolated */
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
-    /* Firefox thin scrollbar */
     scrollbar-width: thin;
-    scrollbar-color: #1e3448 transparent;
-    /* Prevent this element's scroll from propagating upward */
+    scrollbar-color: #cbd5e1 transparent;
     isolation: isolate;
   }
 
   .sidebar-scroll-container::-webkit-scrollbar {
-    width: 4px;
+    width: 5px;
   }
 
   .sidebar-scroll-container::-webkit-scrollbar-track {
@@ -58,61 +49,78 @@
   }
 
   .sidebar-scroll-container::-webkit-scrollbar-thumb {
-    background: #1e3448;
+    background: #cbd5e1;
     border-radius: 4px;
   }
 
   .sidebar-scroll-container::-webkit-scrollbar-thumb:hover {
-    background: #22d3ee44;
+    background: #2479C2aa;
   }
 
-  /* When sidebar is active (pointer inside), block pointer events on canvas */
+  /* When sidebar is active, block pointer events on canvas */
   .viewer-section.pointer-blocked {
     pointer-events: none !important;
   }
 
-  /* ─── Global dark scrollbar ─────────────────────────────────────────────── */
+  /* ─── Global scrollbar ─────────────────────────────────────────────────── */
   ::-webkit-scrollbar {
-    width: 5px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    background: #0a0f1a;
+    background: #f1f5f9;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #1e2a3a;
-    border-radius: 3px;
+    background: #cbd5e1;
+    border-radius: 4px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #2a3a4e;
+    background: #2479C2;
   }
 }
 
 @layer utilities {
 
-  /* Glow text utility */
-  .glow-cyan {
-    text-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+  /* AccuDesign Blue Glow utility */
+  .glow-blue {
+    text-shadow: 0 0 10px rgba(36, 121, 194, 0.4);
   }
 
-  /* Glass card */
+  /* AccuDesign Orange Glow utility */
+  .glow-orange {
+    text-shadow: 0 0 10px rgba(241, 104, 58, 0.4);
+  }
+
+  /* AccuDesign Glass card */
   .glass-card {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
   }
 
-  /* Sidebar gradient background */
+  /* AccuDesign Card */
+  .accu-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  }
+
+  /* Sidebar background */
   .sidebar-bg {
-    background: linear-gradient(180deg, rgba(13, 17, 23, 0.95) 0%, rgba(8, 12, 20, 0.98) 100%);
+    background: #ffffff;
+    border-right: 1px solid #e2e8f0;
   }
 
   /* Animated gradient border */
-  .glow-border-cyan {
-    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.2), 0 0 20px rgba(34, 211, 238, 0.08);
+  .glow-border-blue {
+    box-shadow: 0 0 0 1px rgba(36, 121, 194, 0.3), 0 0 15px rgba(36, 121, 194, 0.12);
+  }
+
+  .glow-border-orange {
+    box-shadow: 0 0 0 1px rgba(241, 104, 58, 0.3), 0 0 15px rgba(241, 104, 58, 0.12);
   }
 
   /* Button hover lift */
@@ -122,6 +130,7 @@
 
   .btn-lift:hover {
     transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(36, 121, 194, 0.15);
   }
 
   .btn-lift:active {
@@ -132,12 +141,12 @@
   .sidebar-resize-handle {
     width: 6px;
     cursor: col-resize;
-    background: rgba(255,255,255,0.03);
+    background: #f1f5f9;
     flex-shrink: 0;
     position: relative;
     z-index: 50;
     transition: background 0.15s ease;
-    border-left: 1px solid rgba(255,255,255,0.05);
+    border-left: 1px solid #e2e8f0;
   }
 
   .sidebar-resize-handle::after {
@@ -149,29 +158,29 @@
     width: 3px;
     height: 36px;
     border-radius: 2px;
-    background: rgba(255,255,255,0.08);
-    opacity: 0;
+    background: #cbd5e1;
+    opacity: 0.6;
     transition: opacity 0.2s ease, background 0.2s ease;
   }
 
   .sidebar-resize-handle:hover {
-    background: rgba(34, 211, 238, 0.08);
-    border-left-color: rgba(34, 211, 238, 0.3);
+    background: #e0f2fe;
+    border-left-color: #2479C2;
   }
 
   .sidebar-resize-handle:hover::after {
     opacity: 1;
-    background: rgba(34, 211, 238, 0.4);
+    background: #2479C2;
   }
 
   .sidebar-resize-handle:active {
-    background: rgba(34, 211, 238, 0.15);
-    border-left-color: rgba(34, 211, 238, 0.5);
+    background: #bae6fd;
+    border-left-color: #2479C2;
   }
 
   .sidebar-resize-handle:active::after {
     opacity: 1;
-    background: rgba(34, 211, 238, 0.7);
+    background: #2479C2;
   }
 
   /* ── Design Module Utilities ─────────────────────────────────────────────── */
@@ -179,13 +188,13 @@
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-width: thin;
-    scrollbar-color: #1e3448 transparent;
+    scrollbar-color: #cbd5e1 transparent;
   }
 
-  .design-scroll::-webkit-scrollbar { width: 4px; }
+  .design-scroll::-webkit-scrollbar { width: 5px; }
   .design-scroll::-webkit-scrollbar-track { background: transparent; }
-  .design-scroll::-webkit-scrollbar-thumb { background: #1e3448; border-radius: 4px; }
-  .design-scroll::-webkit-scrollbar-thumb:hover { background: #22d3ee44; }
+  .design-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  .design-scroll::-webkit-scrollbar-thumb:hover { background: #2479C2aa; }
 
   /* ── Micro-Animations ───────────────────────────────────────────────────── */
   @keyframes fadeIn {
@@ -193,8 +202,8 @@
     to { opacity: 1; transform: translateY(0); }
   }
   @keyframes pulseGlow {
-    0%, 100% { opacity: 0.6; box-shadow: 0 0 12px rgba(34, 211, 238, 0.2); }
-    50% { opacity: 1; box-shadow: 0 0 20px rgba(34, 211, 238, 0.45); }
+    0%, 100% { opacity: 0.8; box-shadow: 0 0 8px rgba(36, 121, 194, 0.2); }
+    50% { opacity: 1; box-shadow: 0 0 16px rgba(36, 121, 194, 0.4); }
   }
   .animate-fadeIn {
     animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;

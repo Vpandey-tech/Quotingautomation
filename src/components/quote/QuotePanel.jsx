@@ -17,11 +17,11 @@ const fmt = (n, dec = 0) =>
 /* ─── LineItem row ───────────────────────────────────────────────────────── */
 function LineItem({ label, value, highlight, large }) {
     return (
-        <div className={`flex items-center justify-between gap-2 ${large ? 'py-3' : 'py-1.5'}
-            border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] px-1.5 rounded transition-colors overflow-hidden`}>
-            <span className={`${large ? 'text-[13px] font-medium' : 'text-[11px]'} text-gray-400 shrink-0`}>{label}</span>
+        <div className={`flex items-center justify-between gap-2 ${large ? 'py-2.5' : 'py-1.5'}
+            border-b border-slate-100 last:border-0 hover:bg-slate-50/60 px-1 rounded transition-colors overflow-hidden`}>
+            <span className={`${large ? 'text-[13px] font-bold text-slate-800' : 'text-[11px] text-slate-600 font-medium'} shrink-0`}>{label}</span>
             <span className={`font-mono text-right truncate min-w-0 ${large ? 'text-sm font-bold tracking-wide' : 'text-[11px] font-semibold'}
-                ${highlight ? 'text-cyan-300 drop-shadow-[0_0_8px_rgba(103,232,249,0.5)]' : 'text-gray-100'}`}>
+                ${highlight ? 'text-accu-600 font-bold' : 'text-slate-900'}`}>
                 {value}
             </span>
         </div>
@@ -32,27 +32,27 @@ function LineItem({ label, value, highlight, large }) {
 function Select({ label, value, onChange, options, disabled }) {
     return (
         <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase tracking-widest">{label}</label>
+            <label className="text-[10.5px] text-slate-700 uppercase tracking-wider font-bold">{label}</label>
             <div className="relative group">
                 <select
                     value={value}
                     onChange={e => onChange(e.target.value)}
                     disabled={disabled || options.length === 0}
-                    className="w-full bg-gray-800/70 border border-gray-700/60 text-gray-200
+                    className="w-full bg-white border border-slate-300 text-slate-800
                         text-[11px] rounded-lg px-3 py-2 appearance-none focus:outline-none
-                        focus:border-cyan-500/80 focus:shadow-[0_0_8px_rgba(34,211,238,0.2)] cursor-pointer font-mono
-                        group-hover:border-gray-600 transition-all duration-200
+                        focus:border-accu-500 focus:ring-1 focus:ring-accu-500 cursor-pointer font-mono shadow-sm
+                        group-hover:border-slate-400 transition-all duration-200
                         disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                     {options.length === 0
                         ? <option>Loading…</option>
                         : options.map(o => (
-                            <option key={o.value} value={o.value} className="bg-gray-900">{o.label}</option>
+                            <option key={o.value} value={o.value} className="bg-white text-slate-800">{o.label}</option>
                         ))
                     }
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2
-                    text-gray-500 pointer-events-none group-hover:text-cyan-400 transition-colors" />
+                    text-slate-400 pointer-events-none group-hover:text-accu-600 transition-colors" />
             </div>
         </div>
     );
@@ -62,12 +62,12 @@ function Select({ label, value, onChange, options, disabled }) {
 function TextInput({ label, value, onChange, placeholder, icon: Icon, type = "text", min, max, step }) {
     return (
         <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase tracking-widest flex items-center justify-between">
+            <label className="text-[10.5px] text-slate-700 uppercase tracking-wider font-bold flex items-center justify-between">
                 {label}
-                {type === 'range' && <span className="text-cyan-400 font-mono">{value}%</span>}
+                {type === 'range' && <span className="text-accu-600 font-mono font-bold">{value}%</span>}
             </label>
             <div className="relative flex items-center">
-                {Icon && type !== 'range' && <Icon size={12} className="absolute left-3 text-gray-600" />}
+                {Icon && type !== 'range' && <Icon size={12} className="absolute left-3 text-slate-400" />}
                 <input
                     type={type}
                     min={min}
@@ -76,9 +76,9 @@ function TextInput({ label, value, onChange, placeholder, icon: Icon, type = "te
                     value={value}
                     onChange={e => onChange(type === 'range' || type === 'number' ? parseFloat(e.target.value) : e.target.value)}
                     placeholder={placeholder}
-                    className={`w-full bg-gray-800/70 text-gray-200 text-[11px] rounded-lg
-                        ${type !== 'range' ? `border border-gray-700/60 py-2 focus:outline-none focus:border-cyan-500/80 focus:shadow-[0_0_8px_rgba(34,211,238,0.2)] hover:border-gray-600 ${Icon ? 'pl-8 pr-3' : 'px-3'}` : 'accent-cyan-500'}
-                        font-mono placeholder:text-gray-700 transition-all duration-200 cursor-pointer`}
+                    className={`w-full bg-white text-slate-800 text-[11px] rounded-lg shadow-sm
+                        ${type !== 'range' ? `border border-slate-300 py-2 focus:outline-none focus:border-accu-500 focus:ring-1 focus:ring-accu-500 hover:border-slate-400 ${Icon ? 'pl-8 pr-3' : 'px-3'}` : 'accent-accu-600'}
+                        font-mono placeholder:text-slate-400 transition-all duration-200 cursor-pointer`}
                 />
             </div>
         </div>
@@ -92,7 +92,7 @@ function MultiSelect({ label, selectedIds = [], onChange, options = [], disabled
 
     return (
         <div className="space-y-2">
-            <label className="text-[10px] text-gray-500 uppercase tracking-widest">{label}</label>
+            <label className="text-[10.5px] text-slate-700 uppercase tracking-wider font-bold">{label}</label>
 
             {/* Chips Area */}
             {selectedIds.length > 0 && (
@@ -100,12 +100,12 @@ function MultiSelect({ label, selectedIds = [], onChange, options = [], disabled
                     {selectedIds.map(id => {
                         const opt = options.find(o => o.value === id);
                         return (
-                            <div key={id} className="flex items-center gap-1.5 bg-cyan-900/30 border border-cyan-500/30 text-cyan-300 text-[10px] px-2 py-1 rounded-full font-medium">
+                            <div key={id} className="flex items-center gap-1.5 bg-accu-50 border border-accu-200 text-accu-700 text-[10px] px-2.5 py-1 rounded-full font-medium shadow-xs">
                                 <span>{opt ? opt.label : id}</span>
                                 <button
                                     onClick={() => onChange(selectedIds.filter(x => x !== id))}
                                     disabled={disabled}
-                                    className="hover:text-cyan-100 hover:bg-cyan-500/20 rounded-full p-0.5 transition-colors"
+                                    className="hover:text-accu-900 hover:bg-accu-200/60 rounded-full p-0.5 transition-colors"
                                 >
                                     <X size={10} />
                                 </button>
@@ -125,25 +125,25 @@ function MultiSelect({ label, selectedIds = [], onChange, options = [], disabled
                         }
                     }}
                     disabled={disabled || unselectedOptions.length === 0}
-                    className="w-full bg-gray-800/70 border border-gray-700/60 text-gray-400
+                    className="w-full bg-white border border-slate-300 text-slate-600
                         text-[11px] rounded-lg px-3 py-2 appearance-none focus:outline-none
-                        focus:border-cyan-500/50 cursor-pointer font-mono
-                        group-hover:border-gray-600 transition-colors
+                        focus:border-accu-500 focus:ring-1 focus:ring-accu-500 cursor-pointer font-mono shadow-sm
+                        group-hover:border-slate-400 transition-colors
                         disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                     <option value="" disabled>
                         {unselectedOptions.length === 0 ? 'No more options available' : '+ Add an option...'}
                     </option>
                     {unselectedOptions.map(o => (
-                        <option key={o.value} value={o.value} className="bg-gray-900 text-gray-200">{o.label}</option>
+                        <option key={o.value} value={o.value} className="bg-white text-slate-800">{o.label}</option>
                     ))}
                 </select>
                 <Plus size={14} className="absolute right-3 top-1/2 -translate-y-1/2
-                    text-gray-500 pointer-events-none group-hover:text-cyan-400 transition-colors" />
+                    text-slate-400 pointer-events-none group-hover:text-accu-600 transition-colors" />
             </div>
 
             {selectedIds.length >= 5 && label.includes('Process') && (
-                <p className="text-[9px] text-amber-400/80 font-mono mt-1 flex items-center gap-1">
+                <p className="text-[9px] text-amber-600 font-mono mt-1 flex items-center gap-1">
                     <AlertCircle size={9} /> ≥5 processes forces "Very Complex" tier.
                 </p>
             )}
@@ -843,49 +843,46 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
         <div className="space-y-4">
 
             {/* ── Metal price banner (INR) ─────────────────────────────────── */}
-            <div className="rounded-2xl bg-gradient-to-br from-white/[0.05] to-white/[0.01]
-                border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-md p-4
-                transition-all hover:border-white/[0.15]">
-                <div className="flex items-center justify-between mb-3 border-b border-white/[0.05] pb-2">
+            <div className="rounded-xl bg-white border border-slate-200 shadow-sm p-4 transition-all hover:border-accu-300">
+                <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
                     <div className="flex items-center gap-1.5">
-                        <IndianRupee size={12} className="text-cyan-400" />
-                        <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
+                        <IndianRupee size={13} className="text-accu-600" />
+                        <span className="text-[10px] font-bold text-slate-800 uppercase tracking-widest">
                             Live Metal Prices (INR)
                         </span>
                     </div>
                     <button onClick={loadPrices} disabled={priceLoading}
-                        className="text-gray-500 hover:text-cyan-400 transition-colors" title="Refresh prices">
+                        className="text-slate-400 hover:text-accu-600 transition-colors" title="Refresh prices">
                         <RefreshCw size={11} className={priceLoading ? 'animate-spin' : ''} />
                     </button>
                 </div>
                 {prices ? (
                     <div className="space-y-1">
                         <div className="flex justify-between items-center">
-                            <span className="text-[10px] text-gray-500">{mat?.name || materialId}</span>
-                            <span className="text-[11px] font-mono text-cyan-300 font-bold">
+                            <span className="text-[10px] text-slate-600">{mat?.name || materialId}</span>
+                            <span className="text-[11px] font-mono text-accu-700 font-bold">
                                 {livePriceInr != null ? `₹${fmt(livePriceInr)}/kg` : '—'}
                             </span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-[10px] text-gray-600">
+                            <span className="text-[10px] text-slate-500">
                                 {exchangeRate ? `USD→INR: ₹${exchangeRate.toFixed(2)}` : ''}
                             </span>
                             <span className={`text-[9px] font-mono ${sourceColor}`}>{sourceLabel}</span>
                         </div>
                     </div>
                 ) : (
-                    <p className="text-[10px] text-gray-600">
+                    <p className="text-[10px] text-slate-400">
                         {priceLoading ? 'Fetching prices…' : 'Backend offline — start the FastAPI server'}
                     </p>
                 )}
             </div>
 
             {/* ── Client Info ──────────────────────────────────────────────── */}
-            <div className="rounded-2xl bg-gradient-to-br from-white/[0.05] to-white/[0.01]
-                border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-md p-4 space-y-3">
-                <div className="flex items-center gap-2 border-b border-white/[0.05] pb-2">
-                    <User size={14} className="text-cyan-400" />
-                    <span className="text-[11px] font-bold text-gray-200 uppercase tracking-widest">
+            <div className="rounded-xl bg-white border border-slate-200 shadow-sm p-4 space-y-3">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <User size={14} className="text-accu-600" />
+                    <span className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">
                         Client Details
                     </span>
                 </div>
@@ -897,27 +894,26 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     placeholder="e.g. 84669310" icon={FileText} />
                 <Select label="Region / Manufacturing Hub" value={region} onChange={setRegion}
                     options={[
-                        { value: 'pune', label: 'Pune (Base)' },
+                        { value: 'pune', label: 'Pune (Base Hub)' },
                         { value: 'ahmedabad', label: 'Ahmedabad' },
                         { value: 'mumbai', label: 'Mumbai' },
                         { value: 'chennai', label: 'Chennai' },
                         { value: 'bangalore', label: 'Bangalore' },
-                        { value: 'delhi', label: 'Delhi' },
+                        { value: 'delhi', label: 'Delhi NCR' },
                     ]} />
             </div>
 
             {/* ── PDF auto-fill indicator ─────────────────────────────────── */}
             {fileMetrics?.source === 'pdf' && (
-                <div className="rounded-xl bg-purple-500/8 border border-purple-500/20 px-3 py-2.5
-                    flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse flex-shrink-0"
-                        style={{ boxShadow: '0 0 6px rgba(168,85,247,0.8)' }} />
+                <div className="rounded-xl bg-accuorange-50 border border-accuorange-200 px-3 py-2.5
+                    flex items-center gap-2 shadow-xs">
+                    <span className="w-2 h-2 rounded-full bg-accuorange-500 animate-pulse flex-shrink-0" />
                     <div>
-                        <p className="text-[10px] text-purple-300 font-mono font-bold">
+                        <p className="text-[10px] text-accuorange-700 font-mono font-bold">
                             AI Auto-Fill Active
                         </p>
-                        <p className="text-[9px] text-purple-400/70 font-mono">
-                            Material, process & tolerance pre-selected from PDF analysis.
+                        <p className="text-[9px] text-slate-600 font-mono">
+                            Material, process &amp; tolerance pre-selected from drawing.
                             {fileMetrics.partName && ` Part: ${fileMetrics.partName}`}
                         </p>
                     </div>
@@ -925,14 +921,13 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
             )}
 
             {/* ── Configuration selectors ─────────────────────────────────── */}
-            <div className="rounded-2xl bg-gradient-to-br from-white/[0.05] to-white/[0.01]
-                border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-md p-4 space-y-4">
-                <div className="flex items-center gap-2 border-b border-white/[0.05] pb-2">
-                    <Wrench size={14} className="text-cyan-400 drop-shadow-[0_0_8px_rgba(103,232,249,0.8)]" />
-                    <span className="text-[11px] font-bold text-gray-200 uppercase tracking-widest">
+            <div className="rounded-xl bg-white border border-slate-200 shadow-sm p-4 space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <Wrench size={14} className="text-accu-600" />
+                    <span className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">
                         Configuration
                     </span>
-                    {catLoading && <RefreshCw size={10} className="ml-auto text-gray-600 animate-spin" />}
+                    {catLoading && <RefreshCw size={10} className="ml-auto text-slate-400 animate-spin" />}
                 </div>
 
                 <Select label="Material" value={materialId} onChange={setMaterialId}
@@ -940,7 +935,7 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                 <MultiSelect label="Manufacturing Processes" selectedIds={processIds} onChange={setProcessIds}
                     options={procOptions} disabled={catLoading} />
                 {processIds.includes('sheet_metal_bending') && (
-                    <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-cyan-500/5 border border-cyan-500/10 animate-fadeIn">
+                    <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-accu-50/70 border border-accu-200 animate-fadeIn">
                         <TextInput
                             label="Bends Count"
                             type="number"
@@ -980,7 +975,7 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
 
                 {/* Quantity */}
                 <div className="space-y-1">
-                    <label className="text-[10px] text-gray-500 uppercase tracking-widest">Quantity</label>
+                    <label className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Quantity</label>
                     <input
                         type="number" min="1" max="10000"
                         value={quantity}
@@ -988,20 +983,20 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                             const v = parseInt(e.target.value, 10);
                             setQuantity(isNaN(v) ? 1 : Math.max(1, Math.min(10000, v)));
                         }}
-                        className="w-full bg-gray-800/70 border border-gray-700/60 text-gray-200
-                            text-[11px] rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500/50 font-mono"
+                        className="w-full bg-white border border-slate-300 text-slate-800
+                            text-[11px] rounded-lg px-3 py-2 focus:outline-none focus:border-accu-500 focus:ring-1 focus:ring-accu-500 font-mono shadow-sm"
                     />
                 </div>
 
                 {/* Setup Cost Toggle (Senior Req) */}
-                <div className="flex items-center justify-between py-2 px-1 border-gray-700/50">
+                <div className="flex items-center justify-between py-2 px-1 border-t border-slate-100">
                     <div className="flex items-center gap-2">
-                        <ToggleLeft size={12} className="text-gray-500" />
-                        <span className="text-[10px] text-gray-400 uppercase tracking-widest">Include Setup / Amortization</span>
+                        <ToggleLeft size={12} className="text-slate-400" />
+                        <span className="text-[10px] text-slate-600 uppercase tracking-widest">Include Setup / Amortization</span>
                     </div>
                     <button
                         onClick={() => setIncludeSetupCost(!includeSetupCost)}
-                        className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${includeSetupCost ? 'bg-cyan-500/60' : 'bg-gray-700'
+                        className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${includeSetupCost ? 'bg-accu-600' : 'bg-slate-300'
                             }`}
                     >
                         <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${includeSetupCost ? 'left-[18px]' : 'left-0.5'
@@ -1012,12 +1007,12 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                 {/* Drilling Surcharge Toggle */}
                 <div className="flex items-center justify-between pb-2 pt-0 px-1">
                     <div className="flex items-center gap-2">
-                        <ToggleLeft size={12} className="text-gray-500" />
-                        <span className="text-[10px] text-gray-400 uppercase tracking-widest">Include Drilling Surcharge</span>
+                        <ToggleLeft size={12} className="text-slate-400" />
+                        <span className="text-[10px] text-slate-600 uppercase tracking-widest">Include Drilling Surcharge</span>
                     </div>
                     <button
                         onClick={() => setIncludeDrillingSurcharge(!includeDrillingSurcharge)}
-                        className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${includeDrillingSurcharge ? 'bg-cyan-500/60' : 'bg-gray-700'
+                        className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${includeDrillingSurcharge ? 'bg-accu-600' : 'bg-slate-300'
                             }`}
                     >
                         <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${includeDrillingSurcharge ? 'left-[18px]' : 'left-0.5'
@@ -1025,20 +1020,20 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     </button>
                 </div>
 
-                {/* Hole Count Override (Senior Req) */}
+                {/* Hole Count Override */}
                 {geometry && (
                     <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
-                            <CircleDot size={10} /> Hole Count
-                            <span className="text-gray-600 normal-case tracking-normal ml-1">
+                        <label className="text-[10px] text-slate-500 uppercase tracking-widest flex items-center gap-1.5 font-semibold">
+                            <CircleDot size={10} className="text-accu-600" /> Hole Count
+                            <span className="text-slate-400 normal-case tracking-normal ml-1">
                                 (AI detected: {geometry?.holes?.length || 0})
                             </span>
                         </label>
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => setHoleCountOverride(prev => Math.max(0, (prev < 0 ? (geometry?.holes?.length || 0) : prev) - 1))}
-                                className="w-7 h-7 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 
-                                    hover:border-cyan-500/50 hover:text-cyan-300 flex items-center justify-center transition-colors"
+                                className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 
+                                    hover:border-accu-500 hover:text-accu-600 flex items-center justify-center transition-colors"
                             >
                                 <Minus size={12} />
                             </button>
@@ -1049,42 +1044,41 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                                     const v = parseInt(e.target.value, 10);
                                     setHoleCountOverride(isNaN(v) ? -1 : Math.max(0, Math.min(200, v)));
                                 }}
-                                className="flex-1 bg-gray-800/70 border border-gray-700/60 text-gray-200
+                                className="flex-1 bg-white border border-slate-300 text-slate-800
                                     text-[11px] rounded-lg px-3 py-1.5 text-center focus:outline-none 
-                                    focus:border-cyan-500/50 font-mono"
+                                    focus:border-accu-500 font-mono shadow-sm"
                             />
                             <button
                                 onClick={() => setHoleCountOverride(prev => (prev < 0 ? (geometry?.holes?.length || 0) : prev) + 1)}
-                                className="w-7 h-7 rounded-lg bg-gray-800 border border-gray-700 text-gray-300
-                                    hover:border-cyan-500/50 hover:text-cyan-300 flex items-center justify-center transition-colors"
+                                className="w-7 h-7 rounded-lg bg-slate-100 border border-slate-200 text-slate-700
+                                    hover:border-accu-500 hover:text-accu-600 flex items-center justify-center transition-colors"
                             >
                                 <Plus size={12} />
                             </button>
                             {holeCountOverride >= 0 && (
                                 <button
                                     onClick={() => setHoleCountOverride(-1)}
-                                    className="text-[9px] text-amber-400/80 hover:text-amber-300 font-mono underline"
+                                    className="text-[9px] text-accuorange-600 hover:text-accuorange-700 font-mono font-bold underline"
                                 >Reset</button>
                             )}
                         </div>
                         {holeCountOverride >= 0 && holeCountOverride !== (geometry?.holes?.length || 0) && (
-                            <p className="text-[9px] text-amber-400/70 font-mono flex items-center gap-1">
+                            <p className="text-[9px] text-amber-600 font-mono flex items-center gap-1">
                                 <AlertCircle size={9} /> Overridden from {geometry?.holes?.length || 0} → {holeCountOverride}
                             </p>
                         )}
                     </div>
                 )}
 
-                {/* ── Material Verification (INSIDE config — above Generate) ── */}
+                {/* ── Material Verification ── */}
                 {geometry && materialEstimate && (
-                    <div className="rounded-xl bg-gradient-to-br from-emerald-900/15 to-black/40
-                        border border-emerald-500/15 p-3 space-y-2 mt-1">
-                        <div className="flex items-center gap-2 border-b border-emerald-500/10 pb-1.5">
-                            <Eye size={12} className="text-emerald-400" />
-                            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">
+                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2 mt-1">
+                        <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
+                            <Eye size={12} className="text-accu-600" />
+                            <span className="text-[10px] font-bold text-slate-800 uppercase tracking-widest">
                                 Material Verification
                             </span>
-                            <span className="text-[8px] text-emerald-400/70 font-mono ml-auto">
+                            <span className="text-[8px] text-emerald-600 font-mono font-bold ml-auto">
                                 {estimateLoading ? '⟳ ...' : '✓ Ready'}
                             </span>
                         </div>
@@ -1096,8 +1090,8 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                                 value={`${parseFloat(geometry.boundingBox?.sizeX || 0).toFixed(1)} × ${parseFloat(geometry.boundingBox?.sizeY || 0).toFixed(1)} × ${parseFloat(geometry.boundingBox?.sizeZ || 0).toFixed(1)}`} />
                         </div>
 
-                        <div className="bg-black/25 rounded-lg p-2 space-y-0.5">
-                            <p className="text-[8px] text-emerald-400/70 uppercase tracking-widest font-bold mb-0.5">Envelope</p>
+                        <div className="bg-white rounded-lg p-2.5 space-y-0.5 border border-slate-200/80 shadow-xs">
+                            <p className="text-[8px] text-accu-600 uppercase tracking-widest font-bold mb-0.5">Envelope</p>
                             {materialEstimate.standard_diameter_mm && (
                                 <LineItem label="Std Ø" value={`${materialEstimate.standard_diameter_mm} mm`} highlight />
                             )}
@@ -1113,8 +1107,8 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                             <LineItem label="Vol." value={`${fmt(materialEstimate.envelope_volume_mm3)} mm³`} />
                         </div>
 
-                        <div className="bg-black/25 rounded-lg p-2 space-y-0.5">
-                            <p className="text-[8px] text-emerald-400/70 uppercase tracking-widest font-bold mb-0.5">Weight & Cost</p>
+                        <div className="bg-white rounded-lg p-2.5 space-y-0.5 border border-slate-200/80 shadow-xs">
+                            <p className="text-[8px] text-accu-600 uppercase tracking-widest font-bold mb-0.5">Weight & Cost</p>
                             <LineItem label="Wt/Part" value={`${materialEstimate.gross_weight_per_part_kg?.toFixed(3)} kg`} highlight />
                             <LineItem label="Batch Wt" value={`${materialEstimate.total_batch_weight_kg?.toFixed(3)} kg`} />
                             <LineItem label="Utilization" value={`${materialEstimate.material_utilization_pct}%`} />
@@ -1124,19 +1118,15 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                             )}
                         </div>
 
-                        <p className="text-[8px] text-gray-600 font-mono leading-tight">
-                            +{materialEstimate.allowances?.surface_allowance_mm}mm surf, +{materialEstimate.allowances?.saw_kerf_mm}mm kerf{materialEstimate.allowances?.end_grip_mm > 0 ? `, +${materialEstimate.allowances?.end_grip_mm}mm grip` : ''}, {materialEstimate.allowances?.scrap_factor_pct}% scrap
-                        </p>
-
                         {/* Validate with AI button */}
                         <button
                             onClick={validateWithAI}
                             disabled={aiValidating || !materialEstimate}
                             className="w-full py-2 rounded-lg text-[10px] font-bold tracking-wider
                                 transition-all duration-200 flex items-center justify-center gap-1.5
-                                border border-purple-500/30 bg-purple-500/5 text-purple-300
-                                hover:bg-purple-500/15 hover:border-purple-400/50 active:scale-[0.98]
-                                disabled:opacity-40 disabled:cursor-not-allowed"
+                                border border-accu-300 bg-accu-50 text-accu-700
+                                hover:bg-accu-100 hover:border-accu-400 active:scale-[0.98]
+                                disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
                         >
                             {aiValidating
                                 ? <><RefreshCw size={11} className="animate-spin" /> Validating...</>
@@ -1146,51 +1136,42 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                         {/* AI Validation Result */}
                         {aiValidation && (
                             <div className={`rounded-lg p-2.5 space-y-1 border ${aiValidation.success
-                                ? aiValidation.match_level === 'excellent' ? 'bg-emerald-500/10 border-emerald-500/25'
-                                    : aiValidation.match_level === 'good' ? 'bg-blue-500/10 border-blue-500/25'
-                                        : aiValidation.match_level === 'fair' ? 'bg-amber-500/10 border-amber-500/25'
-                                            : 'bg-red-500/10 border-red-500/25'
-                                : 'bg-red-500/10 border-red-500/25'
+                                ? aiValidation.match_level === 'excellent' ? 'bg-emerald-50 border-emerald-200'
+                                    : aiValidation.match_level === 'good' ? 'bg-accu-50 border-accu-200'
+                                        : aiValidation.match_level === 'fair' ? 'bg-amber-50 border-amber-200'
+                                            : 'bg-red-50 border-red-200'
+                                : 'bg-red-50 border-red-200'
                                 }`}>
                                 {aiValidation.success ? (
                                     <>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
+                                            <span className="text-[10px] font-bold text-slate-800 flex items-center gap-1">
                                                 <ShieldCheck size={11} className={
-                                                    aiValidation.match_level === 'excellent' ? 'text-emerald-400' :
-                                                        aiValidation.match_level === 'good' ? 'text-blue-400' :
-                                                            aiValidation.match_level === 'fair' ? 'text-amber-400' : 'text-red-400'
+                                                    aiValidation.match_level === 'excellent' ? 'text-emerald-600' :
+                                                        aiValidation.match_level === 'good' ? 'text-accu-600' :
+                                                            aiValidation.match_level === 'fair' ? 'text-amber-600' : 'text-red-600'
                                                 } />
                                                 AI Confidence
                                             </span>
-                                            <span className={`text-[13px] font-bold font-mono ${aiValidation.confidence_score >= 85 ? 'text-emerald-300' :
-                                                aiValidation.confidence_score >= 60 ? 'text-blue-300' :
-                                                    aiValidation.confidence_score >= 40 ? 'text-amber-300' : 'text-red-300'
+                                            <span className={`text-[13px] font-bold font-mono ${aiValidation.confidence_score >= 85 ? 'text-emerald-700' :
+                                                aiValidation.confidence_score >= 60 ? 'text-accu-700' :
+                                                    aiValidation.confidence_score >= 40 ? 'text-amber-700' : 'text-red-700'
                                                 }`}>
                                                 {aiValidation.confidence_score}%
                                             </span>
                                         </div>
-                                        <div className="w-full bg-gray-800 rounded-full h-1.5 mt-0.5">
+                                        <div className="w-full bg-slate-200 rounded-full h-1.5 mt-0.5">
                                             <div
-                                                className={`h-1.5 rounded-full transition-all duration-500 ${aiValidation.confidence_score >= 85 ? 'bg-emerald-400' :
-                                                    aiValidation.confidence_score >= 60 ? 'bg-blue-400' :
-                                                        aiValidation.confidence_score >= 40 ? 'bg-amber-400' : 'bg-red-400'
+                                                className={`h-1.5 rounded-full transition-all duration-500 ${aiValidation.confidence_score >= 85 ? 'bg-emerald-500' :
+                                                    aiValidation.confidence_score >= 60 ? 'bg-accu-500' :
+                                                        aiValidation.confidence_score >= 40 ? 'bg-amber-500' : 'bg-red-500'
                                                     }`}
                                                 style={{ width: `${aiValidation.confidence_score}%` }}
                                             />
                                         </div>
-                                        <p className="text-[9px] text-gray-400 mt-1">
-                                            Match: <span className="font-bold capitalize">{aiValidation.match_level}</span>
-                                            {aiValidation.weight_diff_pct > 0 && ` (${aiValidation.weight_diff_pct}% diff)`}
-                                        </p>
-                                        {aiValidation.discrepancy_notes && aiValidation.discrepancy_notes !== 'Values align' && (
-                                            <p className="text-[9px] text-amber-400/80 mt-0.5">
-                                                ⚠ {aiValidation.discrepancy_notes}
-                                            </p>
-                                        )}
                                     </>
                                 ) : (
-                                    <p className="text-[9px] text-red-400 flex items-center gap-1">
+                                    <p className="text-[9px] text-red-600 flex items-center gap-1">
                                         <AlertCircle size={10} /> {aiValidation.error}
                                     </p>
                                 )}
@@ -1203,96 +1184,94 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                 <button
                     onClick={generateQuote}
                     disabled={loading || (!geometry && !(fileMetrics?.allParts?.length > 1) && !(accumulatedParts.length > 1))}
-                    className={`w-full py-3 mt-1 rounded-xl text-[12px] font-bold tracking-wider
+                    className={`w-full py-3.5 mt-1 rounded-xl text-[12px] font-bold tracking-wider
                         transition-all duration-300 flex items-center justify-center gap-2
                         ${(geometry || fileMetrics?.allParts?.length > 1 || accumulatedParts.length > 1)
-                            ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 shadow-[0_0_20px_rgba(34,211,238,0.3)] hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] hover:scale-[1.02] active:scale-[0.98]'
-                            : 'bg-white/5 text-gray-500 cursor-not-allowed border border-white/10'}`}
+                            ? 'bg-accu-600 text-white hover:bg-accu-700 shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]'
+                            : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'}`}
                 >
                     {loading
-                        ? <><RefreshCw size={14} className="animate-spin" /> Computing…</>
-                        : <><Zap size={14} className="drop-shadow-md" />
+                        ? <><RefreshCw size={14} className="animate-spin" /> Computing Estimate…</>
+                        : <><Zap size={15} className="text-accuorange-400 drop-shadow" />
                             {accumulatedParts.length > 1
                                 ? `Generate Combined Quote (${accumulatedParts.length} parts)`
-                                : (geometry || fileMetrics?.allParts?.length > 1) ? 'Generate Quote (₹)' : 'Upload STEP/PDF First'}</>
+                                : (geometry || fileMetrics?.allParts?.length > 1) ? 'Generate Instant Quote (₹)' : 'Upload STEP / PDF First'}</>
                     }
                 </button>
 
                 {/* Error */}
                 {error && (
-                    <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-                        <AlertCircle size={12} className="text-red-400 mt-0.5 flex-shrink-0" />
-                        <p className="text-[11px] text-red-400 leading-relaxed">{error}</p>
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-red-50 border border-red-200">
+                        <AlertCircle size={12} className="text-red-500 mt-0.5 flex-shrink-0" />
+                        <p className="text-[11px] text-red-600 leading-relaxed">{error}</p>
                     </div>
                 )}
             </div>
 
             {/* ── Multi-Part Tabular Quote (for assemblies) ──────────────── */}
             {multiQuote && (
-                <div ref={resultRef} className="rounded-2xl bg-gradient-to-b from-purple-900/30 to-black/60
-                    border border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.15)]
-                    backdrop-blur-xl p-4 space-y-3 relative overflow-hidden">
+                <div ref={resultRef} className="rounded-xl bg-white border border-slate-200 shadow-md p-4 space-y-3 relative overflow-hidden">
 
                     {/* Header */}
-                    <div className="flex items-center gap-2 border-b border-purple-500/20 pb-2">
-                        <Layers size={15} className="text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
-                        <span className="text-[11px] font-bold text-white uppercase tracking-widest">
+                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <Layers size={15} className="text-accu-600" />
+                        <span className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">
                             BOM Assembly Quote (₹ INR)
                         </span>
                     </div>
 
                     {/* Quote Number */}
                     {multiQuote.quote_number && (
-                        <div className="bg-gray-900/70 rounded-lg px-3 py-2 flex justify-between items-center">
+                        <div className="bg-slate-50 rounded-lg px-3 py-2 flex justify-between items-center border border-slate-200">
                             <div>
-                                <p className="text-[9px] text-gray-500 uppercase tracking-widest">Quotation No.</p>
-                                <p className="text-[12px] font-mono text-purple-300 font-bold">{multiQuote.quote_number}</p>
+                                <p className="text-[9px] text-slate-500 uppercase tracking-widest font-semibold">Quotation No.</p>
+                                <p className="text-[12px] font-mono text-accu-700 font-bold">{multiQuote.quote_number}</p>
                             </div>
                             <div className="text-right">
-                                <p className="text-[9px] text-gray-500 uppercase tracking-widest">Total Parts</p>
-                                <p className="text-[12px] font-mono text-gray-300 font-bold">{multiQuote.parts.length}</p>
+                                <p className="text-[9px] text-slate-500 uppercase tracking-widest font-semibold">Total Parts</p>
+                                <p className="text-[12px] font-mono text-slate-800 font-bold">{multiQuote.parts.length}</p>
                             </div>
                         </div>
                     )}
 
                     {/* Tabular Data */}
-                    <div className="overflow-x-auto custom-scrollbar rounded-lg border border-purple-500/10">
+                    <div className="overflow-x-auto custom-scrollbar rounded-lg border border-slate-200">
                         <table className="w-full text-left border-collapse whitespace-nowrap text-[10px]">
                             <thead>
-                                <tr className="bg-purple-500/10 text-purple-200 border-b border-purple-500/20">
-                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase">Item #</th>
-                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase">Part Name / Desc</th>
-                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase">Material</th>
-                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase">Dimensions (mm)</th>
-                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase">Qty</th>
-                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase">Process</th>
-                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase whitespace-nowrap">Machining Cost (₹)</th>
-                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase whitespace-nowrap">Material Cost (₹)</th>
-                                    <th className="px-2 py-1.5 font-medium tracking-wider uppercase whitespace-nowrap">Critical Considerations</th>
+                                <tr className="bg-slate-50 text-slate-700 border-b border-slate-200">
+                                    <th className="px-2.5 py-2 font-bold tracking-wider uppercase">Item #</th>
+                                    <th className="px-2.5 py-2 font-bold tracking-wider uppercase">Part Name / Desc</th>
+                                    <th className="px-2.5 py-2 font-bold tracking-wider uppercase">Material</th>
+                                    <th className="px-2.5 py-2 font-bold tracking-wider uppercase">Dimensions (mm)</th>
+                                    <th className="px-2.5 py-2 font-bold tracking-wider uppercase">Qty</th>
+                                    <th className="px-2.5 py-2 font-bold tracking-wider uppercase">Process</th>
+                                    <th className="px-2.5 py-2 font-bold tracking-wider uppercase">Machining Cost</th>
+                                    <th className="px-2.5 py-2 font-bold tracking-wider uppercase">Material Cost</th>
+                                    <th className="px-2.5 py-2 font-bold tracking-wider uppercase">Critical Considerations</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/5">
+                            <tbody className="divide-y divide-slate-100">
                                 {multiQuote.parts.map((p, i) => (
-                                    <tr key={i} className={`hover:bg-white/5 transition-colors ${p.isBuyout ? 'opacity-80 bg-black/20' : ''}`}>
-                                        <td className="px-2 py-2 font-mono text-gray-400">{p.item_number}</td>
-                                        <td className="px-2 py-2 text-cyan-100 max-w-[150px] truncate" title={p.name}>{p.name}</td>
-                                        <td className="px-2 py-2 text-gray-300 max-w-[120px] truncate">{p.material}</td>
-                                        <td className="px-2 py-2 text-gray-400 font-mono text-[9px]">{p.dimensions}</td>
-                                        <td className="px-2 py-2 font-mono text-cyan-300">{p.qty}</td>
-                                        <td className="px-2 py-2 text-gray-300">
-                                            {p.isBuyout ? <span className="text-amber-400/80 text-[9px] uppercase tracking-wider bg-amber-400/10 px-1 py-0.5 rounded border border-amber-400/20">{p.process}</span> : p.process}
+                                    <tr key={i} className={`hover:bg-slate-50 transition-colors ${p.isBuyout ? 'opacity-80 bg-slate-50/50' : ''}`}>
+                                        <td className="px-2.5 py-2 font-mono text-slate-500">{p.item_number}</td>
+                                        <td className="px-2.5 py-2 text-slate-800 font-medium max-w-[150px] truncate" title={p.name}>{p.name}</td>
+                                        <td className="px-2.5 py-2 text-slate-600 max-w-[120px] truncate">{p.material}</td>
+                                        <td className="px-2.5 py-2 text-slate-500 font-mono text-[9px]">{p.dimensions}</td>
+                                        <td className="px-2.5 py-2 font-mono text-accu-700 font-bold">{p.qty}</td>
+                                        <td className="px-2.5 py-2 text-slate-700">
+                                            {p.isBuyout ? <span className="text-accuorange-600 text-[9px] uppercase tracking-wider bg-accuorange-50 px-1.5 py-0.5 rounded border border-accuorange-200 font-bold">{p.process}</span> : p.process}
                                         </td>
-                                        <td className="px-2 py-2 font-mono text-gray-300">{p.isBuyout ? '—' : `₹${fmt(p.machining_cost)}`}</td>
-                                        <td className="px-2 py-2 font-mono text-gray-300">{p.isBuyout ? '—' : `₹${fmt(p.material_cost)}`}</td>
-                                        <td className="px-2 py-2 text-gray-400 text-[9px] max-w-[200px] truncate" title={p.critical_considerations}>{p.critical_considerations}</td>
+                                        <td className="px-2.5 py-2 font-mono text-slate-700">{p.isBuyout ? '—' : `₹${fmt(p.machining_cost)}`}</td>
+                                        <td className="px-2.5 py-2 font-mono text-slate-700">{p.isBuyout ? '—' : `₹${fmt(p.material_cost)}`}</td>
+                                        <td className="px-2.5 py-2 text-slate-500 text-[9px] max-w-[200px] truncate" title={p.critical_considerations}>{p.critical_considerations}</td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
 
-                    {/* Totals — uses pre-computed combined values */}
-                    <div className="border-t border-purple-500/20 pt-2 space-y-0.5 mt-2">
+                    {/* Totals */}
+                    <div className="border-t border-slate-100 pt-2 space-y-0.5 mt-2">
                         <LineItem
                             label="Order Subtotal (Pre-Tax)"
                             value={`₹${fmt(multiQuote.combined_order_total || multiQuote.parts.reduce((sum, p) => sum + (p.order_total || 0), 0))}`}
@@ -1310,21 +1289,20 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                             value={`₹${fmt(multiQuote.combined_grand_total || 0)}`}
                             highlight large
                         />
-                        <p className="text-[9px] text-gray-500 text-right italic pt-1">All prices in ₹ INR. Buyout items quoted separately.</p>
+                        <p className="text-[9px] text-slate-400 text-right italic pt-1">All prices in ₹ INR. Buyout items quoted separately.</p>
 
                         {/* Download BOM PDF */}
                         <button
                             onClick={downloadBomPdf}
                             disabled={pdfLoading}
-                            className="w-full py-2.5 mt-2 rounded-xl text-[12px] font-bold tracking-wider
+                            className="w-full py-3 mt-2 rounded-xl text-[12px] font-bold tracking-wider
                                 transition-all duration-300 flex items-center justify-center gap-2
-                                border border-purple-500/30 bg-white/5 text-purple-300
-                                hover:bg-purple-500/10 hover:border-purple-400 active:scale-[0.98]
-                                disabled:opacity-50 disabled:cursor-not-allowed"
+                                bg-accuorange-500 text-white hover:bg-accuorange-600 shadow-md
+                                active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {pdfLoading
                                 ? <><RefreshCw size={14} className="animate-spin" /> Generating PDF…</>
-                                : <><FileText size={14} /> Download Quote (PDF)</>}
+                                : <><FileText size={15} /> Download Official AccuDesign Quote (PDF)</>}
                         </button>
                     </div>
                 </div>
@@ -1332,18 +1310,16 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
 
             {/* ── Quote result (INR) ──────────────────────────────────────── */}
             {quote && (
-                <div ref={resultRef} className="rounded-2xl bg-gradient-to-b from-cyan-900/30 to-black/60
-                    border border-cyan-500/30 shadow-[0_0_30px_rgba(34,211,238,0.15)]
-                    backdrop-blur-xl p-4 space-y-3">
+                <div ref={resultRef} className="rounded-xl bg-white border border-slate-200 shadow-md p-4 space-y-3">
 
                     {/* Header */}
-                    <div className="flex items-center gap-2 border-b border-cyan-500/20 pb-2">
-                        <CheckCircle size={15} className="text-green-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.8)]" />
-                        <span className="text-[11px] font-bold text-white uppercase tracking-widest">
+                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <CheckCircle size={15} className="text-emerald-600" />
+                        <span className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">
                             Quote Result (₹ INR)
                         </span>
-                        <span className={`ml-auto text-[9px] font-mono font-medium ${quote.price_source === 'metals_dev' ? 'text-green-300' :
-                            quote.price_source === 'world_bank' ? 'text-blue-300' : 'text-amber-300'}`}>
+                        <span className={`ml-auto text-[9px] font-mono font-bold ${quote.price_source === 'metals_dev' ? 'text-emerald-600' :
+                            quote.price_source === 'world_bank' ? 'text-accu-600' : 'text-amber-600'}`}>
                             {quote.price_source === 'metals_dev' ? '● LME Live' :
                                 quote.price_source === 'world_bank' ? '● World Bank' : '◐ Estimated'}
                         </span>
@@ -1351,14 +1327,14 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
 
                     {/* Quote Number */}
                     {quote.quote_number && (
-                        <div className="bg-gray-900/70 rounded-lg px-3 py-2">
-                            <p className="text-[9px] text-gray-500 uppercase tracking-widest">Quotation No.</p>
-                            <p className="text-[12px] font-mono text-cyan-300 font-bold">{quote.quote_number}</p>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                            <p className="text-[9px] text-slate-500 uppercase tracking-widest font-semibold">Quotation No.</p>
+                            <p className="text-[12px] font-mono text-accu-700 font-bold">{quote.quote_number}</p>
                         </div>
                     )}
 
                     {/* Cost breakdown (INR) */}
-                    <div className="bg-gray-900/50 rounded-lg p-2 space-y-0.5">
+                    <div className="bg-slate-50 rounded-lg p-2.5 space-y-0.5 border border-slate-200">
                         <LineItem label="Material Cost" value={`₹${fmt(quote.breakdown?.material_cost)}`} />
                         <LineItem label="Machining Cost" value={`₹${fmt(quote.breakdown?.machining_cost)}`} />
                         {(quote.breakdown?.drilling_cost > 0) &&
@@ -1373,7 +1349,7 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     </div>
 
                     {/* Totals (INR) */}
-                    <div className="border-t border-gray-700/60 pt-2 space-y-0.5">
+                    <div className="border-t border-slate-100 pt-2 space-y-0.5">
                         <LineItem label="Unit Price" value={`₹${fmt(quote.unit_price)}`} />
                         {quote.discount_pct > 0 &&
                             <LineItem
@@ -1387,7 +1363,7 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     </div>
 
                     {/* GST */}
-                    <div className="border-t border-gray-700/40 pt-2 space-y-0.5">
+                    <div className="border-t border-slate-100 pt-2 space-y-0.5">
                         <LineItem label="SGST (9%)" value={`₹${fmt(quote.sgst)}`} />
                         <LineItem label="CGST (9%)" value={`₹${fmt(quote.cgst)}`} />
                         <LineItem
@@ -1398,7 +1374,7 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     </div>
 
                     {/* Part info + Material Estimate */}
-                    <div className="border-t border-gray-700/40 pt-2 space-y-0.5">
+                    <div className="border-t border-slate-100 pt-2 space-y-0.5">
                         <LineItem label="Part Mass" value={`${fmt(quote.mass_kg, 3)} kg`} />
                         {quote.scrap_weight_kg != null && (
                             <LineItem label="Scrap Value" value={`${fmt(quote.scrap_weight_kg, 3)} kg`} />
@@ -1422,22 +1398,22 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
 
                     {/* DFM Feedback Section */}
                     {quote.dfm_feedback && (quote.dfm_feedback.warnings?.length > 0 || quote.dfm_feedback.recommendations?.length > 0) && (
-                        <div className="border-t border-gray-700/40 pt-3 space-y-3">
+                        <div className="border-t border-slate-100 pt-3 space-y-3">
                             <div className="flex items-center gap-1.5">
-                                <Zap size={13} className="text-cyan-400 animate-pulse" />
-                                <span className="text-[10px] font-bold text-gray-200 uppercase tracking-widest">
+                                <Zap size={13} className="text-accuorange-500 animate-pulse" />
+                                <span className="text-[10px] font-bold text-slate-800 uppercase tracking-widest">
                                     Design for Manufacturing (DFM)
                                 </span>
                             </div>
                             
                             {quote.dfm_feedback.warnings?.length > 0 && (
                                 <div className="space-y-1.5">
-                                    <p className="text-[9px] text-amber-400 font-bold uppercase tracking-wider">Warnings</p>
+                                    <p className="text-[9px] text-amber-700 font-bold uppercase tracking-wider">Warnings</p>
                                     <div className="space-y-1">
                                         {quote.dfm_feedback.warnings.map((warn, idx) => (
-                                            <div key={idx} className="flex items-start gap-1.5 bg-amber-500/5 border border-amber-500/10 rounded-lg p-2">
-                                                <AlertCircle size={12} className="text-amber-400 shrink-0 mt-0.5" />
-                                                <p className="text-[10px] text-amber-200/90 font-mono leading-relaxed">{warn}</p>
+                                            <div key={idx} className="flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                                                <AlertCircle size={12} className="text-amber-600 shrink-0 mt-0.5" />
+                                                <p className="text-[10px] text-amber-900 font-mono leading-relaxed">{warn}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -1446,12 +1422,12 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
 
                             {quote.dfm_feedback.recommendations?.length > 0 && (
                                 <div className="space-y-1.5">
-                                    <p className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider">Recommendations</p>
+                                    <p className="text-[9px] text-accu-700 font-bold uppercase tracking-wider">Recommendations</p>
                                     <div className="space-y-1">
                                         {quote.dfm_feedback.recommendations.map((rec, idx) => (
-                                            <div key={idx} className="flex items-start gap-1.5 bg-cyan-500/5 border border-cyan-500/10 rounded-lg p-2">
-                                                <Zap size={12} className="text-cyan-400 shrink-0 mt-0.5" />
-                                                <p className="text-[10px] text-cyan-200/90 font-mono leading-relaxed">{rec}</p>
+                                            <div key={idx} className="flex items-start gap-1.5 bg-accu-50 border border-accu-200 rounded-lg p-2">
+                                                <Zap size={12} className="text-accu-600 shrink-0 mt-0.5" />
+                                                <p className="text-[10px] text-accu-900 font-mono leading-relaxed">{rec}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -1464,15 +1440,14 @@ export default function QuotePanel({ activePart, onUpdatePartData, geometry, fil
                     <button
                         onClick={downloadPdf}
                         disabled={pdfLoading}
-                        className="w-full py-2.5 rounded-xl text-[12px] font-bold tracking-wider
+                        className="w-full py-3 rounded-xl text-[12px] font-bold tracking-wider
                             transition-all duration-300 flex items-center justify-center gap-2
-                            border border-cyan-500/30 bg-white/5 text-cyan-300
-                            hover:bg-cyan-500/10 hover:border-cyan-400 active:scale-[0.98]
-                            disabled:opacity-50 disabled:cursor-not-allowed"
+                            bg-accuorange-500 text-white hover:bg-accuorange-600 shadow-md
+                            active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {pdfLoading
                             ? <><RefreshCw size={14} className="animate-spin" /> Generating PDF…</>
-                            : <><FileText size={14} /> Download ACCU AI Quote (PDF)</>}
+                            : <><FileText size={15} /> Download Official AccuDesign Quote (PDF)</>}
                     </button>
                 </div>
             )}

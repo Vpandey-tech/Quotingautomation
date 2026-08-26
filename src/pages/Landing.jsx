@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Cog, PenTool, ArrowRight, Shield, Zap, ShieldCheck, Leaf, LogOut, Lock, UserCheck
+  Cog, PenTool, ArrowRight, Zap, ShieldCheck, Leaf, LogOut, Lock, UserCheck, Layers
 } from 'lucide-react';
 
 export default function Landing() {
@@ -15,134 +15,122 @@ export default function Landing() {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col items-center justify-center relative overflow-hidden"
-      style={{ background: 'linear-gradient(135deg, #040812 0%, #081022 40%, #050a16 100%)' }}>
+    <div className="h-screen w-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#f8fafc] text-slate-800 font-sans">
 
-      {/* Grid Overlay */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293706_1px,transparent_1px),linear-gradient(to_bottom,#1f293706_1px,transparent_1px)] bg-[size:3rem_3rem] pointer-events-none" />
+      {/* Subtle Grid Overlay */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#2479c20d_1px,transparent_1px),linear-gradient(to_bottom,#2479c20d_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] pointer-events-none" />
 
-      {/* Ambient glow - green/cyan for sustainability & security */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full opacity-[0.06] pointer-events-none"
-        style={{ background: 'radial-gradient(circle, #10b981 0%, transparent 70%)' }} />
-      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full opacity-[0.04] pointer-events-none"
-        style={{ background: 'radial-gradient(circle, #06b6d4 0%, transparent 70%)' }} />
+      {/* Ambient glow - AccuDesign blue & subtle orange */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[650px] h-[650px] rounded-full opacity-[0.10] pointer-events-none"
+        style={{ background: 'radial-gradient(circle, #2479C2 0%, transparent 70%)' }} />
+      <div className="absolute bottom-1/4 right-1/4 w-[450px] h-[450px] rounded-full opacity-[0.06] pointer-events-none"
+        style={{ background: 'radial-gradient(circle, #f1683a 0%, transparent 70%)' }} />
 
       {/* Top Session & Logout Panel */}
       <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-20">
-        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-emerald-500/10 bg-emerald-500/[0.02] backdrop-blur-md">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[10px] font-mono tracking-widest text-emerald-400 uppercase flex items-center gap-1.5">
-            <UserCheck size={10} /> Secure Session: {currentUser}
+        <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white/90 backdrop-blur-md shadow-sm">
+          <div className="w-2 h-2 rounded-full bg-accu-500 animate-pulse" />
+          <span className="text-[10px] font-mono tracking-widest text-slate-700 uppercase flex items-center gap-1.5 font-bold">
+            <UserCheck size={11} className="text-accu-600" /> Active Session: {currentUser}
           </span>
         </div>
         
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-mono tracking-wider uppercase
-            text-gray-500 hover:text-red-400 hover:bg-red-500/5 transition-all border border-transparent hover:border-red-500/10"
+          className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-[10px] font-mono tracking-wider uppercase
+            text-slate-500 hover:text-red-600 hover:bg-red-50 transition-all border border-slate-200 bg-white/90 backdrop-blur-md shadow-sm"
         >
           <LogOut size={12} /> Log Out
         </button>
       </div>
 
-      {/* Header */}
-      <div className="relative z-10 text-center mb-12">
+      {/* Header with AccuDesign Logo */}
+      <div className="relative z-10 text-center mb-10">
         <div className="flex items-center justify-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(6,180,212,0.05))', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <ShieldCheck size={20} className="text-emerald-400" />
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white border border-slate-200 shadow-md">
+            <img 
+              src="https://res.cloudinary.com/dxrryep5y/image/upload/v1753295781/website_static_media/ad_logo.svg" 
+              alt="ACCU DESIGN" 
+              className="w-8 h-8 object-contain"
+            />
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white uppercase" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            ACCU DESIGN
-          </h1>
+          <div className="text-left">
+            <h1 className="text-3xl lg:text-4xl font-black tracking-tight text-slate-900 uppercase font-heading">
+              ACCU DESIGN
+            </h1>
+            <p className="text-accu-600 text-[10px] font-mono tracking-widest uppercase font-bold">
+              ON-DEMAND PRECISION MANUFACTURING &amp; QUOTING
+            </p>
+          </div>
         </div>
-        <p className="text-gray-500 text-xs font-mono tracking-widest uppercase">
-          SECURE & CARBON-NEUTRAL ENGINEERING INTERACTION CORE
-        </p>
       </div>
 
       {/* Cards */}
-      <div className="relative z-10 flex flex-col md:flex-row gap-6 px-8 max-w-4xl w-full">
+      <div className="relative z-10 flex flex-col md:flex-row gap-6 px-6 max-w-4xl w-full">
 
-        {/* Design Tool Card */}
+        {/* Quoting Engine Card - Highlighted primary tool */}
         <button
-          onClick={() => navigate('/design')}
+          onClick={() => navigate('/quote')}
           className="flex-1 group relative rounded-2xl p-8 text-left transition-all duration-300
-            hover:shadow-[0_8px_40px_rgba(16,185,129,0.08)] hover:-translate-y-1"
-          style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%)',
-            border: '1px solid rgba(255,255,255,0.06)',
-          }}
+            bg-white border border-slate-200 shadow-md hover:shadow-xl hover:-translate-y-1 hover:border-accu-400"
         >
-          <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-            style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.04) 0%, transparent 60%)' }} />
-
           <div className="relative z-10">
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-6"
-              style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(16,185,129,0.02))', border: '1px solid rgba(16,185,129,0.15)' }}>
-              <PenTool size={22} className="text-emerald-400" />
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-accu-50 border border-accu-200 shadow-sm">
+              <Cog size={26} className="text-accu-600 group-hover:rotate-45 transition-transform duration-500" />
             </div>
 
-            <h2 className="text-xl font-bold text-white mb-2 tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
-              Secure Engineering Design
+            <h2 className="text-xl font-bold text-slate-900 mb-2 tracking-tight font-heading">
+              Instant Quoting Platform
             </h2>
-            <p className="text-gray-400 text-sm leading-relaxed mb-8">
-              Audited design algorithms for shafts, bearings, and gears. Generates precise ASME/ISO calculation reports and local STEP files.
+            <p className="text-slate-600 text-sm leading-relaxed mb-6">
+              Instantaneous CAD B-Rep analysis and 2D drawing evaluation. Generates official AccuDesign quotations in ₹ INR.
             </p>
 
             <div className="flex flex-wrap gap-2 mb-6">
-              {['Shafts', 'Bearings', 'Gears', 'CAMs'].map(t => (
+              {['STEP Analysis', 'B-Rep Math', 'LME Live Prices', 'Official PDF'].map(t => (
                 <span key={t} className="px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider rounded-md
-                  text-emerald-300/70 bg-emerald-500/5 border border-emerald-500/10">
+                  text-accu-700 bg-accu-50 border border-accu-200">
                   {t}
                 </span>
               ))}
             </div>
 
-            <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold group-hover:gap-3 transition-all">
-              <span>Enter Design Cockpit</span>
+            <div className="flex items-center gap-2 text-accuorange-600 text-sm font-bold group-hover:gap-3 transition-all">
+              <span>Launch Quoting Engine</span>
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
         </button>
 
-        {/* Quoting Engine Card */}
+        {/* Design Tool Card */}
         <button
-          onClick={() => navigate('/quote')}
+          onClick={() => navigate('/design')}
           className="flex-1 group relative rounded-2xl p-8 text-left transition-all duration-300
-            hover:shadow-[0_8px_40px_rgba(6,182,212,0.08)] hover:-translate-y-1"
-          style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.005) 100%)',
-            border: '1px solid rgba(255,255,255,0.06)',
-          }}
+            bg-white border border-slate-200 shadow-md hover:shadow-xl hover:-translate-y-1 hover:border-slate-400"
         >
-          <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-            style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.04) 0%, transparent 60%)' }} />
-
           <div className="relative z-10">
-            <div className="w-14 h-14 rounded-xl flex items-center justify-center mb-6"
-              style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.12), rgba(6,182,212,0.02))', border: '1px solid rgba(6,182,212,0.15)' }}>
-              <Cog size={22} className="text-cyan-400" />
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-slate-50 border border-slate-200 shadow-sm">
+              <PenTool size={24} className="text-slate-700" />
             </div>
 
-            <h2 className="text-xl font-bold text-white mb-2 tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>
-              Precision Quoting Engine
+            <h2 className="text-xl font-bold text-slate-900 mb-2 tracking-tight font-heading">
+              Engineering Design Suite
             </h2>
-            <p className="text-gray-400 text-sm leading-relaxed mb-8">
-              Verify B-Rep geometries instantly. Encrypted cost estimation under audited industrial pricing tables.
+            <p className="text-slate-600 text-sm leading-relaxed mb-6">
+              Automated design calculation algorithms for shafts, bearings, and gears with ASME/ISO calculation reports.
             </p>
 
             <div className="flex flex-wrap gap-2 mb-6">
-              {['STEP Analysis', 'B-Rep Math', 'Secure Pricing', 'Audit Log'].map(t => (
+              {['Shafts', 'Bearings', 'Gears', 'CAMs'].map(t => (
                 <span key={t} className="px-2.5 py-1 text-[9px] font-mono font-bold uppercase tracking-wider rounded-md
-                  text-cyan-300/70 bg-cyan-500/5 border border-cyan-500/10">
+                  text-slate-700 bg-slate-100 border border-slate-200">
                   {t}
                 </span>
               ))}
             </div>
 
-            <div className="flex items-center gap-2 text-cyan-400 text-sm font-semibold group-hover:gap-3 transition-all">
-              <span>Open Quoting Engine</span>
+            <div className="flex items-center gap-2 text-accu-600 text-sm font-bold group-hover:gap-3 transition-all">
+              <span>Open Design Suite</span>
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
@@ -150,15 +138,15 @@ export default function Landing() {
       </div>
 
       {/* Footer badges */}
-      <div className="relative z-10 flex flex-wrap justify-center items-center gap-6 mt-16">
-        <div className="flex items-center gap-1.5 text-gray-600 text-[10px] font-mono tracking-widest uppercase">
-          <ShieldCheck size={12} className="text-emerald-500/60" /> ISO 27001 & ASME Compliant
+      <div className="relative z-10 flex flex-wrap justify-center items-center gap-6 mt-12">
+        <div className="flex items-center gap-1.5 text-slate-500 text-[10px] font-mono tracking-widest uppercase font-semibold">
+          <ShieldCheck size={13} className="text-accu-600" /> ISO 9001:2015 Precision Quality
         </div>
-        <div className="flex items-center gap-1.5 text-gray-600 text-[10px] font-mono tracking-widest uppercase">
-          <Leaf size={12} className="text-emerald-500/60" /> Carbon-Neutral Computing
+        <div className="flex items-center gap-1.5 text-slate-500 text-[10px] font-mono tracking-widest uppercase font-semibold">
+          <Leaf size={13} className="text-emerald-600" /> Pune, Maharashtra, India
         </div>
-        <div className="flex items-center gap-1.5 text-gray-600 text-[10px] font-mono tracking-widest uppercase">
-          <Lock size={12} className="text-cyan-500/60" /> ACCU AI Secured Core
+        <div className="flex items-center gap-1.5 text-slate-500 text-[10px] font-mono tracking-widest uppercase font-semibold">
+          <Lock size={13} className="text-accu-600" /> ACCU AI Quoting Automation
         </div>
       </div>
     </div>
