@@ -30,21 +30,28 @@ import tempfile, os, sys
 # Ensure backend directory is in sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import warnings
 import numpy as np
-for alias, target in [
-    ("bool8", "bool_"),
-    ("bool0", "bool_"),
-    ("object0", "object_"),
-    ("int0", "intp"),
-    ("uint0", "uintp"),
-    ("void0", "void"),
-    ("bytes0", "bytes_"),
-    ("str0", "str_"),
-    ("float0", "float64"),
-    ("complex0", "complex128"),
-]:
-    if not hasattr(np, alias) and hasattr(np, target):
-        setattr(np, alias, getattr(np, target))
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", DeprecationWarning)
+    for alias, target in [
+        ("bool8", "bool_"),
+        ("bool0", "bool_"),
+        ("object0", "object_"),
+        ("int0", "intp"),
+        ("uint0", "uintp"),
+        ("void0", "void"),
+        ("bytes0", "bytes_"),
+        ("str0", "str_"),
+        ("float0", "float64"),
+        ("complex0", "complex128"),
+    ]:
+        if not hasattr(np, alias) and hasattr(np, target):
+            try:
+                setattr(np, alias, getattr(np, target))
+            except Exception:
+                pass
 
 from dotenv import load_dotenv
 
