@@ -41,5 +41,6 @@ COPY --from=frontend-builder /app/dist ./dist
 # Expose default port
 EXPOSE 8000
 
-# Start FastAPI application using Uvicorn bound to Railway dynamic $PORT
-CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Start FastAPI application using Python entrypoint (handles dynamic PORT safely)
+CMD ["python", "backend/main.py"]
+
